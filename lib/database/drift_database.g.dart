@@ -292,8 +292,25 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _nationalCodeMeta = const VerificationMeta(
+    'nationalCode',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, defaultDosageMg, notes];
+  late final GeneratedColumn<int> nationalCode = GeneratedColumn<int>(
+    'national_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    defaultDosageMg,
+    notes,
+    nationalCode,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -332,6 +349,15 @@ class $MedicationsTable extends Medications
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('national_code')) {
+      context.handle(
+        _nationalCodeMeta,
+        nationalCode.isAcceptableOrUnknown(
+          data['national_code']!,
+          _nationalCodeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -357,6 +383,10 @@ class $MedicationsTable extends Medications
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      nationalCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}national_code'],
+      ),
     );
   }
 
@@ -371,11 +401,13 @@ class Medication extends DataClass implements Insertable<Medication> {
   final String name;
   final double? defaultDosageMg;
   final String? notes;
+  final int? nationalCode;
   const Medication({
     required this.id,
     required this.name,
     this.defaultDosageMg,
     this.notes,
+    this.nationalCode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -387,6 +419,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || nationalCode != null) {
+      map['national_code'] = Variable<int>(nationalCode);
     }
     return map;
   }
@@ -401,6 +436,9 @@ class Medication extends DataClass implements Insertable<Medication> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      nationalCode: nationalCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nationalCode),
     );
   }
 
@@ -414,6 +452,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       name: serializer.fromJson<String>(json['name']),
       defaultDosageMg: serializer.fromJson<double?>(json['defaultDosageMg']),
       notes: serializer.fromJson<String?>(json['notes']),
+      nationalCode: serializer.fromJson<int?>(json['nationalCode']),
     );
   }
   @override
@@ -424,6 +463,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       'name': serializer.toJson<String>(name),
       'defaultDosageMg': serializer.toJson<double?>(defaultDosageMg),
       'notes': serializer.toJson<String?>(notes),
+      'nationalCode': serializer.toJson<int?>(nationalCode),
     };
   }
 
@@ -432,6 +472,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     String? name,
     Value<double?> defaultDosageMg = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<int?> nationalCode = const Value.absent(),
   }) => Medication(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -439,6 +480,7 @@ class Medication extends DataClass implements Insertable<Medication> {
         ? defaultDosageMg.value
         : this.defaultDosageMg,
     notes: notes.present ? notes.value : this.notes,
+    nationalCode: nationalCode.present ? nationalCode.value : this.nationalCode,
   );
   Medication copyWithCompanion(MedicationsCompanion data) {
     return Medication(
@@ -448,6 +490,9 @@ class Medication extends DataClass implements Insertable<Medication> {
           ? data.defaultDosageMg.value
           : this.defaultDosageMg,
       notes: data.notes.present ? data.notes.value : this.notes,
+      nationalCode: data.nationalCode.present
+          ? data.nationalCode.value
+          : this.nationalCode,
     );
   }
 
@@ -457,13 +502,15 @@ class Medication extends DataClass implements Insertable<Medication> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('defaultDosageMg: $defaultDosageMg, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('nationalCode: $nationalCode')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, defaultDosageMg, notes);
+  int get hashCode =>
+      Object.hash(id, name, defaultDosageMg, notes, nationalCode);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -471,7 +518,8 @@ class Medication extends DataClass implements Insertable<Medication> {
           other.id == this.id &&
           other.name == this.name &&
           other.defaultDosageMg == this.defaultDosageMg &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.nationalCode == this.nationalCode);
 }
 
 class MedicationsCompanion extends UpdateCompanion<Medication> {
@@ -479,29 +527,34 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<String> name;
   final Value<double?> defaultDosageMg;
   final Value<String?> notes;
+  final Value<int?> nationalCode;
   const MedicationsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.defaultDosageMg = const Value.absent(),
     this.notes = const Value.absent(),
+    this.nationalCode = const Value.absent(),
   });
   MedicationsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
     this.defaultDosageMg = const Value.absent(),
     this.notes = const Value.absent(),
+    this.nationalCode = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Medication> custom({
     Expression<int>? id,
     Expression<String>? name,
     Expression<double>? defaultDosageMg,
     Expression<String>? notes,
+    Expression<int>? nationalCode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (defaultDosageMg != null) 'default_dosage_mg': defaultDosageMg,
       if (notes != null) 'notes': notes,
+      if (nationalCode != null) 'national_code': nationalCode,
     });
   }
 
@@ -510,12 +563,14 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Value<String>? name,
     Value<double?>? defaultDosageMg,
     Value<String?>? notes,
+    Value<int?>? nationalCode,
   }) {
     return MedicationsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       defaultDosageMg: defaultDosageMg ?? this.defaultDosageMg,
       notes: notes ?? this.notes,
+      nationalCode: nationalCode ?? this.nationalCode,
     );
   }
 
@@ -534,6 +589,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (nationalCode.present) {
+      map['national_code'] = Variable<int>(nationalCode.value);
+    }
     return map;
   }
 
@@ -543,7 +601,8 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('defaultDosageMg: $defaultDosageMg, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('nationalCode: $nationalCode')
           ..write(')'))
         .toString();
   }
@@ -2137,6 +2196,270 @@ class MedicationIntakeLogsCompanion
   }
 }
 
+class $AppSettingsTable extends AppSettings
+    with TableInfo<$AppSettingsTable, AppSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _themeModeMeta = const VerificationMeta(
+    'themeMode',
+  );
+  @override
+  late final GeneratedColumn<String> themeMode = GeneratedColumn<String>(
+    'theme_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('system'),
+  );
+  static const VerificationMeta _defaultUserIdMeta = const VerificationMeta(
+    'defaultUserId',
+  );
+  @override
+  late final GeneratedColumn<int> defaultUserId = GeneratedColumn<int>(
+    'default_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES users (id)',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, themeMode, defaultUserId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('theme_mode')) {
+      context.handle(
+        _themeModeMeta,
+        themeMode.isAcceptableOrUnknown(data['theme_mode']!, _themeModeMeta),
+      );
+    }
+    if (data.containsKey('default_user_id')) {
+      context.handle(
+        _defaultUserIdMeta,
+        defaultUserId.isAcceptableOrUnknown(
+          data['default_user_id']!,
+          _defaultUserIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AppSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppSetting(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      themeMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}theme_mode'],
+      )!,
+      defaultUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_user_id'],
+      ),
+    );
+  }
+
+  @override
+  $AppSettingsTable createAlias(String alias) {
+    return $AppSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class AppSetting extends DataClass implements Insertable<AppSetting> {
+  final int id;
+  final String themeMode;
+  final int? defaultUserId;
+  const AppSetting({
+    required this.id,
+    required this.themeMode,
+    this.defaultUserId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['theme_mode'] = Variable<String>(themeMode);
+    if (!nullToAbsent || defaultUserId != null) {
+      map['default_user_id'] = Variable<int>(defaultUserId);
+    }
+    return map;
+  }
+
+  AppSettingsCompanion toCompanion(bool nullToAbsent) {
+    return AppSettingsCompanion(
+      id: Value(id),
+      themeMode: Value(themeMode),
+      defaultUserId: defaultUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultUserId),
+    );
+  }
+
+  factory AppSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppSetting(
+      id: serializer.fromJson<int>(json['id']),
+      themeMode: serializer.fromJson<String>(json['themeMode']),
+      defaultUserId: serializer.fromJson<int?>(json['defaultUserId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'themeMode': serializer.toJson<String>(themeMode),
+      'defaultUserId': serializer.toJson<int?>(defaultUserId),
+    };
+  }
+
+  AppSetting copyWith({
+    int? id,
+    String? themeMode,
+    Value<int?> defaultUserId = const Value.absent(),
+  }) => AppSetting(
+    id: id ?? this.id,
+    themeMode: themeMode ?? this.themeMode,
+    defaultUserId: defaultUserId.present
+        ? defaultUserId.value
+        : this.defaultUserId,
+  );
+  AppSetting copyWithCompanion(AppSettingsCompanion data) {
+    return AppSetting(
+      id: data.id.present ? data.id.value : this.id,
+      themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
+      defaultUserId: data.defaultUserId.present
+          ? data.defaultUserId.value
+          : this.defaultUserId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSetting(')
+          ..write('id: $id, ')
+          ..write('themeMode: $themeMode, ')
+          ..write('defaultUserId: $defaultUserId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, themeMode, defaultUserId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppSetting &&
+          other.id == this.id &&
+          other.themeMode == this.themeMode &&
+          other.defaultUserId == this.defaultUserId);
+}
+
+class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
+  final Value<int> id;
+  final Value<String> themeMode;
+  final Value<int?> defaultUserId;
+  const AppSettingsCompanion({
+    this.id = const Value.absent(),
+    this.themeMode = const Value.absent(),
+    this.defaultUserId = const Value.absent(),
+  });
+  AppSettingsCompanion.insert({
+    this.id = const Value.absent(),
+    this.themeMode = const Value.absent(),
+    this.defaultUserId = const Value.absent(),
+  });
+  static Insertable<AppSetting> custom({
+    Expression<int>? id,
+    Expression<String>? themeMode,
+    Expression<int>? defaultUserId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (themeMode != null) 'theme_mode': themeMode,
+      if (defaultUserId != null) 'default_user_id': defaultUserId,
+    });
+  }
+
+  AppSettingsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? themeMode,
+    Value<int?>? defaultUserId,
+  }) {
+    return AppSettingsCompanion(
+      id: id ?? this.id,
+      themeMode: themeMode ?? this.themeMode,
+      defaultUserId: defaultUserId ?? this.defaultUserId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (themeMode.present) {
+      map['theme_mode'] = Variable<String>(themeMode.value);
+    }
+    if (defaultUserId.present) {
+      map['default_user_id'] = Variable<int>(defaultUserId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('themeMode: $themeMode, ')
+          ..write('defaultUserId: $defaultUserId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2149,6 +2472,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $MedicationScheduleRulesTable(this);
   late final $MedicationIntakeLogsTable medicationIntakeLogs =
       $MedicationIntakeLogsTable(this);
+  late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2159,6 +2483,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     medicationPlans,
     medicationScheduleRules,
     medicationIntakeLogs,
+    appSettings,
   ];
 }
 
@@ -2222,6 +2547,24 @@ final class $$UsersTableReferences
     final cache = $_typedResult.readTableOrNull(
       _medicationIntakeLogsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$AppSettingsTable, List<AppSetting>>
+  _appSettingsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.appSettings,
+    aliasName: $_aliasNameGenerator(db.users.id, db.appSettings.defaultUserId),
+  );
+
+  $$AppSettingsTableProcessedTableManager get appSettingsRefs {
+    final manager = $$AppSettingsTableTableManager(
+      $_db,
+      $_db.appSettings,
+    ).filter((f) => f.defaultUserId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_appSettingsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -2292,6 +2635,31 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
           }) => $$MedicationIntakeLogsTableFilterComposer(
             $db: $db,
             $table: $db.medicationIntakeLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> appSettingsRefs(
+    Expression<bool> Function($$AppSettingsTableFilterComposer f) f,
+  ) {
+    final $$AppSettingsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.appSettings,
+      getReferencedColumn: (t) => t.defaultUserId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AppSettingsTableFilterComposer(
+            $db: $db,
+            $table: $db.appSettings,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2395,6 +2763,31 @@ class $$UsersTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> appSettingsRefs<T extends Object>(
+    Expression<T> Function($$AppSettingsTableAnnotationComposer a) f,
+  ) {
+    final $$AppSettingsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.appSettings,
+      getReferencedColumn: (t) => t.defaultUserId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AppSettingsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.appSettings,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableTableManager
@@ -2413,6 +2806,7 @@ class $$UsersTableTableManager
           PrefetchHooks Function({
             bool medicationPlansRefs,
             bool medicationIntakeLogsRefs,
+            bool appSettingsRefs,
           })
         > {
   $$UsersTableTableManager(_$AppDatabase db, $UsersTable table)
@@ -2452,12 +2846,14 @@ class $$UsersTableTableManager
               ({
                 medicationPlansRefs = false,
                 medicationIntakeLogsRefs = false,
+                appSettingsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (medicationPlansRefs) db.medicationPlans,
                     if (medicationIntakeLogsRefs) db.medicationIntakeLogs,
+                    if (appSettingsRefs) db.appSettings,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -2504,6 +2900,27 @@ class $$UsersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (appSettingsRefs)
+                        await $_getPrefetchedData<
+                          User,
+                          $UsersTable,
+                          AppSetting
+                        >(
+                          currentTable: table,
+                          referencedTable: $$UsersTableReferences
+                              ._appSettingsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UsersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).appSettingsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.defaultUserId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -2527,6 +2944,7 @@ typedef $$UsersTableProcessedTableManager =
       PrefetchHooks Function({
         bool medicationPlansRefs,
         bool medicationIntakeLogsRefs,
+        bool appSettingsRefs,
       })
     >;
 typedef $$MedicationsTableCreateCompanionBuilder =
@@ -2535,6 +2953,7 @@ typedef $$MedicationsTableCreateCompanionBuilder =
       required String name,
       Value<double?> defaultDosageMg,
       Value<String?> notes,
+      Value<int?> nationalCode,
     });
 typedef $$MedicationsTableUpdateCompanionBuilder =
     MedicationsCompanion Function({
@@ -2542,6 +2961,7 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<double?> defaultDosageMg,
       Value<String?> notes,
+      Value<int?> nationalCode,
     });
 
 final class $$MedicationsTableReferences
@@ -2629,6 +3049,11 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get nationalCode => $composableBuilder(
+    column: $table.nationalCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> medicationPlansRefs(
     Expression<bool> Function($$MedicationPlansTableFilterComposer f) f,
   ) {
@@ -2708,6 +3133,11 @@ class $$MedicationsTableOrderingComposer
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get nationalCode => $composableBuilder(
+    column: $table.nationalCode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MedicationsTableAnnotationComposer
@@ -2732,6 +3162,11 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<int> get nationalCode => $composableBuilder(
+    column: $table.nationalCode,
+    builder: (column) => column,
+  );
 
   Expression<T> medicationPlansRefs<T extends Object>(
     Expression<T> Function($$MedicationPlansTableAnnotationComposer a) f,
@@ -2820,11 +3255,13 @@ class $$MedicationsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<double?> defaultDosageMg = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<int?> nationalCode = const Value.absent(),
               }) => MedicationsCompanion(
                 id: id,
                 name: name,
                 defaultDosageMg: defaultDosageMg,
                 notes: notes,
+                nationalCode: nationalCode,
               ),
           createCompanionCallback:
               ({
@@ -2832,11 +3269,13 @@ class $$MedicationsTableTableManager
                 required String name,
                 Value<double?> defaultDosageMg = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<int?> nationalCode = const Value.absent(),
               }) => MedicationsCompanion.insert(
                 id: id,
                 name: name,
                 defaultDosageMg: defaultDosageMg,
                 notes: notes,
+                nationalCode: nationalCode,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -4606,6 +5045,281 @@ typedef $$MedicationIntakeLogsTableProcessedTableManager =
       MedicationIntakeLog,
       PrefetchHooks Function({bool planId, bool medicationId, bool userId})
     >;
+typedef $$AppSettingsTableCreateCompanionBuilder =
+    AppSettingsCompanion Function({
+      Value<int> id,
+      Value<String> themeMode,
+      Value<int?> defaultUserId,
+    });
+typedef $$AppSettingsTableUpdateCompanionBuilder =
+    AppSettingsCompanion Function({
+      Value<int> id,
+      Value<String> themeMode,
+      Value<int?> defaultUserId,
+    });
+
+final class $$AppSettingsTableReferences
+    extends BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting> {
+  $$AppSettingsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $UsersTable _defaultUserIdTable(_$AppDatabase db) =>
+      db.users.createAlias(
+        $_aliasNameGenerator(db.appSettings.defaultUserId, db.users.id),
+      );
+
+  $$UsersTableProcessedTableManager? get defaultUserId {
+    final $_column = $_itemColumn<int>('default_user_id');
+    if ($_column == null) return null;
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_defaultUserIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AppSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$UsersTableFilterComposer get defaultUserId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AppSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$UsersTableOrderingComposer get defaultUserId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AppSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get themeMode =>
+      $composableBuilder(column: $table.themeMode, builder: (column) => column);
+
+  $$UsersTableAnnotationComposer get defaultUserId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AppSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppSettingsTable,
+          AppSetting,
+          $$AppSettingsTableFilterComposer,
+          $$AppSettingsTableOrderingComposer,
+          $$AppSettingsTableAnnotationComposer,
+          $$AppSettingsTableCreateCompanionBuilder,
+          $$AppSettingsTableUpdateCompanionBuilder,
+          (AppSetting, $$AppSettingsTableReferences),
+          AppSetting,
+          PrefetchHooks Function({bool defaultUserId})
+        > {
+  $$AppSettingsTableTableManager(_$AppDatabase db, $AppSettingsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> themeMode = const Value.absent(),
+                Value<int?> defaultUserId = const Value.absent(),
+              }) => AppSettingsCompanion(
+                id: id,
+                themeMode: themeMode,
+                defaultUserId: defaultUserId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> themeMode = const Value.absent(),
+                Value<int?> defaultUserId = const Value.absent(),
+              }) => AppSettingsCompanion.insert(
+                id: id,
+                themeMode: themeMode,
+                defaultUserId: defaultUserId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$AppSettingsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({defaultUserId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (defaultUserId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.defaultUserId,
+                                referencedTable: $$AppSettingsTableReferences
+                                    ._defaultUserIdTable(db),
+                                referencedColumn: $$AppSettingsTableReferences
+                                    ._defaultUserIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AppSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppSettingsTable,
+      AppSetting,
+      $$AppSettingsTableFilterComposer,
+      $$AppSettingsTableOrderingComposer,
+      $$AppSettingsTableAnnotationComposer,
+      $$AppSettingsTableCreateCompanionBuilder,
+      $$AppSettingsTableUpdateCompanionBuilder,
+      (AppSetting, $$AppSettingsTableReferences),
+      AppSetting,
+      PrefetchHooks Function({bool defaultUserId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4623,4 +5337,6 @@ class $AppDatabaseManager {
       );
   $$MedicationIntakeLogsTableTableManager get medicationIntakeLogs =>
       $$MedicationIntakeLogsTableTableManager(_db, _db.medicationIntakeLogs);
+  $$AppSettingsTableTableManager get appSettings =>
+      $$AppSettingsTableTableManager(_db, _db.appSettings);
 }

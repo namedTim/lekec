@@ -5,5 +5,6 @@ class Medications extends Table {
   TextColumn get name => text()();
   RealColumn get defaultDosageMg => real().nullable()();
   TextColumn get notes => text().nullable()();
+  IntColumn get nationalCode => integer().nullable()();
 
 }

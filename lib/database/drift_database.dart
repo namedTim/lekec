@@ -10,6 +10,7 @@ import 'package:lekec/database/tables/medication_plans.dart';
 import 'package:lekec/database/tables/medication_schedule_rule.dart';
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/database/tables/users.dart';
+import 'package:lekec/database/tables/app_settings.dart';
 
 part 'drift_database.g.dart';
 
@@ -20,6 +21,7 @@ part 'drift_database.g.dart';
     MedicationPlans,
     MedicationScheduleRules,
     MedicationIntakeLogs,
+    AppSettings,
   ],
 )
 class AppDatabase extends _$AppDatabase {

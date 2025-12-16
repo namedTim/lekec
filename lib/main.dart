@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lekec/database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
+import 'ui/screens/meds.dart';
+import 'ui/screens/meds_history.dart';
 import 'features/core/providers/database_provider.dart';
+import 'features/core/providers/theme_provider.dart';
 
 late final AppDatabase db;
 
@@ -45,10 +48,41 @@ Future<void> testInsert(AppDatabase db) async {
 }
 
 final _router = GoRouter(
+  initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const MyHomePage(title: 'Lekec'),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return ScaffoldWithNavBar(navigationShell: navigationShell);
+      },
+      branches: [
+        // Branch 1: Zdravila (Meds)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/meds',
+              builder: (context, state) => const MedsScreen(),
+            ),
+          ],
+        ),
+        // Branch 2: Tekoči pregled (Home)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const MyHomePage(title: 'Lekec'),
+            ),
+          ],
+        ),
+        // Branch 3: Zgodovina (History)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/history',
+              builder: (context, state) => const MedsHistoryScreen(),
+            ),
+          ],
+        ),
+      ],
     ),
     GoRoute(
       path: '/dev',
@@ -57,13 +91,56 @@ final _router = GoRouter(
   ],
 );
 
+class ScaffoldWithNavBar extends StatelessWidget {
+  const ScaffoldWithNavBar({
+    required this.navigationShell,
+    Key? key,
+  }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
-class MyApp extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: navigationShell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (int index) => _onTap(context, index),
+        destinations: const <NavigationDestination>[
+          NavigationDestination(
+            icon: Icon(Icons.medication),
+            label: 'Zdravila',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.home),
+            label: 'Tekoči pregled',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.manage_search),
+            label: 'Zgodovina',
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onTap(BuildContext context, int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
+}
+
+
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: 'Lekec',
       theme: ThemeData(
@@ -84,6 +161,13 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 79, 183, 58)),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color.fromARGB(255, 79, 183, 58),
+          brightness: Brightness.dark,
+        ),
+      ),
+      themeMode: themeMode.value ?? ThemeMode.system,
       routerConfig: _router,
     );
   }
@@ -145,20 +229,11 @@ class _MyHomePageState extends State<MyHomePage> {
           // axis because Columns are vertical (the cross axis would be
           // horizontal).
           //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint" 
           // action in the IDE, or press "p" in the console), to see the
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            // Developer settings button
-            ElevatedButton.icon(
-              onPressed: () {
-                context.push('/dev');
-              },
-              icon: const Icon(Icons.developer_mode),
-              label: const Text('Developer Settings'),
-            ),
-            const SizedBox(height: 16),
             const Text('You have pushed the button this many times:'),
             Text(
               '$_counter',
