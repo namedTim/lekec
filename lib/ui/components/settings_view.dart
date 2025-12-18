@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../../features/core/providers/theme_provider.dart';
 
 class SettingsView extends ConsumerWidget {
@@ -23,7 +24,7 @@ class SettingsView extends ConsumerWidget {
                   loading: () => 'Pridobivanje nastavitve...',
                   error: (_, __) => 'NaN',
                 )),
-                leading: const Icon(Icons.brightness_6),
+                leading: const Icon(Symbols.brightness_6),
               ),
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -32,17 +33,17 @@ class SettingsView extends ConsumerWidget {
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.system,
                       label: Text('Sistemska'),
-                      icon: Icon(Icons.brightness_auto),
+                      icon: Icon(Symbols.brightness_auto),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.light,
                       label: Text('Svetla'),
-                      icon: Icon(Icons.light_mode),
+                      icon: Icon(Symbols.light_mode),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.dark,
                       label: Text('Temna'),
-                      icon: Icon(Icons.dark_mode),
+                      icon: Icon(Symbols.dark_mode),
                     ),
                   ],
                   selected: {themeMode.value ?? ThemeMode.system},
@@ -59,9 +60,9 @@ class SettingsView extends ConsumerWidget {
         const SizedBox(height: 16),
         Card(
           child: ListTile(
-            leading: const Icon(Icons.developer_mode),
+            leading: const Icon(Symbols.developer_mode),
             title: const Text('Developer Settings'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(Symbols.chevron_right),
             onTap: () {
               context.push('/dev');
             },

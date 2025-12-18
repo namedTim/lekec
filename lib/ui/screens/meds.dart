@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../components/settings_view.dart';
 
 enum MedsTab { medications, users, settings }
@@ -29,17 +30,18 @@ class _MedsScreenState extends State<MedsScreen> {
                     ButtonSegment<MedsTab>(
                       value: MedsTab.medications,
                       label: Text('Zdravila'),
-                      icon: Icon(Icons.medication_outlined),
+                      icon: Icon(Symbols.pill),
+                      
                     ),
                     ButtonSegment<MedsTab>(
                       value: MedsTab.users,
                       label: Text('Uporabniki'),
-                      icon: Icon(Icons.people_outline),
+                      icon: Icon(Symbols.group),
                     ),
                     ButtonSegment<MedsTab>(
                       value: MedsTab.settings,
                       label: Text('Nastavitve'),
-                      icon: Icon(Icons.settings_outlined),
+                      icon: Icon(Symbols.settings),
                     ),
                   ],
                   selected: {_selectedTab},
@@ -48,6 +50,9 @@ class _MedsScreenState extends State<MedsScreen> {
                       _selectedTab = newSelection.first;
                     });
                   },
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity(horizontal: -2),
+                  ),
                 ),
               ),
             ),

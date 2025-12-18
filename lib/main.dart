@@ -2,12 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:lekec/database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
+
+import 'ui/theme/app_theme.dart';
 
 late final AppDatabase db;
 
@@ -108,15 +111,15 @@ class ScaffoldWithNavBar extends StatelessWidget {
         onDestinationSelected: (int index) => _onTap(context, index),
         destinations: const <NavigationDestination>[
           NavigationDestination(
-            icon: Icon(Icons.medication),
+            icon: Icon(Symbols.pill),
             label: 'Zdravila',
           ),
           NavigationDestination(
-            icon: Icon(Icons.home),
+            icon: Icon(Symbols.home),
             label: 'Tekoči pregled',
           ),
           NavigationDestination(
-            icon: Icon(Icons.manage_search),
+            icon: Icon(Symbols.manage_search),
             label: 'Zgodovina',
           ),
         ],
@@ -143,30 +146,8 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'Lekec',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 79, 183, 58)),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 79, 183, 58),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: themeMode.value ?? ThemeMode.system,
       routerConfig: _router,
     );
