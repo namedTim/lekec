@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:material_symbols_icons/symbols.dart';
 import '../../features/dev/providers/dev_actions_provider.dart';
+import '../../features/core/providers/database_provider.dart';
+import '../../database/drift_database.dart';
 
 class DeveloperSettingsScreen extends ConsumerWidget {
   const DeveloperSettingsScreen({super.key});
@@ -9,6 +11,7 @@ class DeveloperSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final actions = ref.read(devActionsProvider);
+    final db = ref.read(databaseProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -19,28 +22,73 @@ class DeveloperSettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _DevCard(
-            icon: Icons.delete_forever,
+            icon: Symbols.delete_forever,
             color: Colors.red,
             title: "Clear Local Database",
             subtitle: "Deletes all tables and user data",
             onTap: () async {
               await actions.clearDatabase();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Database cleared")),
-              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Database cleared")),
+                );
+              }
             },
           ),
           const SizedBox(height: 16),
           _DevCard(
-            icon: Icons.add_chart,
+            icon: Symbols.add_chart,
             color: Colors.blue,
             title: "Insert Mock Data",
             subtitle: "Loads sample medications & schedules",
             onTap: () async {
               await actions.insertMockData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Mock data inserted")),
-              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Mock data inserted")),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _DevCard(
+            icon: Symbols.bug_report,
+            color: Colors.green,
+            title: "Test Insert User",
+            subtitle: "Insert test user and log output",
+            onTap: () async {
+              try {
+                final insertedId = await db.into(db.users).insert(
+                  UsersCompanion.insert(
+                    name: 'Test User',
+                  ),
+                );
+
+                final allUsers = await db.select(db.users).get();
+                final output = 'Inserted user id: $insertedId\nAll users: $allUsers';
+                print(output);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(output),
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              } catch (e, st) {
+                final error = 'Error inserting user: $e\n$st';
+                print(error);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -99,7 +147,7 @@ class _DevCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              const Icon(Symbols.chevron_right),
             ],
           ),
         ),

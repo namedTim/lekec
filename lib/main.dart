@@ -7,10 +7,13 @@ import 'package:lekec/database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
+import 'ui/screens/add_medication.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 
 import 'ui/theme/app_theme.dart';
+import 'ui/widgets/medication_card.dart';
+import 'ui/widgets/time_island.dart';
 
 late final AppDatabase db;
 
@@ -18,36 +21,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   db = AppDatabase();
-  await testInsert(db);
 
-  // Override the provider so the whole app uses the same 'db' instance
   runApp(ProviderScope(
     overrides: [
       databaseProvider.overrideWithValue(db),
-    ], 
+    ],
     child: const MyApp(),
   ));
-}
-
-Future<void> testInsert(AppDatabase db) async {
-  try {
-    // Use the generated companion constructor for required fields.
-    // For tables with `autoIncrement()` integer id columns, the
-    // `insert` call will return the generated id (int).
-    final insertedId = await db.into(db.users).insert(
-      UsersCompanion.insert(
-        name: 'Test User',
-      ),
-    );
-
-    print('Inserted user id: $insertedId');
-
-    final allUsers = await db.select(db.users).get();
-    print('All users: $allUsers');
-  } catch (e, st) {
-    print('Error inserting user: $e');
-    print(st);
-  }
 }
 
 final _router = GoRouter(
@@ -58,7 +38,6 @@ final _router = GoRouter(
         return ScaffoldWithNavBar(navigationShell: navigationShell);
       },
       branches: [
-        // Branch 1: Zdravila (Meds)
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -67,7 +46,6 @@ final _router = GoRouter(
             ),
           ],
         ),
-        // Branch 2: Tekoči pregled (Home)
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -76,7 +54,6 @@ final _router = GoRouter(
             ),
           ],
         ),
-        // Branch 3: Zgodovina (History)
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -91,14 +68,18 @@ final _router = GoRouter(
       path: '/dev',
       builder: (context, state) => const DeveloperSettingsScreen(),
     ),
+    GoRoute(
+      path: '/add-medication',
+      builder: (context, state) => const AddMedicationScreen(),
+    ),
   ],
 );
 
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({
     required this.navigationShell,
-    Key? key,
-  }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
+    super.key,
+  });
 
   final StatefulNavigationShell navigationShell;
 
@@ -135,11 +116,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
   }
 }
 
-
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
@@ -156,78 +135,237 @@ class MyApp extends ConsumerWidget {
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+  final controller = TimeIslandController();
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  bool _isExpanded = false;
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSpeedDial() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
     });
-    testInsert(db);
+  }
+
+  void _onAddSingleEntry() {
+    _toggleSpeedDial();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dodaj enkraten vnos')),
+    );
+  }
+
+  void _onAddNewMedication() {
+    _toggleSpeedDial();
+    context.push('/add-medication');
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint" 
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TimeIsland(
+                totalDuration: const Duration(minutes: 30),
+                remainingDuration: const Duration(minutes: 5),
+                controller: controller,
+              ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              children: <Widget>[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      "12:00",
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const MedicationCard(
+                  medName: 'Nalgesin S 250mg',
+                  dosage: '2 tableti',
+                  medicineRemaining: 'Preostane še 17 tablet',
+                  pillCount: 17,
+                  showName: false,
+                  username: 'jaz',
+                  userId: '1',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Speed dial options
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              if (!_isExpanded && _animation.value == 0) {
+                return const SizedBox.shrink();
+              }
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Option 2: Add new medication
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj novo zdravilo',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'add_medication',
+                              mini: true,
+                              onPressed: _onAddNewMedication,
+                              child: const Icon(Symbols.pill),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Option 1: Add single entry
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj enkraten vnos zdravila',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'add_entry',
+                              mini: true,
+                              onPressed: _onAddSingleEntry,
+                              child: const Icon(Symbols.add),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          // Main FAB
+          FloatingActionButton(
+            heroTag: 'main_fab',
+            onPressed: _toggleSpeedDial,
+            tooltip: 'Dodaj',
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(32),
+                bottomLeft: Radius.circular(32),
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: AnimatedRotation(
+              turns: _isExpanded ? 0.125 : 0,
+              duration: const Duration(milliseconds: 250),
+              child: const Icon(Symbols.pill),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

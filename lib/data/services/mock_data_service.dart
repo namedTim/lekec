@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' show Value;
+import 'package:lekec/database/tables/medications.dart';
 import '../../database/drift_database.dart';
 
 class MockDataService {
@@ -14,6 +15,7 @@ class MockDataService {
 
     final med1 = await db.into(db.medications).insert(
       MedicationsCompanion.insert(
+        medType: MedicationType.pills,
         name: "Nalgesin S",
         defaultDosageMg: Value(500.00),
         notes: Value("Če je potrebno."),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import '../components/settings_view.dart';
+import '../views/settings_view.dart';
 
 enum MedsTab { medications, users, settings }
 
