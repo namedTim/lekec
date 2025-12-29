@@ -8,8 +8,13 @@ import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'ui/screens/add_medication.dart';
+import 'ui/screens/medication_frequency_selection.dart';
+import 'ui/screens/simple_medication_planning.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
+import 'package:lekec/database/tables/medications.dart';
+import '/ui/screens/medication_frequency_selection.dart'
+    show FrequencyOption;
 
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
@@ -71,6 +76,27 @@ final _router = GoRouter(
     GoRoute(
       path: '/add-medication',
       builder: (context, state) => const AddMedicationScreen(),
+    ),
+    GoRoute(
+      path: '/add-medication/frequency',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return MedicationFrequencySelectionScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/simple-planning',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return SimpleMedicationPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+          frequency: extra['frequency'] as FrequencyOption,
+        );
+      },
     ),
   ],
 );

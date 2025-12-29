@@ -50,25 +50,28 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
 
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
-      final db = ref.read(databaseProvider);
-      
-      final medicationCompanion = MedicationsCompanion(
-        name: drift.Value(_medicationNameController.text),
-        medType: drift.Value(_selectedType),
-      );
+      // final db = ref.read(databaseProvider);
+      // 
+      // final medicationCompanion = MedicationsCompanion(
+      //   name: drift.Value(_medicationNameController.text),
+      //   medType: drift.Value(_selectedType),
+      // );
+      //
+      // try {
+      //   final id = await db.into(db.medications).insert(medicationCompanion);
+      //   developer.log('Medication added', name: 'AddMedication');
+      // } catch (e) {
+      //   developer.log('Error adding medication', name: 'AddMedication', error: e);
+      // }
 
-      try {
-        final id = await db.into(db.medications).insert(medicationCompanion);
-        developer.log('Medication added', name: 'AddMedication');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Zdravilo dodano: ${_medicationNameController.text}')),
-          );
-          context.pop();
-        }
-      } catch (e) {
-        developer.log('Error adding medication', name: 'AddMedication', error: e);
+      if (mounted) {
+        context.push(
+          '/add-medication/frequency',
+          extra: {
+            'name': _medicationNameController.text,
+            'medType': _selectedType,
+          },
+        );
       }
     }
   }
