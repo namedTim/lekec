@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/ui/components/quantity_selector.dart';
+import 'package:lekec/ui/components/step_progress_indicator.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
 import 'dart:developer' as developer;
 import 'medication_frequency_selection.dart' show FrequencyOption;
@@ -235,6 +236,10 @@ class _SimpleMedicationPlanningScreenState
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: const StepProgressIndicator(
+        currentStep: 3,
+        totalSteps: 3,
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:lekec/database/drift_database.dart';
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
+import 'package:lekec/ui/components/step_progress_indicator.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
@@ -200,6 +201,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
             ),
           ),
         ),
+      ),
+      bottomNavigationBar: const StepProgressIndicator(
+        currentStep: 1,
+        totalSteps: 3,
       ),
     );
   }

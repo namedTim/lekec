@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:lekec/database/tables/medications.dart';
+import 'package:lekec/ui/components/step_progress_indicator.dart';
 
 enum FrequencyOption {
   onceDaily,
@@ -132,8 +133,10 @@ class _MedicationFrequencySelectionScreenState
             ],
           ),
         ),
-      ),
-    );
+      ),      bottomNavigationBar: const StepProgressIndicator(
+        currentStep: 2,
+        totalSteps: 3,
+      ),    );
   }
 }
 
