@@ -74,8 +74,8 @@ class _MedicationFrequencySelectionScreenState
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Symbols.close),
-          onPressed: () => context.go('/'),
+          icon: const Icon(Symbols.arrow_back),
+          onPressed: () => context.pop(),
         ),
         title: const Text(''),
       ),

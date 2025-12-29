@@ -46,40 +46,46 @@ class _QuantitySelectorState extends State<QuantitySelector> {
     final colors = theme.colorScheme;
 
     return AlertDialog(
-      title: Text(widget.label),
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            onPressed: _value > widget.minValue ? _decrement : null,
-            icon: const Icon(Symbols.remove),
-            style: IconButton.styleFrom(
-              backgroundColor: colors.surfaceContainerHighest,
-              disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
-            ),
-          ),
-          const SizedBox(width: 24),
-          Container(
-            width: 60,
-            alignment: Alignment.center,
-            child: Text(
-              _value.toString(),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+      title: Text(
+        widget.label,
+        textAlign: TextAlign.center,
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      content: IntrinsicHeight(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: _value > widget.minValue ? _decrement : null,
+              icon: const Icon(Symbols.remove),
+              style: IconButton.styleFrom(
+                backgroundColor: colors.surfaceContainerHighest,
+                disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
               ),
             ),
-          ),
-          const SizedBox(width: 24),
-          IconButton(
-            onPressed: _value < widget.maxValue ? _increment : null,
-            icon: const Icon(Symbols.add),
-            style: IconButton.styleFrom(
-              backgroundColor: colors.surfaceContainerHighest,
-              disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
+            const SizedBox(width: 24),
+            Container(
+              width: 60,
+              alignment: Alignment.center,
+              child: Text(
+                _value.toString(),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 24),
+            IconButton(
+              onPressed: _value < widget.maxValue ? _increment : null,
+              icon: const Icon(Symbols.add),
+              style: IconButton.styleFrom(
+                backgroundColor: colors.surfaceContainerHighest,
+                disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
