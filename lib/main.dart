@@ -138,17 +138,19 @@ class ScaffoldWithNavBar extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (int index) => _onTap(context, index),
-        destinations: const <NavigationDestination>[
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        height: 64,
+        destinations: <NavigationDestination>[
           NavigationDestination(
-            icon: Icon(Symbols.pill),
+            icon: const Icon(Symbols.pill),
             label: 'Zdravila',
           ),
           NavigationDestination(
-            icon: Icon(Symbols.home),
+            icon: const Icon(Symbols.home),
             label: 'Tekoči pregled',
           ),
           NavigationDestination(
-            icon: Icon(Symbols.manage_search),
+            icon: const Icon(Symbols.manage_search),
             label: 'Zgodovina',
           ),
         ],
@@ -394,10 +396,18 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                       final timeKey = _groupedIntakes.keys.elementAt(index);
                       final intakesAtTime = _groupedIntakes[timeKey]!;
 
+                      // Determine if this time slot is in the past
+                      final now = DateTime.now();
+                      final parts = timeKey.split(':');
+                      final hour = int.parse(parts[0]);
+                      final minute = int.parse(parts[1]);
+                      final slotTime = DateTime(now.year, now.month, now.day, hour, minute);
+                      final isPast = slotTime.isBefore(now);
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TimeSlot(time: timeKey),
+                          TimeSlot(time: timeKey, isPast: isPast),
                           ...intakesAtTime.map((intakeData) {
                             final medication = intakeData['medication'] as Medication;
                             final plan = intakeData['plan'] as MedicationPlan;

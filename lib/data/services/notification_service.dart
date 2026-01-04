@@ -22,6 +22,26 @@ class NotificationService {
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Ljubljana'));
 
+    // Create notification channel for Android
+    const androidChannel = AndroidNotificationChannel(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      description: 'Opomniki za jemanje zdravil',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidPlugin != null) {
+      // Create the notification channel
+      await androidPlugin.createNotificationChannel(androidChannel);
+      developer.log('Created Android notification channel', name: 'NotificationService');
+    }
+
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -51,7 +71,13 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     
     if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
+      // Request notification permission
+      final granted = await androidPlugin.requestNotificationsPermission();
+      developer.log('Notification permission granted: $granted', name: 'NotificationService');
+      
+      // Request exact alarm permission for Android 12+
+      final exactAlarmGranted = await androidPlugin.requestExactAlarmsPermission();
+      developer.log('Exact alarm permission granted: $exactAlarmGranted', name: 'NotificationService');
     }
 
     final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
@@ -81,9 +107,15 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+    final tzNow = tz.TZDateTime.now(tz.local);
+    
+    developer.log('Scheduling notification ID $id for $medicationName', name: 'NotificationService');
+    developer.log('  Scheduled time: $tzScheduledTime', name: 'NotificationService');
+    developer.log('  Current time: $tzNow', name: 'NotificationService');
+    developer.log('  Is future: ${tzScheduledTime.isAfter(tzNow)}', name: 'NotificationService');
     
     // Don't schedule if time is in the past
-    if (tzScheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
+    if (tzScheduledTime.isBefore(tzNow)) {
       developer.log('Skipping past notification for $medicationName at $scheduledTime', 
         name: 'NotificationService');
       return;
@@ -115,21 +147,30 @@ class NotificationService {
         ? 'Vzemite $dosage'
         : 'Čas za jemanje zdravila';
 
-    await _notifications.zonedSchedule(
-      id,
-      'Vzemite zdravilo $medicationName',
-      body,
-      tzScheduledTime,
-      notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      payload: id.toString(),
-    );
+    try {
+      await _notifications.zonedSchedule(
+        id,
+        'Vzemite $medicationName',
+        body,
+        tzScheduledTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: id.toString(),
+      );
 
-    developer.log(
-      'Scheduled notification for $medicationName at $scheduledTime (ID: $id)',
-      name: 'NotificationService',
-    );
+      developer.log(
+        'Successfully scheduled notification for $medicationName at $scheduledTime (ID: $id)',
+        name: 'NotificationService',
+      );
+    } catch (e, st) {
+      developer.log(
+        'Failed to schedule notification for $medicationName',
+        error: e,
+        stackTrace: st,
+        name: 'NotificationService',
+      );
+    }
   }
 
   /// Cancel a specific notification
@@ -148,6 +189,41 @@ class NotificationService {
   Future<int> getPendingNotificationsCount() async {
     final pending = await _notifications.pendingNotificationRequests();
     return pending.length;
+  }
+
+  /// Log all pending notifications to debug console
+  Future<void> logPendingNotifications() async {
+    final pending = await _notifications.pendingNotificationRequests();
+    
+    developer.log('=== PENDING NOTIFICATIONS (${pending.length}) ===', 
+      name: 'NotificationService');
+    
+    for (final notification in pending) {
+      developer.log(
+        'ID: ${notification.id}, '
+        'Title: ${notification.title}, '
+        'Body: ${notification.body}, '
+        'Payload: ${notification.payload}',
+        name: 'NotificationService',
+      );
+    }
+    
+    developer.log('=== END PENDING NOTIFICATIONS ===', 
+      name: 'NotificationService');
+  }
+
+  /// Check if exact alarm permission is granted (Android 12+)
+  Future<bool> checkExactAlarmPermission() async {
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidPlugin != null) {
+      final canSchedule = await androidPlugin.canScheduleExactNotifications();
+      developer.log('Can schedule exact alarms: $canSchedule', name: 'NotificationService');
+      return canSchedule ?? false;
+    }
+    
+    return false;
   }
 
   /// Schedule notifications for all upcoming intakes
@@ -236,5 +312,268 @@ class NotificationService {
       case MedicationType.applications:
         return 'aplikacijo/e';
     }
+  }
+
+  /// Show an immediate test notification
+  Future<void> showTestNotification() async {
+    if (!_initialized) await initialize();
+
+    const androidDetails = AndroidNotificationDetails(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      channelDescription: 'Opomniki za jemanje zdravil',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.show(
+      999999,
+      'Test obvestilo',
+      'To je testno obvestilo za zdravila',
+      notificationDetails,
+    );
+
+    developer.log('Showed test notification', name: 'NotificationService');
+  }
+
+  /// Schedule a test notification 10 seconds from now
+  Future<void> scheduleTestNotification() async {
+    if (!_initialized) await initialize();
+
+    final now = DateTime.now();
+    final testTime = now.add(const Duration(seconds: 10));
+    
+    developer.log('Current time: $now', name: 'NotificationService');
+    developer.log('Scheduling test notification for: $testTime', name: 'NotificationService');
+    
+    final tzNow = tz.TZDateTime.now(tz.local);
+    final tzTestTime = tz.TZDateTime.from(testTime, tz.local);
+    
+    developer.log('TZ Current time: $tzNow', name: 'NotificationService');
+    developer.log('TZ Test time: $tzTestTime', name: 'NotificationService');
+    developer.log('Is test time in future? ${tzTestTime.isAfter(tzNow)}', name: 'NotificationService');
+    developer.log('Difference in seconds: ${tzTestTime.difference(tzNow).inSeconds}', name: 'NotificationService');
+    
+    // Try direct scheduling without going through scheduleIntakeNotification
+    const androidDetails = AndroidNotificationDetails(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      channelDescription: 'Opomniki za jemanje zdravil',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+      ticker: 'Test notification',
+    );
+
+    const notificationDetails = NotificationDetails(android: androidDetails);
+
+    try {
+      await _notifications.zonedSchedule(
+        999998,
+        'Test obvestilo čez 10 sekund',
+        'To bi moralo prikazati čez 10 sekund',
+        tzTestTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      
+      developer.log('✓ zonedSchedule call completed successfully', name: 'NotificationService');
+      
+      // Verify it was scheduled
+      final pending = await _notifications.pendingNotificationRequests();
+      final found = pending.any((n) => n.id == 999998);
+      developer.log('Notification in pending list: $found', name: 'NotificationService');
+      
+    } catch (e, st) {
+      developer.log('✗ Failed to schedule notification', error: e, stackTrace: st, name: 'NotificationService');
+    }
+  }
+
+  /// Alternative test with basic scheduling (30 seconds)
+  Future<void> scheduleBasicTestNotification() async {
+    if (!_initialized) await initialize();
+
+    final now = DateTime.now();
+    final testTime = now.add(const Duration(seconds: 30));
+    
+    // Create timezone-aware datetime
+    final tzTestTime = tz.TZDateTime(
+      tz.local,
+      testTime.year,
+      testTime.month,
+      testTime.day,
+      testTime.hour,
+      testTime.minute,
+      testTime.second,
+    );
+    
+    developer.log('=== BASIC TEST NOTIFICATION (30s) ===', name: 'NotificationService');
+    developer.log('Local time now: $now', name: 'NotificationService');
+    developer.log('Will fire at: $testTime', name: 'NotificationService');
+    developer.log('TZ time: $tzTestTime', name: 'NotificationService');
+    developer.log('Seconds until fire: ${testTime.difference(now).inSeconds}', name: 'NotificationService');
+    
+    const androidDetails = AndroidNotificationDetails(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      channelDescription: 'Opomniki za jemanje zdravil',
+      importance: Importance.max,
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+      ticker: 'Test after 30 seconds',
+      fullScreenIntent: true,
+      showWhen: true,
+    );
+
+    const notificationDetails = NotificationDetails(android: androidDetails);
+
+    try {
+      await _notifications.zonedSchedule(
+        999997,
+        'Test 30 sekund',
+        'To obvestilo bi moralo priti čez 30 sekund',
+        tzTestTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      
+      developer.log('✓ Scheduled 30s test notification (ID: 999997)', name: 'NotificationService');
+      
+      // Check if it's in the queue
+      final pending = await _notifications.pendingNotificationRequests();
+      final found = pending.where((n) => n.id == 999997).toList();
+      developer.log('Found in pending: ${found.isNotEmpty}', name: 'NotificationService');
+      if (found.isNotEmpty) {
+        developer.log('Pending notification: ${found.first}', name: 'NotificationService');
+      }
+      
+    } catch (e, st) {
+      developer.log('✗ Failed to schedule 30s test', error: e, stackTrace: st, name: 'NotificationService');
+    }
+  }
+
+  /// Check all notification settings and permissions
+  Future<Map<String, dynamic>> checkNotificationStatus() async {
+    final status = <String, dynamic>{};
+    
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidPlugin != null) {
+      status['canScheduleExact'] = await androidPlugin.canScheduleExactNotifications() ?? false;
+      status['notificationPermission'] = await androidPlugin.areNotificationsEnabled() ?? false;
+      
+      final pending = await _notifications.pendingNotificationRequests();
+      status['pendingCount'] = pending.length;
+      
+      // Get active notifications
+      final active = await _notifications.getActiveNotifications();
+      status['activeCount'] = active.length;
+    }
+    
+    status['initialized'] = _initialized;
+    
+    developer.log('=== NOTIFICATION STATUS ===', name: 'NotificationService');
+    status.forEach((key, value) {
+      developer.log('$key: $value', name: 'NotificationService');
+    });
+    developer.log('=== END STATUS ===', name: 'NotificationService');
+    
+    return status;
+  }
+
+  /// Schedule multiple test notifications at various intervals
+  Future<void> scheduleMultipleTestNotifications() async {
+    if (!_initialized) await initialize();
+
+    final intervals = [
+      1,    // 1 minute
+      2,    // 2 minutes
+      5,    // 5 minutes
+      7,    // 7 minutes
+      10,   // 10 minutes
+      20,   // 20 minutes
+      30,   // 30 minutes
+      60,   // 1 hour
+    ];
+
+    developer.log('=== SCHEDULING MULTIPLE TEST NOTIFICATIONS ===', name: 'NotificationService');
+    
+    final now = DateTime.now();
+    
+    for (int i = 0; i < intervals.length; i++) {
+      final minutes = intervals[i];
+      final testTime = now.add(Duration(minutes: minutes));
+      final tzTestTime = tz.TZDateTime(
+        tz.local,
+        testTime.year,
+        testTime.month,
+        testTime.day,
+        testTime.hour,
+        testTime.minute,
+        testTime.second,
+      );
+
+      final timeLabel = minutes < 60 
+          ? '$minutes min'
+          : '${minutes ~/ 60} h';
+
+      const androidDetails = AndroidNotificationDetails(
+        'medication_reminders',
+        'Opomniki za zdravila',
+        channelDescription: 'Opomniki za jemanje zdravil',
+        importance: Importance.max,
+        priority: Priority.max,
+        icon: '@mipmap/ic_launcher',
+        playSound: true,
+        enableVibration: true,
+      );
+
+      const notificationDetails = NotificationDetails(android: androidDetails);
+
+      try {
+        final notificationId = 990000 + i;
+        await _notifications.zonedSchedule(
+          notificationId,
+          'Test obvestilo ($timeLabel)',
+          'To obvestilo je bilo načrtovano za $timeLabel od zdaj',
+          tzTestTime,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        );
+
+        developer.log('✓ Scheduled notification for $timeLabel (ID: $notificationId) at $testTime', 
+          name: 'NotificationService');
+      } catch (e, st) {
+        developer.log('✗ Failed to schedule $timeLabel notification', 
+          error: e, stackTrace: st, name: 'NotificationService');
+      }
+    }
+
+    final pending = await _notifications.pendingNotificationRequests();
+    developer.log('Total pending notifications after scheduling: ${pending.length}', 
+      name: 'NotificationService');
+    developer.log('=== END MULTIPLE TEST SCHEDULING ===', name: 'NotificationService');
   }
 }
