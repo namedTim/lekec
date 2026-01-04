@@ -8,8 +8,12 @@ import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/ui/components/quantity_selector.dart';
 import 'package:lekec/ui/components/step_progress_indicator.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
+import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
+import 'package:lekec/data/services/notification_service.dart';
 import 'dart:developer' as developer;
+import 'dart:convert';
 import 'medication_frequency_selection.dart' show FrequencyOption;
+import 'package:lekec/main.dart' show homePageKey;
 
 class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -98,36 +102,99 @@ class _SimpleMedicationPlanningScreenState
     }
 
     final db = ref.read(databaseProvider);
+    final scheduleGenerator = ref.read(intakeScheduleGeneratorProvider);
+    final notificationService = NotificationService();
 
     try {
+      // 1. Insert medication
       final medicationId = await db.into(db.medications).insert(
-            MedicationsCompanion(
-              name: drift.Value(widget.medicationName),
-              medType: drift.Value(widget.medType),
-            ),
-          );
-
-      developer.log(
-        'Medication saved',
-        name: 'SimpleMedicationPlanning',
-        error: {
-          'id': medicationId,
-          'name': widget.medicationName,
-          'frequency': widget.frequency.toString(),
-          'startDate': _startDate?.toIso8601String(),
-          'firstIntakeTime': _firstIntakeTime?.format(context),
-          'quantity': _quantity,
-        },
+        MedicationsCompanion(
+          name: drift.Value(widget.medicationName),
+          medType: drift.Value(widget.medType),
+        ),
       );
+
+      developer.log('Medication inserted: ID $medicationId', name: 'SimpleMedicationPlanning');
+
+      // 2. Prepare schedule times
+      List<String> times = [];
+      String ruleType = 'daily';
+
+      switch (widget.frequency) {
+        case FrequencyOption.onceDaily:
+          times = [_formatTime(_firstIntakeTime!)];
+          ruleType = 'daily';
+          break;
+        case FrequencyOption.twiceDaily:
+          times = [_formatTime(_firstIntakeTime!)];
+          // Add second time (12 hours later)
+          final secondTime = TimeOfDay(
+            hour: (_firstIntakeTime!.hour + 12) % 24,
+            minute: _firstIntakeTime!.minute,
+          );
+          times.add(_formatTime(secondTime));
+          ruleType = 'daily';
+          break;
+        case FrequencyOption.asNeeded:
+          ruleType = 'asNeeded';
+          break;
+        case FrequencyOption.moreOptions:
+          // Should not reach here
+          return;
+      }
+
+      // 3. Create medication plan
+      final planId = await db.into(db.medicationPlans).insert(
+        MedicationPlansCompanion.insert(
+          userId: 1, // TODO: Get from current user
+          medicationId: medicationId,
+          startDate: _startDate ?? DateTime.now(),
+          dosageAmount: _quantity.toDouble(),
+          isActive: drift.Value(true),
+        ),
+      );
+
+      developer.log('Plan created: ID $planId', name: 'SimpleMedicationPlanning');
+
+      // 4. Create schedule rule (if not "as needed")
+      if (ruleType != 'asNeeded') {
+        await db.into(db.medicationScheduleRules).insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: ruleType,
+            timesOfDay: drift.Value(jsonEncode(times)),
+            isActive: drift.Value(true),
+          ),
+        );
+
+        developer.log('Schedule rule created with times: $times', name: 'SimpleMedicationPlanning');
+
+        // 5. Generate future intake entries
+        await scheduleGenerator.regeneratePlanSchedule(planId);
+        
+        // 6. Schedule notifications
+        await notificationService.scheduleAllUpcomingNotifications(db);
+        
+        developer.log('Generated intake schedule and notifications for plan $planId', 
+          name: 'SimpleMedicationPlanning');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${widget.medicationName} dodano!')),
+          SnackBar(
+            content: Text('${widget.medicationName} dodano!'),
+            backgroundColor: Colors.green,
+          ),
         );
+        
+        // Refresh home page to show new medication
+        homePageKey.currentState?.loadTodaysIntakes();
+        
         context.go('/');
       }
-    } catch (e) {
-      developer.log('Error saving medication', name: 'SimpleMedicationPlanning', error: e);
+    } catch (e, st) {
+      developer.log('Error saving medication plan', error: e, stackTrace: st, 
+        name: 'SimpleMedicationPlanning');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -137,6 +204,10 @@ class _SimpleMedicationPlanningScreenState
         );
       }
     }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   @override

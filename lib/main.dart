@@ -19,6 +19,11 @@ import '/ui/screens/medication_frequency_selection.dart'
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
 import 'ui/widgets/time_island.dart';
+import 'ui/components/time_slot.dart';
+import 'data/services/intake_schedule_generator.dart';
+import 'package:drift/drift.dart' as drift;
+import 'data/services/notification_service.dart';
+import 'data/services/background_task_service.dart';
 
 late final AppDatabase db;
 
@@ -26,6 +31,23 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   db = AppDatabase();
+
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+
+  // Generate upcoming intake schedules
+  final scheduleGenerator = IntakeScheduleGenerator(db);
+  await scheduleGenerator.generateScheduledIntakes();
+
+  // Schedule notifications for upcoming intakes
+  await notificationService.scheduleAllUpcomingNotifications(db);
+
+  // Initialize and schedule background tasks
+  final backgroundService = BackgroundTaskService();
+  await backgroundService.initialize();
+  await backgroundService.scheduleScheduleGeneration();
+  await backgroundService.scheduleNotificationRefresh();
 
   runApp(ProviderScope(
     overrides: [
@@ -55,7 +77,7 @@ final _router = GoRouter(
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => const MyHomePage(title: 'Lekec'),
+              builder: (context, state) => MyHomePage(key: homePageKey, title: 'Lekec'),
             ),
           ],
         ),
@@ -167,11 +189,16 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+final GlobalKey<_MyHomePageState> homePageKey = GlobalKey<_MyHomePageState>();
+
 class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
   final controller = TimeIslandController();
   late AnimationController _animationController;
   late Animation<double> _animation;
   bool _isExpanded = false;
+  final ScrollController _scrollController = ScrollController();
+  
+  Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
 
   @override
   void initState() {
@@ -184,12 +211,88 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+    loadTodaysIntakes();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> loadTodaysIntakes() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final intakes = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+        .get();
+
+    // Load medication details for each intake
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    
+    for (final intake in intakes) {
+      final plan = await (db.select(db.medicationPlans)
+            ..where((t) => t.id.equals(intake.planId)))
+          .getSingleOrNull();
+      
+      if (plan == null) continue;
+      
+      final medication = await (db.select(db.medications)
+            ..where((t) => t.id.equals(plan.medicationId)))
+          .getSingleOrNull();
+      
+      if (medication == null) continue;
+
+      final timeKey = '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
+      
+      grouped.putIfAbsent(timeKey, () => []);
+      grouped[timeKey]!.add({
+        'intake': intake,
+        'plan': plan,
+        'medication': medication,
+      });
+    }
+
+    setState(() {
+      _groupedIntakes = grouped;
+    });
+
+    // Scroll to next intake
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToNextIntake();
+    });
+  }
+
+  void _scrollToNextIntake() {
+    if (_groupedIntakes.isEmpty) return;
+    
+    final now = DateTime.now();
+    final times = _groupedIntakes.keys.toList();
+    
+    // Find the next upcoming time
+    int nextIndex = times.indexWhere((timeStr) {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final timeToday = DateTime(now.year, now.month, now.day, hour, minute);
+      return timeToday.isAfter(now);
+    });
+
+    if (nextIndex > 0 && _scrollController.hasClients) {
+      // Scroll to show the next time slot near the top
+      // Each time slot + cards is roughly 100-150px, adjust as needed
+      final offset = (nextIndex * 120.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _toggleSpeedDial() {
@@ -215,6 +318,45 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     context.push('/add-medication');
   }
 
+  String _getMedicationUnit(MedicationType type) {
+    switch (type) {
+      case MedicationType.pills:
+        return 'tableto/e';
+      case MedicationType.capsules:
+        return 'kapsulo/e';
+      case MedicationType.drops:
+        return 'kapljic/o';
+      case MedicationType.milliliters:
+        return 'ml';
+      case MedicationType.sprays:
+        return 'brizgov/a';
+      case MedicationType.injections:
+        return 'injekcijo/e';
+      case MedicationType.patches:
+        return 'obliž/ev';
+      case MedicationType.puffs:
+        return 'vdihov/a';
+      case MedicationType.applications:
+        return 'nanosov/a';
+      case MedicationType.ampules:
+        return 'ampulo/e';
+      case MedicationType.grams:
+        return 'gramov/a';
+      case MedicationType.milligrams:
+        return 'mg';
+      case MedicationType.micrograms:
+        return 'mcg';
+      case MedicationType.tablespoons:
+        return 'žličk/o';
+      case MedicationType.portions:
+        return 'porcijo/e';
+      case MedicationType.pieces:
+        return 'kos/ov';
+      case MedicationType.units:
+        return 'enot/o';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -235,37 +377,45 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
             ),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              children: <Widget>[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: colors.primary,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+            child: _groupedIntakes.isEmpty
+                ? Center(
                     child: Text(
-                      "12:00",
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                      'Ni načrtovanih zdravil za danes',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    itemCount: _groupedIntakes.length,
+                    itemBuilder: (context, index) {
+                      final timeKey = _groupedIntakes.keys.elementAt(index);
+                      final intakesAtTime = _groupedIntakes[timeKey]!;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TimeSlot(time: timeKey),
+                          ...intakesAtTime.map((intakeData) {
+                            final medication = intakeData['medication'] as Medication;
+                            final plan = intakeData['plan'] as MedicationPlan;
+
+                            return MedicationCard(
+                              medName: medication.name,
+                              dosage: '${plan.dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
+                              medicineRemaining: '', // TODO: Calculate remaining
+                              pillCount: 0, // TODO: Calculate from inventory
+                              showName: false,
+                              username: 'jaz', // TODO: Get from user
+                              userId: '1',
+                            );
+                          }),
+                        ],
+                      );
+                    },
                   ),
-                ),
-                const MedicationCard(
-                  medName: 'Nalgesin S 250mg',
-                  dosage: '2 tableti',
-                  medicineRemaining: 'Preostane še 17 tablet',
-                  pillCount: 17,
-                  showName: false,
-                  username: 'jaz',
-                  userId: '1',
-                ),
-              ],
-            ),
           ),
         ],
       ),
