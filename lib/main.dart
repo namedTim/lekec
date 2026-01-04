@@ -25,6 +25,8 @@ import 'package:drift/drift.dart' as drift;
 import 'data/services/notification_service.dart';
 import 'data/services/background_task_service.dart';
 
+export 'ui/widgets/medication_card.dart' show MedicationStatus;
+
 late final AppDatabase db;
 
 void main() async {
@@ -297,6 +299,50 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     }
   }
 
+  Future<void> _updateIntakeStatus(int intakeId, MedicationStatus newStatus) async {
+    try {
+      final wasTaken = newStatus == MedicationStatus.taken;
+      
+      await (db.update(db.medicationIntakeLogs)
+            ..where((t) => t.id.equals(intakeId)))
+          .write(MedicationIntakeLogsCompanion(
+            wasTaken: drift.Value(wasTaken),
+            takenTime: drift.Value(wasTaken ? DateTime.now() : null),
+          ));
+
+      // Refresh the view
+      await loadTodaysIntakes();
+
+      if (mounted) {
+        final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              wasTaken ? 'Označeno kot vzeto' : 'Označeno kot ne vzeto',
+              style: TextStyle(color: colors.onSurface),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: colors.surfaceContainerHighest,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Napaka: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _toggleSpeedDial() {
     setState(() {
       _isExpanded = !_isExpanded;
@@ -411,6 +457,17 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           ...intakesAtTime.map((intakeData) {
                             final medication = intakeData['medication'] as Medication;
                             final plan = intakeData['plan'] as MedicationPlan;
+                            final intake = intakeData['intake'] as MedicationIntakeLog;
+
+                            // Determine status based on wasTaken and time
+                            MedicationStatus status;
+                            if (intake.wasTaken) {
+                              status = MedicationStatus.taken;
+                            } else if (isPast) {
+                              status = MedicationStatus.notTaken;
+                            } else {
+                              status = MedicationStatus.upcoming;
+                            }
 
                             return MedicationCard(
                               medName: medication.name,
@@ -420,6 +477,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                               showName: false,
                               username: 'jaz', // TODO: Get from user
                               userId: '1',
+                              status: status,
+                              onStatusChanged: (newStatus) async {
+                                await _updateIntakeStatus(intake.id, newStatus);
+                              },
                             );
                           }),
                         ],
