@@ -13,8 +13,7 @@ import 'ui/screens/simple_medication_planning.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'package:lekec/database/tables/medications.dart';
-import '/ui/screens/medication_frequency_selection.dart'
-    show FrequencyOption;
+import '/ui/screens/medication_frequency_selection.dart' show FrequencyOption;
 
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
@@ -51,12 +50,12 @@ void main() async {
   await backgroundService.scheduleScheduleGeneration();
   await backgroundService.scheduleNotificationRefresh();
 
-  runApp(ProviderScope(
-    overrides: [
-      databaseProvider.overrideWithValue(db),
-    ],
-    child: const MyApp(),
-  ));
+  runApp(
+    ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: const MyApp(),
+    ),
+  );
 }
 
 final _router = GoRouter(
@@ -79,7 +78,8 @@ final _router = GoRouter(
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => MyHomePage(key: homePageKey, title: 'Lekec'),
+              builder: (context, state) =>
+                  MyHomePage(key: homePageKey, title: 'Lekec'),
             ),
           ],
         ),
@@ -126,10 +126,7 @@ final _router = GoRouter(
 );
 
 class ScaffoldWithNavBar extends StatelessWidget {
-  const ScaffoldWithNavBar({
-    required this.navigationShell,
-    super.key,
-  });
+  const ScaffoldWithNavBar({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
@@ -195,13 +192,14 @@ class MyHomePage extends StatefulWidget {
 
 final GlobalKey<_MyHomePageState> homePageKey = GlobalKey<_MyHomePageState>();
 
-class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+class _MyHomePageState extends State<MyHomePage>
+    with SingleTickerProviderStateMixin {
   final controller = TimeIslandController();
   late AnimationController _animationController;
   late Animation<double> _animation;
   bool _isExpanded = false;
   final ScrollController _scrollController = ScrollController();
-  
+
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
 
   @override
@@ -230,30 +228,32 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final intakes = await (db.select(db.medicationIntakeLogs)
-          ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
-          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
-          ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
-        .get();
+    final intakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
+              ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+              ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+            .get();
 
     // Load medication details for each intake
     final grouped = <String, List<Map<String, dynamic>>>{};
-    
+
     for (final intake in intakes) {
-      final plan = await (db.select(db.medicationPlans)
-            ..where((t) => t.id.equals(intake.planId)))
-          .getSingleOrNull();
-      
+      final plan = await (db.select(
+        db.medicationPlans,
+      )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
+
       if (plan == null) continue;
-      
-      final medication = await (db.select(db.medications)
-            ..where((t) => t.id.equals(plan.medicationId)))
-          .getSingleOrNull();
-      
+
+      final medication = await (db.select(
+        db.medications,
+      )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
+
       if (medication == null) continue;
 
-      final timeKey = '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
-      
+      final timeKey =
+          '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
+
       grouped.putIfAbsent(timeKey, () => []);
       grouped[timeKey]!.add({
         'intake': intake,
@@ -274,10 +274,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
   void _scrollToNextIntake() {
     if (_groupedIntakes.isEmpty) return;
-    
+
     final now = DateTime.now();
     final times = _groupedIntakes.keys.toList();
-    
+
     // Find the next upcoming time
     int nextIndex = times.indexWhere((timeStr) {
       final parts = timeStr.split(':');
@@ -290,7 +290,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     if (nextIndex > 0 && _scrollController.hasClients) {
       // Scroll to show the next time slot near the top
       // Each time slot + cards is roughly 100-150px, adjust as needed
-      final offset = (nextIndex * 120.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+      final offset = (nextIndex * 120.0).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
       _scrollController.animateTo(
         offset,
         duration: const Duration(milliseconds: 500),
@@ -299,16 +302,64 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _updateIntakeStatus(int intakeId, MedicationStatus newStatus) async {
+  Future<void> _updateIntakeStatus(
+    int intakeId,
+    MedicationStatus newStatus,
+  ) async {
     try {
       final wasTaken = newStatus == MedicationStatus.taken;
-      
-      await (db.update(db.medicationIntakeLogs)
-            ..where((t) => t.id.equals(intakeId)))
-          .write(MedicationIntakeLogsCompanion(
-            wasTaken: drift.Value(wasTaken),
-            takenTime: drift.Value(wasTaken ? DateTime.now() : null),
-          ));
+
+      // Get the intake log to find the plan and medication
+      final intake = await (db.select(
+        db.medicationIntakeLogs,
+      )..where((t) => t.id.equals(intakeId))).getSingleOrNull();
+
+      if (intake == null) return;
+
+      final plan = await (db.select(
+        db.medicationPlans,
+      )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
+
+      if (plan == null) return;
+
+      final medication = await (db.select(
+        db.medications,
+      )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
+
+      // Update the intake log
+      await (db.update(
+        db.medicationIntakeLogs,
+      )..where((t) => t.id.equals(intakeId))).write(
+        MedicationIntakeLogsCompanion(
+          wasTaken: drift.Value(wasTaken),
+          takenTime: drift.Value(wasTaken ? DateTime.now() : null),
+        ),
+      );
+
+      // If marking as taken, decrease the medication count
+      if (wasTaken &&
+          medication != null &&
+          medication.dosagesRemaining != null) {
+        final newRemaining = medication.dosagesRemaining! - plan.dosageAmount;
+        await (db.update(
+          db.medications,
+        )..where((t) => t.id.equals(medication.id))).write(
+          MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+        );
+      }
+
+      // If marking as not taken (was previously taken), increase the count back
+      if (!wasTaken &&
+          intake.wasTaken &&
+          medication != null &&
+          medication.dosagesRemaining != null) {
+        final newRemaining = medication.dosagesRemaining! + plan.dosageAmount;
+        await (db.update(
+          db.medications,
+        )..where((t) => t.id.equals(medication.id))).write(
+          MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+        );
+      }
 
       // Refresh the view
       await loadTodaysIntakes();
@@ -318,7 +369,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              wasTaken ? 'Vnos zdravila zabeležen' : 'Zdravilo označeno kot ne-vzeto',
+              wasTaken
+                  ? 'Vnos zdravila zabeležen'
+                  : 'Zdravilo označeno kot ne-vzeto',
               style: TextStyle(color: colors.onSurface),
             ),
             duration: const Duration(seconds: 2),
@@ -356,9 +409,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
   void _onAddSingleEntry() {
     _toggleSpeedDial();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dodaj enkraten vnos')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Dodaj enkraten vnos')));
   }
 
   void _onAddNewMedication() {
@@ -447,7 +500,13 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                       final parts = timeKey.split(':');
                       final hour = int.parse(parts[0]);
                       final minute = int.parse(parts[1]);
-                      final slotTime = DateTime(now.year, now.month, now.day, hour, minute);
+                      final slotTime = DateTime(
+                        now.year,
+                        now.month,
+                        now.day,
+                        hour,
+                        minute,
+                      );
                       final isPast = slotTime.isBefore(now);
 
                       return Column(
@@ -455,9 +514,11 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         children: [
                           TimeSlot(time: timeKey, isPast: isPast),
                           ...intakesAtTime.map((intakeData) {
-                            final medication = intakeData['medication'] as Medication;
+                            final medication =
+                                intakeData['medication'] as Medication;
                             final plan = intakeData['plan'] as MedicationPlan;
-                            final intake = intakeData['intake'] as MedicationIntakeLog;
+                            final intake =
+                                intakeData['intake'] as MedicationIntakeLog;
 
                             // Determine status based on wasTaken and time
                             MedicationStatus status;
@@ -471,8 +532,10 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
                             return MedicationCard(
                               medName: medication.name,
-                              dosage: '${plan.dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
-                              medicineRemaining: '', // TODO: Calculate remaining
+                              dosage:
+                                  '${plan.dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
+                              medicineRemaining:
+                                  '', // TODO: Calculate remaining
                               pillCount: 0, // TODO: Calculate from inventory
                               showName: false,
                               username: 'jaz', // TODO: Get from user

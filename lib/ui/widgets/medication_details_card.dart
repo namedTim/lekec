@@ -14,6 +14,7 @@ class MedicationDetailsCard extends StatelessWidget {
     required this.times,
     required this.medType,
     this.onAddMedication,
+    this.onDelete,
   });
 
   final String medName;
@@ -23,6 +24,7 @@ class MedicationDetailsCard extends StatelessWidget {
   final List<String> times; // e.g., ["8:00", "20:00"]
   final MedicationType medType;
   final Function(int)? onAddMedication;
+  final VoidCallback? onDelete;
 
   Color _getPillCountColor(int count) {
     if (count >= 20) {
@@ -65,96 +67,116 @@ class MedicationDetailsCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+    return Dismissible(
+      key: Key('medication_$medName${DateTime.now().millisecondsSinceEpoch}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: colors.error,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Icon(Symbols.delete, color: colors.onError, size: 36),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Main content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Medicine name
-                Text(
-                  medName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          onDelete?.call();
+        }
+        return false; // Don't actually dismiss, let parent handle it
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Main content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Medicine name
+                  Text(
+                    medName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 6),
+                  const SizedBox(height: 6),
 
-                // Dosage
-                Text(
-                  dosage,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
+                  // Dosage
+                  Text(
+                    dosage,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
-                // Frequency and times
-                Row(
-                  children: [
-                    Icon(Symbols.schedule, size: 16, color: colors.primary),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '$frequency ${_getTimesText()}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
+                  // Frequency and times
+                  Row(
+                    children: [
+                      Icon(Symbols.schedule, size: 16, color: colors.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '$frequency ${_getTimesText()}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Remaining pills chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                // Remaining pills chip
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getPillCountColor(pillsRemaining),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$pillsRemaining preostalo',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: _getPillCountColor(pillsRemaining),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$pillsRemaining preostalo',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Add button
-          Container(
-            margin: const EdgeInsets.only(left: 12),
-            decoration: BoxDecoration(
-              color: colors.primary,
-              shape: BoxShape.circle,
+            // Add button
+            Container(
+              margin: const EdgeInsets.only(left: 12),
+              decoration: BoxDecoration(
+                color: colors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                onPressed: () => _handleAddMedication(context),
+                icon: const Icon(Symbols.add),
+                color: colors.onPrimary,
+                tooltip: 'Dodaj zdravilo',
+              ),
             ),
-            child: IconButton(
-              onPressed: () => _handleAddMedication(context),
-              icon: const Icon(Symbols.add),
-              color: colors.onPrimary,
-              tooltip: 'Dodaj zdravilo',
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' as drift;
 import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
 import '../components/speed_dial_fab.dart';
+import '../components/confirmation_dialog.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../utils/medication_utils.dart';
@@ -22,6 +23,52 @@ class MedsScreen extends ConsumerStatefulWidget {
 
 class _MedsScreenState extends ConsumerState<MedsScreen> {
   MedsTab _selectedTab = MedsTab.medications;
+  int _refreshKey = 0;
+
+  void _refreshMedications() {
+    setState(() {
+      _refreshKey++;
+    });
+  }
+
+  Future<void> _deleteMedication(
+    int medicationId,
+    String medicationName,
+  ) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Izbris zdravila',
+      message: 'Ali želite izbrisati zdravilo $medicationName?',
+    );
+
+    if (confirmed) {
+      try {
+        final db = ref.read(databaseProvider);
+        await (db.delete(
+          db.medications,
+        )..where((m) => m.id.equals(medicationId))).go();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Zdravilo $medicationName je bilo izbrisano'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _refreshMedications();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Napaka pri brisanju: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +145,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
         return FutureBuilder(
+          key: ValueKey(_refreshKey),
           future: _loadMedications(db),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -133,6 +181,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                       ),
                     );
                   },
+                  onDelete: () => _deleteMedication(
+                    med['id'] as int,
+                    med['name'] as String,
+                  ),
                 );
               },
             );
@@ -175,6 +227,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
       }
 
       result.add({
+        'id': medication.id,
         'name': medication.name,
         'dosage': plan != null
             ? '${plan.dosageAmount.toInt()} ${getMedicationUnit(medication.medType)}'
