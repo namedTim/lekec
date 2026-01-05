@@ -318,7 +318,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              wasTaken ? 'Označeno kot vzeto' : 'Označeno kot ne vzeto',
+              wasTaken ? 'Vnos zdravila zabeležen' : 'Zdravilo označeno kot ne-vzeto',
               style: TextStyle(color: colors.onSurface),
             ),
             duration: const Duration(seconds: 2),

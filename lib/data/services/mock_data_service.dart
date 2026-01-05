@@ -17,7 +17,7 @@ class MockDataService {
       MedicationsCompanion.insert(
         medType: MedicationType.pills,
         name: "Nalgesin S",
-        defaultDosageMg: Value(500.00),
+
         notes: Value("Če je potrebno."),
       ),
     );

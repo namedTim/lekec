@@ -272,12 +272,12 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _defaultDosageMgMeta = const VerificationMeta(
-    'defaultDosageMg',
+  static const VerificationMeta _dosagesRemainingMeta = const VerificationMeta(
+    'dosagesRemaining',
   );
   @override
-  late final GeneratedColumn<double> defaultDosageMg = GeneratedColumn<double>(
-    'default_dosage_mg',
+  late final GeneratedColumn<double> dosagesRemaining = GeneratedColumn<double>(
+    'dosages_remaining',
     aliasedName,
     true,
     type: DriftSqlType.double,
@@ -316,7 +316,7 @@ class $MedicationsTable extends Medications
   List<GeneratedColumn> get $columns => [
     id,
     name,
-    defaultDosageMg,
+    dosagesRemaining,
     notes,
     nationalCode,
     medType,
@@ -344,12 +344,12 @@ class $MedicationsTable extends Medications
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
-    if (data.containsKey('default_dosage_mg')) {
+    if (data.containsKey('dosages_remaining')) {
       context.handle(
-        _defaultDosageMgMeta,
-        defaultDosageMg.isAcceptableOrUnknown(
-          data['default_dosage_mg']!,
-          _defaultDosageMgMeta,
+        _dosagesRemainingMeta,
+        dosagesRemaining.isAcceptableOrUnknown(
+          data['dosages_remaining']!,
+          _dosagesRemainingMeta,
         ),
       );
     }
@@ -385,9 +385,9 @@ class $MedicationsTable extends Medications
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
-      defaultDosageMg: attachedDatabase.typeMapping.read(
+      dosagesRemaining: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
-        data['${effectivePrefix}default_dosage_mg'],
+        data['${effectivePrefix}dosages_remaining'],
       ),
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -418,14 +418,14 @@ class $MedicationsTable extends Medications
 class Medication extends DataClass implements Insertable<Medication> {
   final int id;
   final String name;
-  final double? defaultDosageMg;
+  final double? dosagesRemaining;
   final String? notes;
   final int? nationalCode;
   final MedicationType medType;
   const Medication({
     required this.id,
     required this.name,
-    this.defaultDosageMg,
+    this.dosagesRemaining,
     this.notes,
     this.nationalCode,
     required this.medType,
@@ -435,8 +435,8 @@ class Medication extends DataClass implements Insertable<Medication> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
-    if (!nullToAbsent || defaultDosageMg != null) {
-      map['default_dosage_mg'] = Variable<double>(defaultDosageMg);
+    if (!nullToAbsent || dosagesRemaining != null) {
+      map['dosages_remaining'] = Variable<double>(dosagesRemaining);
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
@@ -456,9 +456,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     return MedicationsCompanion(
       id: Value(id),
       name: Value(name),
-      defaultDosageMg: defaultDosageMg == null && nullToAbsent
+      dosagesRemaining: dosagesRemaining == null && nullToAbsent
           ? const Value.absent()
-          : Value(defaultDosageMg),
+          : Value(dosagesRemaining),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -477,7 +477,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return Medication(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      defaultDosageMg: serializer.fromJson<double?>(json['defaultDosageMg']),
+      dosagesRemaining: serializer.fromJson<double?>(json['dosagesRemaining']),
       notes: serializer.fromJson<String?>(json['notes']),
       nationalCode: serializer.fromJson<int?>(json['nationalCode']),
       medType: $MedicationsTable.$convertermedType.fromJson(
@@ -491,7 +491,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
-      'defaultDosageMg': serializer.toJson<double?>(defaultDosageMg),
+      'dosagesRemaining': serializer.toJson<double?>(dosagesRemaining),
       'notes': serializer.toJson<String?>(notes),
       'nationalCode': serializer.toJson<int?>(nationalCode),
       'medType': serializer.toJson<int>(
@@ -503,16 +503,16 @@ class Medication extends DataClass implements Insertable<Medication> {
   Medication copyWith({
     int? id,
     String? name,
-    Value<double?> defaultDosageMg = const Value.absent(),
+    Value<double?> dosagesRemaining = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     Value<int?> nationalCode = const Value.absent(),
     MedicationType? medType,
   }) => Medication(
     id: id ?? this.id,
     name: name ?? this.name,
-    defaultDosageMg: defaultDosageMg.present
-        ? defaultDosageMg.value
-        : this.defaultDosageMg,
+    dosagesRemaining: dosagesRemaining.present
+        ? dosagesRemaining.value
+        : this.dosagesRemaining,
     notes: notes.present ? notes.value : this.notes,
     nationalCode: nationalCode.present ? nationalCode.value : this.nationalCode,
     medType: medType ?? this.medType,
@@ -521,9 +521,9 @@ class Medication extends DataClass implements Insertable<Medication> {
     return Medication(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      defaultDosageMg: data.defaultDosageMg.present
-          ? data.defaultDosageMg.value
-          : this.defaultDosageMg,
+      dosagesRemaining: data.dosagesRemaining.present
+          ? data.dosagesRemaining.value
+          : this.dosagesRemaining,
       notes: data.notes.present ? data.notes.value : this.notes,
       nationalCode: data.nationalCode.present
           ? data.nationalCode.value
@@ -537,7 +537,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     return (StringBuffer('Medication(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('defaultDosageMg: $defaultDosageMg, ')
+          ..write('dosagesRemaining: $dosagesRemaining, ')
           ..write('notes: $notes, ')
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType')
@@ -547,14 +547,14 @@ class Medication extends DataClass implements Insertable<Medication> {
 
   @override
   int get hashCode =>
-      Object.hash(id, name, defaultDosageMg, notes, nationalCode, medType);
+      Object.hash(id, name, dosagesRemaining, notes, nationalCode, medType);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Medication &&
           other.id == this.id &&
           other.name == this.name &&
-          other.defaultDosageMg == this.defaultDosageMg &&
+          other.dosagesRemaining == this.dosagesRemaining &&
           other.notes == this.notes &&
           other.nationalCode == this.nationalCode &&
           other.medType == this.medType);
@@ -563,14 +563,14 @@ class Medication extends DataClass implements Insertable<Medication> {
 class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<int> id;
   final Value<String> name;
-  final Value<double?> defaultDosageMg;
+  final Value<double?> dosagesRemaining;
   final Value<String?> notes;
   final Value<int?> nationalCode;
   final Value<MedicationType> medType;
   const MedicationsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
-    this.defaultDosageMg = const Value.absent(),
+    this.dosagesRemaining = const Value.absent(),
     this.notes = const Value.absent(),
     this.nationalCode = const Value.absent(),
     this.medType = const Value.absent(),
@@ -578,7 +578,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   MedicationsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
-    this.defaultDosageMg = const Value.absent(),
+    this.dosagesRemaining = const Value.absent(),
     this.notes = const Value.absent(),
     this.nationalCode = const Value.absent(),
     required MedicationType medType,
@@ -587,7 +587,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   static Insertable<Medication> custom({
     Expression<int>? id,
     Expression<String>? name,
-    Expression<double>? defaultDosageMg,
+    Expression<double>? dosagesRemaining,
     Expression<String>? notes,
     Expression<int>? nationalCode,
     Expression<int>? medType,
@@ -595,7 +595,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
-      if (defaultDosageMg != null) 'default_dosage_mg': defaultDosageMg,
+      if (dosagesRemaining != null) 'dosages_remaining': dosagesRemaining,
       if (notes != null) 'notes': notes,
       if (nationalCode != null) 'national_code': nationalCode,
       if (medType != null) 'med_type': medType,
@@ -605,7 +605,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   MedicationsCompanion copyWith({
     Value<int>? id,
     Value<String>? name,
-    Value<double?>? defaultDosageMg,
+    Value<double?>? dosagesRemaining,
     Value<String?>? notes,
     Value<int?>? nationalCode,
     Value<MedicationType>? medType,
@@ -613,7 +613,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return MedicationsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
-      defaultDosageMg: defaultDosageMg ?? this.defaultDosageMg,
+      dosagesRemaining: dosagesRemaining ?? this.dosagesRemaining,
       notes: notes ?? this.notes,
       nationalCode: nationalCode ?? this.nationalCode,
       medType: medType ?? this.medType,
@@ -629,8 +629,8 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
-    if (defaultDosageMg.present) {
-      map['default_dosage_mg'] = Variable<double>(defaultDosageMg.value);
+    if (dosagesRemaining.present) {
+      map['dosages_remaining'] = Variable<double>(dosagesRemaining.value);
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
@@ -651,7 +651,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     return (StringBuffer('MedicationsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('defaultDosageMg: $defaultDosageMg, ')
+          ..write('dosagesRemaining: $dosagesRemaining, ')
           ..write('notes: $notes, ')
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType')
@@ -3003,7 +3003,7 @@ typedef $$MedicationsTableCreateCompanionBuilder =
     MedicationsCompanion Function({
       Value<int> id,
       required String name,
-      Value<double?> defaultDosageMg,
+      Value<double?> dosagesRemaining,
       Value<String?> notes,
       Value<int?> nationalCode,
       required MedicationType medType,
@@ -3012,7 +3012,7 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
     MedicationsCompanion Function({
       Value<int> id,
       Value<String> name,
-      Value<double?> defaultDosageMg,
+      Value<double?> dosagesRemaining,
       Value<String?> notes,
       Value<int?> nationalCode,
       Value<MedicationType> medType,
@@ -3093,8 +3093,8 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get defaultDosageMg => $composableBuilder(
-    column: $table.defaultDosageMg,
+  ColumnFilters<double> get dosagesRemaining => $composableBuilder(
+    column: $table.dosagesRemaining,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3184,8 +3184,8 @@ class $$MedicationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get defaultDosageMg => $composableBuilder(
-    column: $table.defaultDosageMg,
+  ColumnOrderings<double> get dosagesRemaining => $composableBuilder(
+    column: $table.dosagesRemaining,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3220,8 +3220,8 @@ class $$MedicationsTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumn<double> get defaultDosageMg => $composableBuilder(
-    column: $table.defaultDosageMg,
+  GeneratedColumn<double> get dosagesRemaining => $composableBuilder(
+    column: $table.dosagesRemaining,
     builder: (column) => column,
   );
 
@@ -3321,14 +3321,14 @@ class $$MedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<double?> defaultDosageMg = const Value.absent(),
+                Value<double?> dosagesRemaining = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> nationalCode = const Value.absent(),
                 Value<MedicationType> medType = const Value.absent(),
               }) => MedicationsCompanion(
                 id: id,
                 name: name,
-                defaultDosageMg: defaultDosageMg,
+                dosagesRemaining: dosagesRemaining,
                 notes: notes,
                 nationalCode: nationalCode,
                 medType: medType,
@@ -3337,14 +3337,14 @@ class $$MedicationsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String name,
-                Value<double?> defaultDosageMg = const Value.absent(),
+                Value<double?> dosagesRemaining = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> nationalCode = const Value.absent(),
                 required MedicationType medType,
               }) => MedicationsCompanion.insert(
                 id: id,
                 name: name,
-                defaultDosageMg: defaultDosageMg,
+                dosagesRemaining: dosagesRemaining,
                 notes: notes,
                 nationalCode: nationalCode,
                 medType: medType,

@@ -49,6 +49,7 @@ class _QuantitySelectorState extends State<QuantitySelector> {
       title: Text(
         widget.label,
         textAlign: TextAlign.center,
+        style: theme.textTheme.titleLarge,
       ),
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       content: IntrinsicHeight(
@@ -61,7 +62,8 @@ class _QuantitySelectorState extends State<QuantitySelector> {
               icon: const Icon(Symbols.remove),
               style: IconButton.styleFrom(
                 backgroundColor: colors.surfaceContainerHighest,
-                disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
+                disabledBackgroundColor: colors.surfaceContainerHighest
+                    .withOpacity(0.3),
               ),
             ),
             const SizedBox(width: 24),
@@ -81,7 +83,8 @@ class _QuantitySelectorState extends State<QuantitySelector> {
               icon: const Icon(Symbols.add),
               style: IconButton.styleFrom(
                 backgroundColor: colors.surfaceContainerHighest,
-                disabledBackgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
+                disabledBackgroundColor: colors.surfaceContainerHighest
+                    .withOpacity(0.3),
               ),
             ),
           ],

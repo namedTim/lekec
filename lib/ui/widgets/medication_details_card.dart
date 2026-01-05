@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import '../components/quantity_selector.dart';
+import '../../database/tables/medications.dart';
+import '../../utils/medication_utils.dart';
+
+class MedicationDetailsCard extends StatelessWidget {
+  const MedicationDetailsCard({
+    super.key,
+    required this.medName,
+    required this.dosage,
+    required this.pillsRemaining,
+    required this.frequency,
+    required this.times,
+    required this.medType,
+    this.onAddMedication,
+  });
+
+  final String medName;
+  final String dosage;
+  final int pillsRemaining;
+  final String frequency; // e.g., "2x dnevno", "1x dnevno"
+  final List<String> times; // e.g., ["8:00", "20:00"]
+  final MedicationType medType;
+  final Function(int)? onAddMedication;
+
+  Color _getPillCountColor(int count) {
+    if (count >= 20) {
+      return const Color(0xFF22C55E); // Green - plenty
+    } else if (count >= 15) {
+      return const Color(0xFF84CC16); // Lime - good
+    } else if (count >= 10) {
+      return const Color(0xFFFBBF24); // Yellow - moderate
+    } else if (count >= 5) {
+      return const Color(0xFFFB923C); // Orange - low
+    } else if (count >= 2) {
+      return const Color(0xFFF87171); // Red-orange - very low
+    } else {
+      return const Color(0xFFEF4444); // Red - critical
+    }
+  }
+
+  String _getTimesText() {
+    if (times.isEmpty) return '';
+    if (times.length == 1) {
+      return 'ob ${times[0]}';
+    }
+    final allButLast = times.sublist(0, times.length - 1).join(', ');
+    return 'ob $allButLast in ${times.last}';
+  }
+
+  Future<void> _handleAddMedication(BuildContext context) async {
+    final quantity = await showQuantitySelector(
+      context,
+      initialValue: 1,
+      label: 'Število ${getMedicationUnitShort(medType)}',
+    );
+    if (quantity != null) {
+      onAddMedication?.call(quantity);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Main content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Medicine name
+                Text(
+                  medName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // Dosage
+                Text(
+                  dosage,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Frequency and times
+                Row(
+                  children: [
+                    Icon(Symbols.schedule, size: 16, color: colors.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$frequency ${_getTimesText()}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Remaining pills chip
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getPillCountColor(pillsRemaining),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$pillsRemaining preostalo',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Add button
+          Container(
+            margin: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(
+              color: colors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed: () => _handleAddMedication(context),
+              icon: const Icon(Symbols.add),
+              color: colors.onPrimary,
+              tooltip: 'Dodaj zdravilo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

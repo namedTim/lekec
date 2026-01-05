@@ -37,6 +37,7 @@ class _SimpleMedicationPlanningScreenState
   DateTime? _startDate;
   TimeOfDay? _firstIntakeTime;
   int _quantity = 1;
+  int _initialQuantity = 0;
 
   String _getFrequencyLabel() {
     switch (widget.frequency) {
@@ -84,13 +85,26 @@ class _SimpleMedicationPlanningScreenState
     }
   }
 
+  Future<void> _selectInitialQuantity() async {
+    final quantity = await showQuantitySelector(
+      context,
+      initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+      minValue: 0,
+      maxValue: 999,
+      label: 'Začetna zaloga',
+    );
+    if (quantity != null) {
+      setState(() => _initialQuantity = quantity);
+    }
+  }
+
   Future<void> _handleSave() async {
     // Validate required fields
     if (widget.frequency != FrequencyOption.asNeeded) {
       if (_startDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Izberite datum začetka')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Izberite datum začetka')));
         return;
       }
       if (_firstIntakeTime == null) {
@@ -107,14 +121,20 @@ class _SimpleMedicationPlanningScreenState
 
     try {
       // 1. Insert medication
-      final medicationId = await db.into(db.medications).insert(
-        MedicationsCompanion(
-          name: drift.Value(widget.medicationName),
-          medType: drift.Value(widget.medType),
-        ),
-      );
+      final medicationId = await db
+          .into(db.medications)
+          .insert(
+            MedicationsCompanion(
+              name: drift.Value(widget.medicationName),
+              medType: drift.Value(widget.medType),
+              dosagesRemaining: drift.Value(_initialQuantity.toDouble()),
+            ),
+          );
 
-      developer.log('Medication inserted: ID $medicationId', name: 'SimpleMedicationPlanning');
+      developer.log(
+        'Medication inserted: ID $medicationId',
+        name: 'SimpleMedicationPlanning',
+      );
 
       // 2. Prepare schedule times
       List<String> times = [];
@@ -144,39 +164,51 @@ class _SimpleMedicationPlanningScreenState
       }
 
       // 3. Create medication plan
-      final planId = await db.into(db.medicationPlans).insert(
-        MedicationPlansCompanion.insert(
-          userId: 1, // TODO: Get from current user
-          medicationId: medicationId,
-          startDate: _startDate ?? DateTime.now(),
-          dosageAmount: _quantity.toDouble(),
-          isActive: drift.Value(true),
-        ),
-      );
+      final planId = await db
+          .into(db.medicationPlans)
+          .insert(
+            MedicationPlansCompanion.insert(
+              userId: 1, // TODO: Get from current user
+              medicationId: medicationId,
+              startDate: _startDate ?? DateTime.now(),
+              dosageAmount: _quantity.toDouble(),
+              isActive: drift.Value(true),
+            ),
+          );
 
-      developer.log('Plan created: ID $planId', name: 'SimpleMedicationPlanning');
+      developer.log(
+        'Plan created: ID $planId',
+        name: 'SimpleMedicationPlanning',
+      );
 
       // 4. Create schedule rule (if not "as needed")
       if (ruleType != 'asNeeded') {
-        await db.into(db.medicationScheduleRules).insert(
-          MedicationScheduleRulesCompanion.insert(
-            planId: planId,
-            ruleType: ruleType,
-            timesOfDay: drift.Value(jsonEncode(times)),
-            isActive: drift.Value(true),
-          ),
-        );
+        await db
+            .into(db.medicationScheduleRules)
+            .insert(
+              MedicationScheduleRulesCompanion.insert(
+                planId: planId,
+                ruleType: ruleType,
+                timesOfDay: drift.Value(jsonEncode(times)),
+                isActive: drift.Value(true),
+              ),
+            );
 
-        developer.log('Schedule rule created with times: $times', name: 'SimpleMedicationPlanning');
+        developer.log(
+          'Schedule rule created with times: $times',
+          name: 'SimpleMedicationPlanning',
+        );
 
         // 5. Generate future intake entries
         await scheduleGenerator.regeneratePlanSchedule(planId);
-        
+
         // 6. Schedule notifications
         await notificationService.scheduleAllUpcomingNotifications(db);
-        
-        developer.log('Generated intake schedule and notifications for plan $planId', 
-          name: 'SimpleMedicationPlanning');
+
+        developer.log(
+          'Generated intake schedule and notifications for plan $planId',
+          name: 'SimpleMedicationPlanning',
+        );
       }
 
       if (mounted) {
@@ -186,21 +218,22 @@ class _SimpleMedicationPlanningScreenState
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Refresh home page to show new medication
         homePageKey.currentState?.loadTodaysIntakes();
-        
+
         context.go('/');
       }
     } catch (e, st) {
-      developer.log('Error saving medication plan', error: e, stackTrace: st, 
-        name: 'SimpleMedicationPlanning');
+      developer.log(
+        'Error saving medication plan',
+        error: e,
+        stackTrace: st,
+        name: 'SimpleMedicationPlanning',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -274,9 +307,20 @@ class _SimpleMedicationPlanningScreenState
                 // Quantity
                 _PlanningCard(
                   icon: Symbols.pill,
-                  label: 'Količina',
+                  label: 'Količina na vnos',
                   value: '$_quantity',
                   onTap: _selectQuantity,
+                ),
+                const SizedBox(height: 16),
+
+                // Initial Quantity
+                _PlanningCard(
+                  icon: Symbols.inventory_2,
+                  label: 'Začetna zaloga',
+                  value: _initialQuantity > 0
+                      ? '$_initialQuantity'
+                      : 'Izberite količino',
+                  onTap: _selectInitialQuantity,
                 ),
                 const SizedBox(height: 48),
               ] else ...[
@@ -298,10 +342,7 @@ class _SimpleMedicationPlanningScreenState
                 ),
                 child: const Text(
                   'Shrani',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
