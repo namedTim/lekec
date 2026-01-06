@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lekec/database/drift_database.dart';
+import 'package:lekec/database/tables/medications.dart' show MedicationStatus;
 import 'package:lekec/features/core/providers/database_provider.dart';
 import 'package:lekec/helpers/medication_unit_helper.dart';
 import 'package:lekec/ui/components/history_time_slot.dart';

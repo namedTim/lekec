@@ -28,7 +28,22 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        if (from < 2) {
+          // Add status column to medications table with default value of 0 (active)
+          await m.addColumn(medications, medications.status);
+        }
+      },
+    );
+  }
 }
 
 LazyDatabase _openConnection() {

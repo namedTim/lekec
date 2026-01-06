@@ -4,7 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
-import '../../database/tables/medications.dart' show MedicationType;
+import '../../database/tables/medications.dart' show MedicationType, MedicationStatus;
 import '../../ui/screens/medication_frequency_selection.dart';
 
 class NotificationService {
@@ -253,9 +253,9 @@ class NotificationService {
         ..where((m) => m.id.equals(intake.medicationId)))
         .getSingleOrNull();
 
-      // Skip if medication was deleted
-      if (medication == null) {
-        developer.log('Skipping intake ${intake.id}: medication ${intake.medicationId} not found', 
+      // Skip if medication was deleted or not found
+      if (medication == null || medication.status == MedicationStatus.deleted) {
+        developer.log('Skipping intake ${intake.id}: medication ${intake.medicationId} ${medication == null ? "not found" : "deleted"}', 
           name: 'NotificationService');
         continue;
       }

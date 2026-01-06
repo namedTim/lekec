@@ -32,15 +32,21 @@ class MedicationService {
         );
   }
 
-  /// Delete a medication by ID
+  /// Soft delete a medication by ID (mark as deleted)
   Future<void> deleteMedication(int medicationId) async {
-    await (db.delete(db.medications)..where((m) => m.id.equals(medicationId)))
-        .go();
+    await (db.update(db.medications)..where((m) => m.id.equals(medicationId)))
+        .write(
+      MedicationsCompanion(
+        status: drift.Value(MedicationStatus.deleted),
+      ),
+    );
   }
 
   /// Load all medications with their plan details and schedule info
   Future<List<Map<String, dynamic>>> loadMedicationsWithDetails() async {
-    final query = await db.select(db.medications).join([
+    final query = await (db.select(db.medications)
+          ..where((m) => m.status.equalsValue(MedicationStatus.active)))
+        .join([
       drift.leftOuterJoin(
         db.medicationPlans,
         db.medicationPlans.medicationId.equalsExp(db.medications.id),
