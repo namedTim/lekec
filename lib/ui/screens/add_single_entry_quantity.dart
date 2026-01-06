@@ -76,9 +76,11 @@ class _AddSingleEntryQuantityScreenState
 
     try {
       // Find existing medication or create new one
-      final medicationId = await medicationService.findOrCreateMedication(
-        widget.medicationName,
-        widget.medType,
+      final medicationId = await medicationService.createMedication(
+        MedicationsCompanion(
+          name: drift.Value(widget.medicationName),
+          medType: drift.Value(widget.medType),
+        ),
       );
 
       // Create a one-time intake log entry

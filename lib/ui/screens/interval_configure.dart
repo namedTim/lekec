@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:drift/drift.dart' as drift;
+import 'package:lekec/database/drift_database.dart';
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/ui/screens/interval_planning.dart';
 import 'package:lekec/features/meds/providers/medications_provider.dart';
@@ -174,9 +176,11 @@ class _IntervalConfigureScreenState
 
     try {
       // Find or create medication
-      final medicationId = await medicationService.findOrCreateMedication(
-        widget.medicationName,
-        widget.medType,
+      final medicationId = await medicationService.createMedication(
+        MedicationsCompanion(
+          name: drift.Value(widget.medicationName),
+          medType: drift.Value(widget.medType),
+        ),
       );
 
       // Create interval plan

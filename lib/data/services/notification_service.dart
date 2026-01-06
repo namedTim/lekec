@@ -251,12 +251,26 @@ class NotificationService {
       // Get medication details
       final medication = await (db.select(db.medications)
         ..where((m) => m.id.equals(intake.medicationId)))
-        .getSingle();
+        .getSingleOrNull();
+
+      // Skip if medication was deleted
+      if (medication == null) {
+        developer.log('Skipping intake ${intake.id}: medication ${intake.medicationId} not found', 
+          name: 'NotificationService');
+        continue;
+      }
 
       // Get plan details for dosage
       final plan = await (db.select(db.medicationPlans)
         ..where((p) => p.id.equals(intake.planId)))
-        .getSingle();
+        .getSingleOrNull();
+
+      // Skip if plan was deleted
+      if (plan == null) {
+        developer.log('Skipping intake ${intake.id}: plan ${intake.planId} not found', 
+          name: 'NotificationService');
+        continue;
+      }
 
       final dosage = plan.dosageAmount != null
           ? '${plan.dosageAmount!.toStringAsFixed(0)} ${_getMedicationTypeUnit(medication.medType)}'

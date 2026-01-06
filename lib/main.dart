@@ -331,6 +331,7 @@ class _MyHomePageState extends State<MyHomePage>
   // Time Island state
   Map<String, dynamic>? _nextMedication;
   Timer? _islandUpdateTimer;
+  Timer? _dayChangeTimer;
 
   @override
   void initState() {
@@ -347,6 +348,7 @@ class _MyHomePageState extends State<MyHomePage>
     loadTodaysIntakes();
     _updateTimeIsland();
     _startIslandUpdateTimer();
+    _startDayChangeTimer();
   }
 
   @override
@@ -354,7 +356,24 @@ class _MyHomePageState extends State<MyHomePage>
     _animationController.dispose();
     _scrollController.dispose();
     _islandUpdateTimer?.cancel();
+    _dayChangeTimer?.cancel();
     super.dispose();
+  }
+
+  void _startDayChangeTimer() {
+    // Calculate time until midnight
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final timeUntilMidnight = tomorrow.difference(now);
+
+    // Schedule refresh at midnight
+    _dayChangeTimer = Timer(timeUntilMidnight, () {
+      if (mounted) {
+        loadTodaysIntakes();
+        // Restart timer for next day
+        _startDayChangeTimer();
+      }
+    });
   }
 
   void _startIslandUpdateTimer() {

@@ -13,6 +13,7 @@ import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import 'dart:convert';
+import 'package:lekec/main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
 
@@ -58,6 +59,8 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             ),
           );
           _refreshMedications();
+          // Refresh home screen to reflect deleted medication
+          homePageKey.currentState?.loadTodaysIntakes();
         }
       } catch (e) {
         if (mounted) {
@@ -161,11 +164,15 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
-            final medications = snapshot.data ?? [];
+            final allMedications = snapshot.data ?? [];
+            // Filter out "Po potrebi" medications (as needed)
+            final medications = allMedications
+                .where((med) => med['frequency'] != 'Po potrebi')
+                .toList();
             if (medications.isEmpty) {
               return Center(
                 child: Text(
-                  'Ni zdravil. Dodajte novo zdravilo.',
+                  'Ni zdravil z aktivnimi opomniki.',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),

@@ -40,6 +40,7 @@ class _SimpleMedicationPlanningScreenState
   TimeOfDay? _firstIntakeTime;
   int _quantity = 1;
   int _initialQuantity = 0;
+  bool _isSaving = false;
 
   String _getFrequencyLabel() {
     switch (widget.frequency) {
@@ -101,6 +102,8 @@ class _SimpleMedicationPlanningScreenState
   }
 
   Future<void> _handleSave() async {
+    if (_isSaving) return; // Prevent double-tap
+    
     // Validate required fields
     if (widget.frequency != FrequencyOption.asNeeded) {
       if (_startDate == null) {
@@ -117,6 +120,8 @@ class _SimpleMedicationPlanningScreenState
       }
     }
 
+    setState(() => _isSaving = true);
+
     final db = ref.read(databaseProvider);
     final scheduleGenerator = ref.read(intakeScheduleGeneratorProvider);
     final notificationService = NotificationService();
@@ -125,9 +130,11 @@ class _SimpleMedicationPlanningScreenState
 
     try {
       // 1. Insert medication
-      final medicationId = await medicationService.findOrCreateMedication(
-        widget.medicationName,
-        widget.medType,
+      final medicationId = await medicationService.createMedication(
+        MedicationsCompanion(
+          name: drift.Value(widget.medicationName),
+          medType: drift.Value(widget.medType),
+        ),
       );
 
       developer.log(
@@ -210,6 +217,7 @@ class _SimpleMedicationPlanningScreenState
         name: 'SimpleMedicationPlanning',
       );
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
         );
@@ -311,17 +319,26 @@ class _SimpleMedicationPlanningScreenState
               ],
 
               FilledButton(
-                onPressed: _handleSave,
+                onPressed: _isSaving ? null : _handleSave,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Shrani',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Shrani',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
               ),
             ],
           ),
