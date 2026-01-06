@@ -10,6 +10,8 @@ import 'package:lekec/ui/components/step_progress_indicator.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
 import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
 import 'package:lekec/data/services/notification_service.dart';
+import 'package:lekec/data/services/medication_service.dart';
+import 'package:lekec/data/services/plan_service.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
 import 'medication_frequency_selection.dart' show FrequencyOption;
@@ -118,21 +120,18 @@ class _SimpleMedicationPlanningScreenState
     final db = ref.read(databaseProvider);
     final scheduleGenerator = ref.read(intakeScheduleGeneratorProvider);
     final notificationService = NotificationService();
+    final medicationService = MedicationService(db);
+    final planService = PlanService(db);
 
     try {
       // 1. Insert medication
-      final medicationId = await db
-          .into(db.medications)
-          .insert(
-            MedicationsCompanion(
-              name: drift.Value(widget.medicationName),
-              medType: drift.Value(widget.medType),
-              dosagesRemaining: drift.Value(_initialQuantity.toDouble()),
-            ),
-          );
+      final medicationId = await medicationService.findOrCreateMedication(
+        widget.medicationName,
+        widget.medType,
+      );
 
       developer.log(
-        'Medication inserted: ID $medicationId',
+        'Medication created/found: ID $medicationId',
         name: 'SimpleMedicationPlanning',
       );
 
@@ -163,46 +162,25 @@ class _SimpleMedicationPlanningScreenState
           return;
       }
 
-      // 3. Create medication plan
-      final planId = await db
-          .into(db.medicationPlans)
-          .insert(
-            MedicationPlansCompanion.insert(
-              userId: 1, // TODO: Get from current user
-              medicationId: medicationId,
-              startDate: _startDate ?? DateTime.now(),
-              dosageAmount: _quantity.toDouble(),
-              isActive: drift.Value(true),
-            ),
-          );
+      // 3. Create medication plan with schedule rules
+      final planId = await planService.createMedicationPlan(
+        userId: 1, // TODO: Get from current user
+        medicationId: medicationId,
+        startDate: _startDate ?? DateTime.now(),
+        dosageAmount: _quantity.toDouble(),
+        initialQuantity: _initialQuantity?.toDouble(),
+        ruleType: ruleType,
+        times: times,
+      );
 
       developer.log(
         'Plan created: ID $planId',
         name: 'SimpleMedicationPlanning',
       );
 
-      // 4. Create schedule rule (if not "as needed")
+      // 4. Generate future intake entries and notifications (if not "as needed")
       if (ruleType != 'asNeeded') {
-        await db
-            .into(db.medicationScheduleRules)
-            .insert(
-              MedicationScheduleRulesCompanion.insert(
-                planId: planId,
-                ruleType: ruleType,
-                timesOfDay: drift.Value(jsonEncode(times)),
-                isActive: drift.Value(true),
-              ),
-            );
-
-        developer.log(
-          'Schedule rule created with times: $times',
-          name: 'SimpleMedicationPlanning',
-        );
-
-        // 5. Generate future intake entries
         await scheduleGenerator.regeneratePlanSchedule(planId);
-
-        // 6. Schedule notifications
         await notificationService.scheduleAllUpcomingNotifications(db);
 
         developer.log(

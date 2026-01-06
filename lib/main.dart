@@ -20,6 +20,8 @@ import '/ui/screens/medication_frequency_selection.dart' show FrequencyOption;
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
 import 'ui/components/confirmation_dialog.dart';
+import 'data/services/intake_log_service.dart';
+import 'data/services/intake_log_service.dart';
 import 'ui/widgets/time_island.dart';
 import 'ui/components/time_slot.dart';
 import 'data/services/intake_schedule_generator.dart';
@@ -218,10 +220,12 @@ class _MyHomePageState extends State<MyHomePage>
   final ScrollController _scrollController = ScrollController();
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
+  late IntakeLogService _intakeService;
 
   @override
   void initState() {
     super.initState();
+    _intakeService = IntakeLogService(db);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 250),
       vsync: this,
@@ -241,55 +245,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> loadTodaysIntakes() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-
-    final intakes =
-        await (db.select(db.medicationIntakeLogs)
-              ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
-              ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
-              ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
-            .get();
-
-    // Load medication details for each intake
-    final grouped = <String, List<Map<String, dynamic>>>{};
-
-    for (final intake in intakes) {
-      MedicationPlan? plan;
-      Medication? medication;
-      
-      if (intake.planId == null) {
-        // One-time entry - load medication directly
-        medication = await (db.select(
-          db.medications,
-        )..where((t) => t.id.equals(intake.medicationId))).getSingleOrNull();
-      } else {
-        // Regular planned intake
-        plan = await (db.select(
-          db.medicationPlans,
-        )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
-
-        if (plan != null) {
-          medication = await (db.select(
-            db.medications,
-          )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
-        }
-      }
-
-      if (medication == null) continue;
-
-      final timeKey =
-          '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
-
-      grouped.putIfAbsent(timeKey, () => []);
-      grouped[timeKey]!.add({
-        'intake': intake,
-        'plan': plan, // Can be null for one-time entries
-        'medication': medication,
-        'isOneTimeEntry': intake.planId == 0,
-      });
-    }
+    final grouped = await _intakeService.loadTodaysIntakes();
 
     setState(() {
       _groupedIntakes = grouped;
@@ -342,10 +298,7 @@ class _MyHomePageState extends State<MyHomePage>
     if (!confirmed) return;
 
     try {
-      await (db.delete(db.medicationIntakeLogs)
-            ..where((t) => t.id.equals(intakeId)))
-          .go();
-
+      await _intakeService.deleteOneTimeEntry(intakeId);
       await loadTodaysIntakes();
 
       if (mounted) {
@@ -384,62 +337,7 @@ class _MyHomePageState extends State<MyHomePage>
   ) async {
     try {
       final wasTaken = newStatus == MedicationStatus.taken;
-
-      // Get the intake log to find the plan and medication
-      final intake = await (db.select(
-        db.medicationIntakeLogs,
-      )..where((t) => t.id.equals(intakeId))).getSingleOrNull();
-
-      if (intake == null) return;
-
-      final plan = await (db.select(
-        db.medicationPlans,
-      )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
-
-      if (plan == null) return;
-
-      final medication = await (db.select(
-        db.medications,
-      )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
-
-      // Update the intake log
-      await (db.update(
-        db.medicationIntakeLogs,
-      )..where((t) => t.id.equals(intakeId))).write(
-        MedicationIntakeLogsCompanion(
-          wasTaken: drift.Value(wasTaken),
-          takenTime: drift.Value(wasTaken ? DateTime.now() : null),
-        ),
-      );
-
-      // Only update medication count if status actually changed
-      // If marking as taken AND it wasn't already taken, decrease the medication count
-      if (wasTaken &&
-          !intake.wasTaken &&
-          medication != null &&
-          medication.dosagesRemaining != null) {
-        final newRemaining = medication.dosagesRemaining! - plan.dosageAmount;
-        await (db.update(
-          db.medications,
-        )..where((t) => t.id.equals(medication.id))).write(
-          MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
-        );
-      }
-
-      // If marking as not taken (was previously taken), increase the count back
-      if (!wasTaken &&
-          intake.wasTaken &&
-          medication != null &&
-          medication.dosagesRemaining != null) {
-        final newRemaining = medication.dosagesRemaining! + plan.dosageAmount;
-        await (db.update(
-          db.medications,
-        )..where((t) => t.id.equals(medication.id))).write(
-          MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
-        );
-      }
-
-      // Refresh the view
+      await _intakeService.updateIntakeStatus(intakeId, wasTaken);
       await loadTodaysIntakes();
 
       if (mounted) {

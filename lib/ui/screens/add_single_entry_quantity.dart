@@ -9,6 +9,8 @@ import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
 import 'package:lekec/utils/medication_utils.dart';
 import 'package:lekec/main.dart' show homePageKey;
+import 'package:lekec/data/services/medication_service.dart';
+import 'package:lekec/data/services/intake_log_service.dart';
 
 class AddSingleEntryQuantityScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -69,38 +71,21 @@ class _AddSingleEntryQuantityScreenState
 
   Future<void> _handleSave() async {
     final db = ref.read(databaseProvider);
+    final medicationService = MedicationService(db);
+    final intakeLogService = IntakeLogService(db);
 
     try {
       // Find existing medication or create new one
-      final existingMeds = await (db.select(db.medications)
-            ..where((m) => m.name.equals(widget.medicationName))
-            ..where((m) => m.medType.equalsValue(widget.medType)))
-          .get();
-
-      int medicationId;
-      if (existingMeds.isNotEmpty) {
-        medicationId = existingMeds.first.id;
-      } else {
-        // Create new medication
-        medicationId = await db.into(db.medications).insert(
-              MedicationsCompanion(
-                name: drift.Value(widget.medicationName),
-                medType: drift.Value(widget.medType),
-              ),
-            );
-      }
+      final medicationId = await medicationService.findOrCreateMedication(
+        widget.medicationName,
+        widget.medType,
+      );
 
       // Create a one-time intake log entry
-      await db.into(db.medicationIntakeLogs).insert(
-            MedicationIntakeLogsCompanion(
-              userId: const drift.Value(1), // TODO: Get from current user
-              medicationId: drift.Value(medicationId),
-              planId: const drift.Value(0), // No plan for one-time entries
-              scheduledTime: drift.Value(DateTime.now()),
-              wasTaken: const drift.Value(true),
-              takenTime: drift.Value(DateTime.now()),
-            ),
-          );
+      await intakeLogService.createOneTimeEntry(
+        medicationId: medicationId,
+        userId: 1, // TODO: Get from current user
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -10,6 +10,7 @@ import '../components/confirmation_dialog.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../utils/medication_utils.dart';
+import '../../data/services/medication_service.dart';
 import 'dart:convert';
 
 enum MedsTab { medications, users, settings }
@@ -44,9 +45,8 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
     if (confirmed) {
       try {
         final db = ref.read(databaseProvider);
-        await (db.delete(
-          db.medications,
-        )..where((m) => m.id.equals(medicationId))).go();
+        final medicationService = MedicationService(db);
+        await medicationService.deleteMedication(medicationId);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -144,9 +144,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
     switch (_selectedTab) {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
+        final medicationService = MedicationService(db);
         return FutureBuilder(
           key: ValueKey(_refreshKey),
-          future: _loadMedications(db),
+          future: medicationService.loadMedicationsWithDetails(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -170,9 +171,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               itemCount: medications.length,
               itemBuilder: (context, index) {
                 final med = medications[index];
+                final dosageAmount = med['dosage'] as double;
                 return MedicationDetailsCard(
                   medName: med['name'] as String,
-                  dosage: med['dosage'] as String,
+                  dosage: '${dosageAmount.toInt()} ${getMedicationUnit(med['medType'] as MedicationType)}',
                   pillsRemaining: med['remaining'] as int,
                   frequency: med['frequency'] as String,
                   times: med['times'] as List<String>,
@@ -200,50 +202,5 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
       case MedsTab.settings:
         return const SettingsView();
     }
-  }
-
-  Future<List<Map<String, dynamic>>> _loadMedications(db) async {
-    final query = await db.select(db.medications).join([
-      drift.leftOuterJoin(
-        db.medicationPlans,
-        db.medicationPlans.medicationId.equalsExp(db.medications.id),
-      ),
-      drift.leftOuterJoin(
-        db.medicationScheduleRules,
-        db.medicationScheduleRules.planId.equalsExp(db.medicationPlans.id),
-      ),
-    ]).get();
-
-    final result = <Map<String, dynamic>>[];
-    for (final row in query) {
-      final medication = row.readTable(db.medications);
-      final plan = row.readTableOrNull(db.medicationPlans);
-      final rule = row.readTableOrNull(db.medicationScheduleRules);
-
-      String frequency = 'Po potrebi';
-      List<String> times = [];
-
-      if (rule != null && rule.timesOfDay != null) {
-        final timesList = (jsonDecode(rule.timesOfDay!) as List)
-            .map((e) => e.toString())
-            .toList();
-        times = timesList;
-        frequency = '${times.length}x dnevno';
-      }
-
-      result.add({
-        'id': medication.id,
-        'name': medication.name,
-        'dosage': plan != null
-            ? '${plan.dosageAmount.toInt()} ${getMedicationUnit(medication.medType)}'
-            : '1 ${getMedicationUnit(medication.medType)}',
-        'remaining': medication.dosagesRemaining?.toInt() ?? 0,
-        'frequency': frequency,
-        'times': times,
-        'medType': medication.medType,
-      });
-    }
-
-    return result;
   }
 }
