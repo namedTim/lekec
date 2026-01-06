@@ -7,7 +7,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:lekec/database/drift_database.dart';
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/utils/medication_utils.dart';
+import 'package:lekec/helpers/medication_unit_helper.dart';
 import 'package:lekec/main.dart' show homePageKey;
 import 'package:lekec/data/services/medication_service.dart';
 import 'package:lekec/data/services/intake_log_service.dart';
@@ -91,7 +91,7 @@ class _AddSingleEntryQuantityScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Vnos zabeležen: $_quantity ${getMedicationUnitShort(widget.medType)}',
+              'Vnos zabeležen: $_quantity ${getMedicationUnitShort(widget.medType, _quantity.toInt())}',
             ),
             backgroundColor: Colors.green,
           ),
@@ -143,7 +143,7 @@ class _AddSingleEntryQuantityScreenState
               ),
               const SizedBox(height: 16),
               Text(
-                'Vnesite število ${getMedicationUnitShort(widget.medType)} za vnos',
+                'Vnesite število ${getMedicationUnitShort(widget.medType, 5)} za vnos',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),

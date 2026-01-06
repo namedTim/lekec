@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../components/quantity_selector.dart';
 import '../../database/tables/medications.dart';
-import '../../utils/medication_utils.dart';
+import '../../helpers/medication_unit_helper.dart';
 
 class MedicationDetailsCard extends StatelessWidget {
   const MedicationDetailsCard({
@@ -55,7 +55,7 @@ class MedicationDetailsCard extends StatelessWidget {
     final quantity = await showQuantitySelector(
       context,
       initialValue: 1,
-      label: 'Število ${getMedicationUnitShort(medType)}',
+      label: 'Število ${getMedicationUnitShort(medType, 5)}',
     );
     if (quantity != null) {
       onAddMedication?.call(quantity);

@@ -37,6 +37,7 @@ import 'ui/components/time_slot.dart';
 import 'data/services/intake_schedule_generator.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/background_task_service.dart';
+import 'helpers/medication_unit_helper.dart';
 
 export 'ui/widgets/medication_card.dart' show MedicationStatus;
 
@@ -536,45 +537,6 @@ class _MyHomePageState extends State<MyHomePage>
     await loadTodaysIntakes();
   }
 
-  String _getMedicationUnit(MedicationType type) {
-    switch (type) {
-      case MedicationType.pills:
-        return 'tableto/e';
-      case MedicationType.capsules:
-        return 'kapsulo/e';
-      case MedicationType.drops:
-        return 'kapljic/o';
-      case MedicationType.milliliters:
-        return 'ml';
-      case MedicationType.sprays:
-        return 'brizgov/a';
-      case MedicationType.injections:
-        return 'injekcijo/e';
-      case MedicationType.patches:
-        return 'obliž/ev';
-      case MedicationType.puffs:
-        return 'vdihov/a';
-      case MedicationType.applications:
-        return 'nanosov/a';
-      case MedicationType.ampules:
-        return 'ampulo/e';
-      case MedicationType.grams:
-        return 'gramov/a';
-      case MedicationType.milligrams:
-        return 'mg';
-      case MedicationType.micrograms:
-        return 'mcg';
-      case MedicationType.tablespoons:
-        return 'žličk/o';
-      case MedicationType.portions:
-        return 'porcijo/e';
-      case MedicationType.pieces:
-        return 'kos/ov';
-      case MedicationType.units:
-        return 'enot/o';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -663,11 +625,12 @@ class _MyHomePageState extends State<MyHomePage>
 
                             // For one-time entries, dosage is stored in the intake log
                             final dosageAmount = plan?.dosageAmount ?? 1.0;
+                            final dosageCount = dosageAmount.toInt();
 
                             return MedicationCard(
                               medName: medication.name,
                               dosage:
-                                  '${dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
+                                  '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
                               medicineRemaining:
                                   '', // TODO: Calculate remaining
                               pillCount: 0, // TODO: Calculate from inventory

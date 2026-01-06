@@ -1,79 +1,52 @@
 import 'package:lekec/database/tables/medications.dart';
 
-String getMedicationUnit(MedicationType type) {
-  switch (type) {
-    case MedicationType.pills:
-      return 'tableto/e';
-    case MedicationType.capsules:
-      return 'kapsulo/e';
-    case MedicationType.drops:
-      return 'kapljic/o';
-    case MedicationType.milliliters:
-      return 'ml';
-    case MedicationType.sprays:
-      return 'brizgov/a';
-    case MedicationType.injections:
-      return 'injekcijo/e';
-    case MedicationType.patches:
-      return 'obliž/ev';
-    case MedicationType.puffs:
-      return 'vdihov/a';
-    case MedicationType.applications:
-      return 'nanosov/a';
-    case MedicationType.ampules:
-      return 'ampulo/e';
-    case MedicationType.grams:
-      return 'gramov/a';
-    case MedicationType.milligrams:
-      return 'mg';
-    case MedicationType.micrograms:
-      return 'mcg';
-    case MedicationType.tablespoons:
-      return 'žličk/o';
-    case MedicationType.portions:
-      return 'porcijo/e';
-    case MedicationType.pieces:
-      return 'kos/ov';
-    case MedicationType.units:
-      return 'enot/o';
+String _pluralizeSlovenian(int count, String singular, String dual, String plural, String genitivePlural) {
+  if (count == 1) {
+    return singular;
+  } else if (count == 2) {
+    return dual;
+  } else if (count == 3 || count == 4) {
+    return plural;
+  } else {
+    return genitivePlural;
   }
 }
 
-String getMedicationUnitShort(MedicationType type) {
+String getMedicationUnit(MedicationType type, int count) {
   switch (type) {
     case MedicationType.pills:
-      return 'tablet';
+      return _pluralizeSlovenian(count, 'tableta', 'tableti', 'tablete', 'tablet');
     case MedicationType.capsules:
-      return 'kapsul';
+      return _pluralizeSlovenian(count, 'kapsula', 'kapsuli', 'kapsule', 'kapsul');
     case MedicationType.drops:
-      return 'kapljic';
+      return _pluralizeSlovenian(count, 'kapljica', 'kapljici', 'kapljice', 'kapljic');
     case MedicationType.milliliters:
       return 'ml';
     case MedicationType.sprays:
-      return 'brizgov';
+      return _pluralizeSlovenian(count, 'brizg', 'brizga', 'brizgi', 'brizgov');
     case MedicationType.injections:
-      return 'injekcij';
+      return _pluralizeSlovenian(count, 'injekcija', 'injekciji', 'injekcije', 'injekcij');
     case MedicationType.patches:
-      return 'obližev';
+      return _pluralizeSlovenian(count, 'obliž', 'obliža', 'obliži', 'obližev');
     case MedicationType.puffs:
-      return 'vdihov';
+      return _pluralizeSlovenian(count, 'vdih', 'vdiha', 'vdihi', 'vdihov');
     case MedicationType.applications:
-      return 'nanosov';
+      return _pluralizeSlovenian(count, 'nanos', 'nanosa', 'nanosi', 'nanosov');
     case MedicationType.ampules:
-      return 'ampul';
+      return _pluralizeSlovenian(count, 'ampula', 'ampuli', 'ampule', 'ampul');
     case MedicationType.grams:
-      return 'gramov';
+      return _pluralizeSlovenian(count, 'gram', 'grama', 'grami', 'gramov');
     case MedicationType.milligrams:
       return 'mg';
     case MedicationType.micrograms:
       return 'mcg';
     case MedicationType.tablespoons:
-      return 'žličk';
+      return _pluralizeSlovenian(count, 'žlička', 'žlički', 'žličke', 'žličk');
     case MedicationType.portions:
-      return 'porcij';
+      return _pluralizeSlovenian(count, 'porcija', 'porciji', 'porcije', 'porcij');
     case MedicationType.pieces:
-      return 'kosov';
+      return _pluralizeSlovenian(count, 'kos', 'kosa', 'kosi', 'kosov');
     case MedicationType.units:
-      return 'enot';
+      return _pluralizeSlovenian(count, 'enota', 'enoti', 'enote', 'enot');
   }
 }

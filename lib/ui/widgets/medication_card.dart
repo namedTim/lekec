@@ -203,13 +203,25 @@ class _MedicationCardState extends State<MedicationCard> {
         break;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(left: 12),
-      alignment: Alignment.center,
-      child: Icon(
-        icon,
-        color: iconColor,
-        size: 36,
+    return GestureDetector(
+      onTap: () {
+        // Toggle between taken and not taken
+        if (widget.status == MedicationStatus.taken) {
+          widget.onStatusChanged?.call(MedicationStatus.notTaken);
+        } else if (widget.status == MedicationStatus.notTaken || 
+                   widget.status == MedicationStatus.upcoming) {
+          widget.onStatusChanged?.call(MedicationStatus.taken);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(left: 12),
+        padding: const EdgeInsets.all(8),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          color: iconColor,
+          size: 36,
+        ),
       ),
     );
   }

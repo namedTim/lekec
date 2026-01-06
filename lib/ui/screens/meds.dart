@@ -10,7 +10,7 @@ import '../components/speed_dial_fab.dart';
 import '../components/confirmation_dialog.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
-import '../../utils/medication_utils.dart';
+import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import 'dart:convert';
 
@@ -183,9 +183,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               itemBuilder: (context, index) {
                 final med = medications[index];
                 final dosageAmount = med['dosage'] as double;
+                final dosageCount = dosageAmount.toInt();
                 return MedicationDetailsCard(
                   medName: med['name'] as String,
-                  dosage: '${dosageAmount.toInt()} ${getMedicationUnit(med['medType'] as MedicationType)}',
+                  dosage: '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
                   pillsRemaining: med['remaining'] as int,
                   frequency: med['frequency'] as String,
                   times: med['times'] as List<String>,
@@ -209,7 +210,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Dodano $quantity ${getMedicationUnitShort(med['medType'] as MedicationType)}',
+                              'Dodano $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}',
                             ),
                             backgroundColor: Colors.green,
                           ),
