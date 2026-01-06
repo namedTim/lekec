@@ -115,41 +115,31 @@ class _TimeIslandState extends State<TimeIsland> {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: _isFinished
-            ? Border.all(color: colors.primary, width: 2)
-            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.medicationName != null) ...[
-            Text(
-              widget.medicationName!,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: _isFinished ? colors.primary : colors.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-          ],
-
-          if (!_isFinished)
-            Text(
-              'Naslednje zdravilo',
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-
-          if (!_isFinished) const SizedBox(height: 6),
-
+          // Show label first
           Text(
-            _timeText,
+            _isFinished ? 'Vzemite zdravilo' : 'Naslednje zdravilo',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: _isFinished ? colors.primary : null,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // Show medication name or time
+          Text(
+            _isFinished 
+                ? (widget.medicationName ?? '--')
+                : _timeText,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: _isFinished ? colors.primary : colors.onSurface,
             ),
+            textAlign: TextAlign.center,
           ),
 
           const SizedBox(height: 10),
@@ -161,9 +151,7 @@ class _TimeIslandState extends State<TimeIsland> {
               value: _progress,
               minHeight: 6,
               backgroundColor: colors.surfaceVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _isFinished ? colors.primary : colors.primary,
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
             ),
           ),
         ],
