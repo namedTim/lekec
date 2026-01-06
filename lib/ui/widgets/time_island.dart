@@ -88,7 +88,7 @@ class _TimeIslandState extends State<TimeIsland> {
 
   String get _timeText {
     if (widget.medicationName == null) return '--';
-    if (_isFinished) return 'Vzemite zdaj!';
+    if (_isFinished) return 'Vzemite zdravilo';
 
     final minutes = _remaining.inMinutes;
     final seconds = _remaining.inSeconds % 60;
@@ -134,21 +134,19 @@ class _TimeIslandState extends State<TimeIsland> {
             const SizedBox(height: 4),
           ],
 
-          Text(
-            _isFinished
-                ? 'Čas za jemanje'
-                : 'Naslednje zdravilo',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: _isFinished ? colors.primary : null,
+          if (!_isFinished)
+            Text(
+              'Naslednje zdravilo',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 6),
+          if (!_isFinished) const SizedBox(height: 6),
 
           Text(
             _timeText,
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: _isFinished ? colors.primary : colors.onSurface,
             ),

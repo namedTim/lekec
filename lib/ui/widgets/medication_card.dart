@@ -80,6 +80,11 @@ class _MedicationCardState extends State<MedicationCard> {
     return Dismissible(
       key: Key('${widget.medName}_${widget.userId}_${DateTime.now().millisecondsSinceEpoch}'),
       direction: _getDismissDirection(),
+      dismissThresholds: const {
+        DismissDirection.startToEnd: 0.2,
+        DismissDirection.endToStart: 0.2,
+      },
+      resizeDuration: null,
       background: widget.enableLeftSwipe ? _buildSwipeBackground(colors, isLeft: true) : null,
       secondaryBackground: widget.enableRightSwipe ? _buildSwipeBackground(colors, isLeft: false) : null,
       confirmDismiss: (direction) async {

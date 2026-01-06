@@ -50,6 +50,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
         await medicationService.deleteMedication(medicationId);
 
         if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Zdravilo $medicationName je bilo izbrisano'),
@@ -60,6 +61,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
         }
       } catch (e) {
         if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Napaka pri brisanju: $e'),
@@ -203,6 +205,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                       );
                       
                       if (mounted) {
+                        ScaffoldMessenger.of(context).clearSnackBars();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -215,6 +218,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                       }
                     } catch (e) {
                       if (mounted) {
+                        ScaffoldMessenger.of(context).clearSnackBars();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Napaka: $e'),

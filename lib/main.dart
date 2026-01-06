@@ -435,6 +435,7 @@ class _MyHomePageState extends State<MyHomePage>
 
       if (mounted) {
         final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -449,6 +450,7 @@ class _MyHomePageState extends State<MyHomePage>
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -477,6 +479,7 @@ class _MyHomePageState extends State<MyHomePage>
 
       if (mounted) {
         final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -493,6 +496,7 @@ class _MyHomePageState extends State<MyHomePage>
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
