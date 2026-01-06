@@ -336,8 +336,10 @@ class _MyHomePageState extends State<MyHomePage>
         ),
       );
 
-      // If marking as taken, decrease the medication count
+      // Only update medication count if status actually changed
+      // If marking as taken AND it wasn't already taken, decrease the medication count
       if (wasTaken &&
+          !intake.wasTaken &&
           medication != null &&
           medication.dosagesRemaining != null) {
         final newRemaining = medication.dosagesRemaining! - plan.dosageAmount;
