@@ -19,6 +19,10 @@ class MedicationCard extends StatefulWidget {
     required this.userId,
     this.status = MedicationStatus.upcoming,
     this.onStatusChanged,
+    this.isOneTimeEntry = false,
+    this.onDelete,
+    this.enableLeftSwipe = true,
+    this.enableRightSwipe = true,
   });
 
   final String medName;
@@ -30,12 +34,28 @@ class MedicationCard extends StatefulWidget {
   final String userId;
   final MedicationStatus status;
   final Function(MedicationStatus)? onStatusChanged;
+  final bool isOneTimeEntry;
+  final VoidCallback? onDelete;
+  final bool enableLeftSwipe;
+  final bool enableRightSwipe;
 
   @override
   State<MedicationCard> createState() => _MedicationCardState();
 }
 
 class _MedicationCardState extends State<MedicationCard> {
+  DismissDirection _getDismissDirection() {
+    if (widget.enableLeftSwipe && widget.enableRightSwipe) {
+      return DismissDirection.horizontal;
+    } else if (widget.enableLeftSwipe) {
+      return DismissDirection.startToEnd;
+    } else if (widget.enableRightSwipe) {
+      return DismissDirection.endToStart;
+    } else {
+      return DismissDirection.none;
+    }
+  }
+
   Color _getPillCountColor(int count) {
     if (count >= 20) {
       return const Color(0xFF22C55E); // Green - plenty
@@ -59,15 +79,20 @@ class _MedicationCardState extends State<MedicationCard> {
 
     return Dismissible(
       key: Key('${widget.medName}_${widget.userId}_${DateTime.now().millisecondsSinceEpoch}'),
-      background: _buildSwipeBackground(colors, isLeft: true),
-      secondaryBackground: _buildSwipeBackground(colors, isLeft: false),
+      direction: _getDismissDirection(),
+      background: widget.enableLeftSwipe ? _buildSwipeBackground(colors, isLeft: true) : null,
+      secondaryBackground: widget.enableRightSwipe ? _buildSwipeBackground(colors, isLeft: false) : null,
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.endToStart) {
+        if (direction == DismissDirection.endToStart && widget.enableRightSwipe) {
           // Swipe from right - mark as taken
           widget.onStatusChanged?.call(MedicationStatus.taken);
-        } else if (direction == DismissDirection.startToEnd) {
-          // Swipe from left - mark as not taken
-          widget.onStatusChanged?.call(MedicationStatus.notTaken);
+        } else if (direction == DismissDirection.startToEnd && widget.enableLeftSwipe) {
+          // Swipe from left - delete one-time entry or mark as not taken
+          if (widget.isOneTimeEntry) {
+            widget.onDelete?.call();
+          } else {
+            widget.onStatusChanged?.call(MedicationStatus.notTaken);
+          }
         }
         return false; // Don't actually dismiss the card
       },

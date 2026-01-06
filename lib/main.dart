@@ -8,6 +8,8 @@ import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'ui/screens/add_medication.dart';
+import 'ui/screens/add_single_entry.dart';
+import 'ui/screens/add_single_entry_quantity.dart';
 import 'ui/screens/medication_frequency_selection.dart';
 import 'ui/screens/simple_medication_planning.dart';
 import 'features/core/providers/database_provider.dart';
@@ -17,6 +19,7 @@ import '/ui/screens/medication_frequency_selection.dart' show FrequencyOption;
 
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
+import 'ui/components/confirmation_dialog.dart';
 import 'ui/widgets/time_island.dart';
 import 'ui/components/time_slot.dart';
 import 'data/services/intake_schedule_generator.dart';
@@ -119,6 +122,20 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           frequency: extra['frequency'] as FrequencyOption,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-single-entry',
+      builder: (context, state) => const AddSingleEntryScreen(),
+    ),
+    GoRoute(
+      path: '/add-single-entry/quantity',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return AddSingleEntryQuantityScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
         );
       },
     ),
@@ -239,15 +256,26 @@ class _MyHomePageState extends State<MyHomePage>
     final grouped = <String, List<Map<String, dynamic>>>{};
 
     for (final intake in intakes) {
-      final plan = await (db.select(
-        db.medicationPlans,
-      )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
+      MedicationPlan? plan;
+      Medication? medication;
+      
+      if (intake.planId == null) {
+        // One-time entry - load medication directly
+        medication = await (db.select(
+          db.medications,
+        )..where((t) => t.id.equals(intake.medicationId))).getSingleOrNull();
+      } else {
+        // Regular planned intake
+        plan = await (db.select(
+          db.medicationPlans,
+        )..where((t) => t.id.equals(intake.planId))).getSingleOrNull();
 
-      if (plan == null) continue;
-
-      final medication = await (db.select(
-        db.medications,
-      )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
+        if (plan != null) {
+          medication = await (db.select(
+            db.medications,
+          )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
+        }
+      }
 
       if (medication == null) continue;
 
@@ -257,8 +285,9 @@ class _MyHomePageState extends State<MyHomePage>
       grouped.putIfAbsent(timeKey, () => []);
       grouped[timeKey]!.add({
         'intake': intake,
-        'plan': plan,
+        'plan': plan, // Can be null for one-time entries
         'medication': medication,
+        'isOneTimeEntry': intake.planId == 0,
       });
     }
 
@@ -302,6 +331,53 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
+  Future<void> _deleteOneTimeEntry(int intakeId) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Izbriši vnos',
+      message: 'Ali ste prepričani, da želite izbrisati ta enkraten vnos?',
+      confirmText: 'Izbriši',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await (db.delete(db.medicationIntakeLogs)
+            ..where((t) => t.id.equals(intakeId)))
+          .go();
+
+      await loadTodaysIntakes();
+
+      if (mounted) {
+        final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Vnos izbrisan',
+              style: TextStyle(color: colors.onSurface),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: colors.surfaceContainerHighest,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Napaka: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _updateIntakeStatus(
     int intakeId,
     MedicationStatus newStatus,
@@ -324,7 +400,7 @@ class _MyHomePageState extends State<MyHomePage>
 
       final medication = await (db.select(
         db.medications,
-      )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
+      )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
 
       // Update the intake log
       await (db.update(
@@ -411,9 +487,7 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _onAddSingleEntry() {
     _toggleSpeedDial();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Dodaj enkraten vnos')));
+    context.push('/add-single-entry');
   }
 
   void _onAddNewMedication() {
@@ -522,9 +596,10 @@ class _MyHomePageState extends State<MyHomePage>
                           ...intakesAtTime.map((intakeData) {
                             final medication =
                                 intakeData['medication'] as Medication;
-                            final plan = intakeData['plan'] as MedicationPlan;
+                            final plan = intakeData['plan'] as MedicationPlan?;
                             final intake =
                                 intakeData['intake'] as MedicationIntakeLog;
+                            final isOneTime = intakeData['isOneTimeEntry'] as bool;
 
                             // Determine status based on wasTaken and time
                             MedicationStatus status;
@@ -536,10 +611,13 @@ class _MyHomePageState extends State<MyHomePage>
                               status = MedicationStatus.upcoming;
                             }
 
+                            // For one-time entries, dosage is stored in the intake log
+                            final dosageAmount = plan?.dosageAmount ?? 1.0;
+
                             return MedicationCard(
                               medName: medication.name,
                               dosage:
-                                  '${plan.dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
+                                  '${dosageAmount.toInt()} ${_getMedicationUnit(medication.medType)}',
                               medicineRemaining:
                                   '', // TODO: Calculate remaining
                               pillCount: 0, // TODO: Calculate from inventory
@@ -547,9 +625,15 @@ class _MyHomePageState extends State<MyHomePage>
                               username: 'jaz', // TODO: Get from user
                               userId: '1',
                               status: status,
-                              onStatusChanged: (newStatus) async {
+                              isOneTimeEntry: isOneTime,
+                              enableLeftSwipe: true,
+                              enableRightSwipe: !isOneTime, // One-time entries can't be marked as taken (already taken)
+                              onStatusChanged: isOneTime ? null : (newStatus) async {
                                 await _updateIntakeStatus(intake.id, newStatus);
                               },
+                              onDelete: isOneTime ? () async {
+                                await _deleteOneTimeEntry(intake.id);
+                              } : null,
                             );
                           }),
                         ],
