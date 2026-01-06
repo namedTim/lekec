@@ -19,7 +19,8 @@ class MedsHistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<MedsHistoryScreen> createState() => _MedsHistoryScreenState();
 }
 
-class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen> {
+class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
+    with AutomaticKeepAliveClientMixin {
   HistoryFilter _currentFilter = HistoryFilter.all;
   final List<Map<String, dynamic>> _allEntries = [];
   bool _isLoading = false;
@@ -30,11 +31,22 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen> {
   late HistoryService _historyService;
 
   @override
+  bool get wantKeepAlive => false; // Don't keep alive so we reload each time
+
+  @override
   void initState() {
     super.initState();
     _historyService = HistoryService(ref.read(databaseProvider));
-    _loadMoreHistory();
     _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data every time the screen becomes visible
+    if (_allEntries.isEmpty || !_isLoading) {
+      _refreshHistory();
+    }
   }
 
   @override
@@ -123,6 +135,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final groupedHistory = _groupEntriesByDate();
