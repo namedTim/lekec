@@ -123,20 +123,20 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
       floatingActionButton: SpeedDialFab(
         options: [
           SpeedDialOption(
-            label: 'Dodaj novo zdravilo',
-            icon: Symbols.pill,
-            heroTag: 'add_medication_meds',
-            onPressed: () async {
-              await context.push('/add-medication');
-              _refreshMedications();
-            },
-          ),
-          SpeedDialOption(
             label: 'Dodaj enkraten vnos',
             icon: Symbols.add,
             heroTag: 'add_entry_meds',
             onPressed: () async {
               await context.push('/add-single-entry');
+              _refreshMedications();
+            },
+          ),
+          SpeedDialOption(
+            label: 'Dodaj novo zdravilo',
+            icon: Symbols.pill,
+            heroTag: 'add_medication_meds',
+            onPressed: () async {
+              await context.push('/add-medication');
               _refreshMedications();
             },
           ),
