@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
+import '../../database/drift_database.dart';
 import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
 import '../components/speed_dial_fab.dart';
@@ -179,14 +180,41 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                   frequency: med['frequency'] as String,
                   times: med['times'] as List<String>,
                   medType: med['medType'] as MedicationType,
-                  onAddMedication: (quantity) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Dodajam $quantity ${getMedicationUnitShort(med['medType'] as MedicationType)}...',
+                  onAddMedication: (quantity) async {
+                    try {
+                      final db = ref.read(databaseProvider);
+                      final currentRemaining = med['remaining'] as int;
+                      final newRemaining = currentRemaining + quantity;
+                      
+                      await (db.update(db.medications)
+                            ..where((t) => t.id.equals(med['id'] as int)))
+                          .write(
+                        MedicationsCompanion(
+                          dosagesRemaining: drift.Value(newRemaining.toDouble()),
                         ),
-                      ),
-                    );
+                      );
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Dodano $quantity ${getMedicationUnitShort(med['medType'] as MedicationType)}',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _refreshMedications();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Napaka: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                   onDelete: () => _deleteMedication(
                     med['id'] as int,

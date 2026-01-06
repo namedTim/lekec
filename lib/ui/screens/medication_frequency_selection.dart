@@ -52,9 +52,13 @@ class _MedicationFrequencySelectionScreenState
     }
 
     if (_selectedFrequency == FrequencyOption.moreOptions) {
-      // TODO: Navigate to complex medication planning
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Napredne možnosti - kmalu')),
+      // Navigate to advanced medication planning
+      context.push(
+        '/add-medication/advanced-planning',
+        extra: {
+          'name': widget.medicationName,
+          'medType': widget.medType,
+        },
       );
     } else {
       context.push(

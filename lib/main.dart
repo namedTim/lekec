@@ -12,6 +12,15 @@ import 'ui/screens/add_single_entry.dart';
 import 'ui/screens/add_single_entry_quantity.dart';
 import 'ui/screens/medication_frequency_selection.dart';
 import 'ui/screens/simple_medication_planning.dart';
+import 'ui/screens/advanced_medication_planning.dart';
+import 'ui/screens/interval_planning.dart';
+import 'ui/screens/interval_configure.dart';
+import 'ui/screens/multiple_times_planning.dart';
+import 'ui/screens/multiple_times_select_times.dart';
+import 'ui/screens/specific_days_planning.dart';
+import 'ui/screens/specific_days_select_times.dart';
+import 'ui/screens/cyclic_planning.dart';
+import 'ui/screens/cyclic_configure.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'package:lekec/database/tables/medications.dart';
@@ -21,11 +30,9 @@ import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
 import 'ui/components/confirmation_dialog.dart';
 import 'data/services/intake_log_service.dart';
-import 'data/services/intake_log_service.dart';
 import 'ui/widgets/time_island.dart';
 import 'ui/components/time_slot.dart';
 import 'data/services/intake_schedule_generator.dart';
-import 'package:drift/drift.dart' as drift;
 import 'data/services/notification_service.dart';
 import 'data/services/background_task_service.dart';
 
@@ -124,6 +131,102 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           frequency: extra['frequency'] as FrequencyOption,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return AdvancedMedicationPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/interval',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return IntervalPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/interval/configure',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return IntervalConfigureScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+          intervalType: extra['intervalType'] as IntervalType,
+          intervalValue: extra['intervalValue'] as int,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/multiple-times',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return MultipleTimesPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/multiple-times/times',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return MultipleTimesSelectTimesScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+          timesPerDay: extra['timesPerDay'] as int,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/specific-days',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return SpecificDaysPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/specific-days/times',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return SpecificDaysSelectTimesScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+          selectedDays: List<int>.from(extra['selectedDays'] as List),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/cyclic',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return CyclicPlanningScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-medication/advanced-planning/cyclic/configure',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return CyclicConfigureScreen(
+          medicationName: extra['name'] as String,
+          medType: extra['medType'] as MedicationType,
+          takingDays: extra['takingDays'] as int,
+          pauseDays: extra['pauseDays'] as int,
         );
       },
     ),
@@ -383,14 +486,18 @@ class _MyHomePageState extends State<MyHomePage>
     });
   }
 
-  void _onAddSingleEntry() {
+  void _onAddSingleEntry() async {
     _toggleSpeedDial();
-    context.push('/add-single-entry');
+    await context.push('/add-single-entry');
+    // Refresh after returning from adding entry
+    loadTodaysIntakes();
   }
 
-  void _onAddNewMedication() {
+  void _onAddNewMedication() async {
     _toggleSpeedDial();
-    context.push('/add-medication');
+    await context.push('/add-medication');
+    // Refresh after returning from adding medication
+    loadTodaysIntakes();
   }
 
   String _getMedicationUnit(MedicationType type) {

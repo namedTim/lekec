@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart' as drift;
 import 'dart:convert';
 import '../../database/drift_database.dart';
-import '../../database/tables/medications.dart';
 
 class PlanService {
   final AppDatabase db;
@@ -56,6 +55,142 @@ class PlanService {
             ),
           );
     }
+
+    return planId;
+  }
+
+  /// Create interval-based medication plan
+  Future<int> createIntervalPlan({
+    required int userId,
+    required int medicationId,
+    required DateTime startDate,
+    required double dosageAmount,
+    required double? initialQuantity,
+    required bool isHourInterval,
+    required int intervalValue,
+    required String startTime,
+  }) async {
+    // Update medication with initial quantity if provided
+    if (initialQuantity != null) {
+      await (db.update(db.medications)
+            ..where((t) => t.id.equals(medicationId)))
+          .write(
+        MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
+      );
+    }
+
+    // Create medication plan
+    final planId = await db.into(db.medicationPlans).insert(
+          MedicationPlansCompanion.insert(
+            userId: userId,
+            medicationId: medicationId,
+            startDate: startDate,
+            dosageAmount: dosageAmount,
+            isActive: const drift.Value(true),
+          ),
+        );
+
+    // Create schedule rule for interval
+    await db.into(db.medicationScheduleRules).insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: isHourInterval ? 'hourInterval' : 'dayInterval',
+            timesOfDay: drift.Value(jsonEncode([startTime])),
+            intervalHours: drift.Value(isHourInterval ? intervalValue : null),
+            intervalDays: drift.Value(isHourInterval ? null : intervalValue),
+            isActive: const drift.Value(true),
+          ),
+        );
+
+    return planId;
+  }
+
+  /// Create specific days medication plan
+  Future<int> createSpecificDaysPlan({
+    required int userId,
+    required int medicationId,
+    required DateTime startDate,
+    required double dosageAmount,
+    required double? initialQuantity,
+    required List<int> daysOfWeek,
+    required List<String> times,
+  }) async {
+    // Update medication with initial quantity if provided
+    if (initialQuantity != null) {
+      await (db.update(db.medications)
+            ..where((t) => t.id.equals(medicationId)))
+          .write(
+        MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
+      );
+    }
+
+    // Create medication plan
+    final planId = await db.into(db.medicationPlans).insert(
+          MedicationPlansCompanion.insert(
+            userId: userId,
+            medicationId: medicationId,
+            startDate: startDate,
+            dosageAmount: dosageAmount,
+            isActive: const drift.Value(true),
+          ),
+        );
+
+    // Create schedule rule for specific days
+    await db.into(db.medicationScheduleRules).insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: 'weekly',
+            timesOfDay: drift.Value(jsonEncode(times)),
+            daysOfWeek: drift.Value(jsonEncode(daysOfWeek)),
+            isActive: const drift.Value(true),
+          ),
+        );
+
+    return planId;
+  }
+
+  /// Create cyclic medication plan
+  Future<int> createCyclicPlan({
+    required int userId,
+    required int medicationId,
+    required DateTime startDate,
+    required double dosageAmount,
+    required double? initialQuantity,
+    required int cycleDaysOn,
+    required int cycleDaysOff,
+    required List<String> times,
+  }) async {
+    // Update medication with initial quantity if provided
+    if (initialQuantity != null) {
+      await (db.update(db.medications)
+            ..where((t) => t.id.equals(medicationId)))
+          .write(
+        MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
+      );
+    }
+
+    // Create medication plan
+    final planId = await db.into(db.medicationPlans).insert(
+          MedicationPlansCompanion.insert(
+            userId: userId,
+            medicationId: medicationId,
+            startDate: startDate,
+            dosageAmount: dosageAmount,
+            isActive: const drift.Value(true),
+          ),
+        );
+
+    // Create schedule rule for cyclic
+    await db.into(db.medicationScheduleRules).insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: 'cyclic',
+            timesOfDay: drift.Value(jsonEncode(times)),
+            cycleDaysOn: drift.Value(cycleDaysOn),
+            cycleDaysOff: drift.Value(cycleDaysOff),
+            isActive: const drift.Value(true),
+          ),
+        );
 
     return planId;
   }

@@ -104,6 +104,11 @@ class IntakeScheduleGenerator {
           _generateWeeklySchedule(rule, startDate, endDate),
         );
         break;
+      case 'hourInterval':
+        scheduledTimes.addAll(
+          _generateHourIntervalSchedule(rule, startDate, endDate),
+        );
+        break;
       case 'dayInterval':
         scheduledTimes.addAll(
           _generateIntervalSchedule(rule, startDate, endDate),
@@ -214,6 +219,51 @@ class IntakeScheduleGenerator {
         }
       }
       currentDate = currentDate.add(const Duration(days: 1));
+    }
+    
+    return times;
+  }
+
+  /// Generate schedule for "hourInterval" rule (every N hours)
+  List<DateTime> _generateHourIntervalSchedule(
+    MedicationScheduleRule rule,
+    DateTime start,
+    DateTime end,
+  ) {
+    final times = <DateTime>[];
+    
+    if (rule.intervalHours == null || rule.timesOfDay == null) return times;
+    
+    final timesList = (jsonDecode(rule.timesOfDay!) as List<dynamic>)
+        .cast<String>();
+    
+    if (timesList.isEmpty) return times;
+    
+    // Parse start time from first time in list
+    final parts = timesList[0].split(':');
+    final startHour = int.parse(parts[0]);
+    final startMinute = int.parse(parts[1]);
+    
+    // Start from the first occurrence of this time at or after start date
+    var current = DateTime(
+      start.year,
+      start.month,
+      start.day,
+      startHour,
+      startMinute,
+    );
+    
+    // If start time today is before start, begin from start
+    if (current.isBefore(start)) {
+      current = start;
+    }
+    
+    // Generate entries every N hours
+    while (current.isBefore(end)) {
+      if (current.isAfter(start) || current.isAtSameMomentAs(start)) {
+        times.add(current);
+      }
+      current = current.add(Duration(hours: rule.intervalHours!));
     }
     
     return times;

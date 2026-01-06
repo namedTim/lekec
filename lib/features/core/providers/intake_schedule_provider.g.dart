@@ -56,3 +56,44 @@ final class IntakeScheduleGeneratorProvider
 
 String _$intakeScheduleGeneratorHash() =>
     r'61cae6f88085218e902bb294e9c4d3bba56ef68a';
+
+@ProviderFor(planService)
+const planServiceProvider = PlanServiceProvider._();
+
+final class PlanServiceProvider
+    extends $FunctionalProvider<PlanService, PlanService, PlanService>
+    with $Provider<PlanService> {
+  const PlanServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'planServiceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$planServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<PlanService> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  PlanService create(Ref ref) {
+    return planService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlanService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlanService>(value),
+    );
+  }
+}
+
+String _$planServiceHash() => r'8f8566755a3956988f130c0994c68a4112beea38';
