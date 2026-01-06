@@ -6,6 +6,79 @@ class IntakeLogService {
 
   IntakeLogService(this.db);
 
+  /// Get the next medication that needs to be taken
+  /// Returns medication info, time until next dose, and if it's overdue
+  Future<Map<String, dynamic>?> getNextMedication() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    // Get all intakes for today that haven't been taken yet
+    final upcomingIntakes = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..where((t) => t.wasTaken.equals(false))
+          ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+        .get();
+
+    if (upcomingIntakes.isEmpty) return null;
+
+    // Find the next or current overdue medication
+    MedicationIntakeLog? nextIntake;
+    
+    // First check for overdue medications (within 3 minutes grace period)
+    for (final intake in upcomingIntakes) {
+      final scheduledTime = intake.scheduledTime;
+      final timeDiff = now.difference(scheduledTime);
+      
+      // If it's overdue (past scheduled time) but within 3 minutes, prioritize it
+      if (timeDiff.inSeconds >= 0 && timeDiff.inMinutes < 3) {
+        nextIntake = intake;
+        break;
+      }
+    }
+    
+    // If no overdue medication, get the next upcoming one
+    nextIntake ??= upcomingIntakes.first;
+
+    // Load medication details
+    Medication? medication;
+    MedicationPlan? plan;
+
+    if (nextIntake.planId == 0) {
+      medication = await (db.select(db.medications)
+            ..where((t) => t.id.equals(nextIntake!.medicationId)))
+          .getSingleOrNull();
+    } else {
+      plan = await (db.select(db.medicationPlans)
+            ..where((t) => t.id.equals(nextIntake!.planId)))
+          .getSingleOrNull();
+
+      if (plan != null) {
+        medication = await (db.select(db.medications)
+              ..where((t) => t.id.equals(plan!.medicationId)))
+            .getSingleOrNull();
+      }
+    }
+
+    if (medication == null) return null;
+
+    final scheduledTime = nextIntake.scheduledTime;
+    final timeDiff = now.difference(scheduledTime);
+    final isOverdue = timeDiff.inSeconds >= 0;
+    final timeUntil = isOverdue ? Duration.zero : scheduledTime.difference(now);
+
+    return {
+      'medication': medication,
+      'plan': plan,
+      'intake': nextIntake,
+      'scheduledTime': scheduledTime,
+      'timeUntil': timeUntil,
+      'isOverdue': isOverdue,
+      'overdueMinutes': isOverdue ? timeDiff.inMinutes : 0,
+    };
+  }
+
   /// Load all intakes for today grouped by time
   Future<Map<String, List<Map<String, dynamic>>>> loadTodaysIntakes() async {
     final now = DateTime.now();

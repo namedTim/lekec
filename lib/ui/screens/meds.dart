@@ -120,19 +120,19 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           SpeedDialOption(
             label: 'Dodaj novo zdravilo',
             icon: Symbols.pill,
-            heroTag: 'add_medication',
-            onPressed: () {
-              context.push('/add-medication');
+            heroTag: 'add_medication_meds',
+            onPressed: () async {
+              await context.push('/add-medication');
+              _refreshMedications();
             },
           ),
           SpeedDialOption(
             label: 'Dodaj enkraten vnos',
             icon: Symbols.add,
-            heroTag: 'add_entry',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Dodaj enkraten vnos')),
-              );
+            heroTag: 'add_entry_meds',
+            onPressed: () async {
+              await context.push('/add-single-entry');
+              _refreshMedications();
             },
           ),
         ],
@@ -142,6 +142,9 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   }
 
   Widget _buildContent() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    
     switch (_selectedTab) {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
@@ -158,8 +161,13 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             }
             final medications = snapshot.data ?? [];
             if (medications.isEmpty) {
-              return const Center(
-                child: Text('Ni zdravil. Dodajte novo zdravilo.'),
+              return Center(
+                child: Text(
+                  'Ni zdravil. Dodajte novo zdravilo.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
               );
             }
             return ListView.builder(

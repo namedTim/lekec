@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/features/meds/providers/medications_provider.dart';
 import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
+import 'package:lekec/main.dart' show homePageKey;
 
 class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -89,7 +90,7 @@ class _MultipleTimesSelectTimesScreenState
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: _times[index] != null
-                                ? colors.primaryContainer.withOpacity(0.5)
+                                ? colors.surfaceContainerHighest
                                 : colors.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
@@ -223,6 +224,10 @@ class _MultipleTimesSelectTimesScreenState
           ),
         );
         context.go('/');
+        // Trigger refresh of home page
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          homePageKey.currentState?.loadTodaysIntakes();
+        });
       }
     } catch (e) {
       if (mounted) {

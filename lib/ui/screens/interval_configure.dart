@@ -6,6 +6,7 @@ import 'package:lekec/database/tables/medications.dart';
 import 'package:lekec/ui/screens/interval_planning.dart';
 import 'package:lekec/features/meds/providers/medications_provider.dart';
 import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
+import 'package:lekec/main.dart' show homePageKey;
 
 class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -202,6 +203,10 @@ class _IntervalConfigureScreenState
           ),
         );
         context.go('/');
+        // Trigger refresh of home page
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          homePageKey.currentState?.loadTodaysIntakes();
+        });
       }
     } catch (e) {
       if (mounted) {

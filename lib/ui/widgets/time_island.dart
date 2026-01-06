@@ -2,21 +2,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class TimeIslandController {
-  VoidCallback? _restart;
+  VoidCallback? _update;
 
-  void restart() => _restart?.call();
+  void update() => _update?.call();
 }
 
 class TimeIsland extends StatefulWidget {
   const TimeIsland({
     super.key,
+    this.medicationName,
     required this.totalDuration,
     required this.remainingDuration,
+    required this.isOverdue,
     this.controller,
   });
 
+  final String? medicationName;
   final Duration totalDuration;
   final Duration remainingDuration;
+  final bool isOverdue;
   final TimeIslandController? controller;
 
   @override
@@ -27,14 +31,14 @@ class _TimeIslandState extends State<TimeIsland> {
   late Duration _remaining;
   Timer? _timer;
 
-  bool get _isFinished => _remaining.inSeconds <= 0;
+  bool get _isFinished => widget.isOverdue || _remaining.inSeconds <= 0;
 
   @override
   void initState() {
     super.initState();
     _remaining = widget.remainingDuration;
 
-    widget.controller?._restart = _restart;
+    widget.controller?._update = _update;
     _startTimer();
   }
 
@@ -42,29 +46,33 @@ class _TimeIslandState extends State<TimeIsland> {
   void didUpdateWidget(covariant TimeIsland oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.remainingDuration != widget.remainingDuration) {
-      _restart();
+    if (oldWidget.remainingDuration != widget.remainingDuration ||
+        oldWidget.medicationName != widget.medicationName ||
+        oldWidget.isOverdue != widget.isOverdue) {
+      _update();
     }
   }
 
   void _startTimer() {
     _timer?.cancel();
 
-    if (_remaining.inSeconds <= 0) return;
+    if (_remaining.inSeconds <= 0 && !widget.isOverdue) return;
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
 
       setState(() {
-        _remaining -= const Duration(seconds: 1);
-        if (_remaining.inSeconds <= 0) {
-          _timer?.cancel();
+        if (!widget.isOverdue) {
+          _remaining -= const Duration(seconds: 1);
+          if (_remaining.inSeconds <= 0) {
+            _timer?.cancel();
+          }
         }
       });
     });
   }
 
-  void _restart() {
+  void _update() {
     setState(() {
       _remaining = widget.remainingDuration;
     });
@@ -79,7 +87,8 @@ class _TimeIslandState extends State<TimeIsland> {
   }
 
   String get _timeText {
-    if (_isFinished) return 'Vzemite zdravilo';
+    if (widget.medicationName == null) return '--';
+    if (_isFinished) return 'Vzemite zdaj!';
 
     final minutes = _remaining.inMinutes;
     final seconds = _remaining.inSeconds % 60;
@@ -106,16 +115,32 @@ class _TimeIslandState extends State<TimeIsland> {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(999),
+        border: _isFinished
+            ? Border.all(color: colors.primary, width: 2)
+            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (widget.medicationName != null) ...[
+            Text(
+              widget.medicationName!,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: _isFinished ? colors.primary : colors.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+          ],
+
           Text(
             _isFinished
-                ? 'Čas za zdravilo'
-                : 'Čas do naslednjega zdravila',
+                ? 'Čas za jemanje'
+                : 'Naslednje zdravilo',
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w600,
+              color: _isFinished ? colors.primary : null,
             ),
           ),
 
@@ -123,7 +148,7 @@ class _TimeIslandState extends State<TimeIsland> {
 
           Text(
             _timeText,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: _isFinished ? colors.primary : colors.onSurface,
             ),

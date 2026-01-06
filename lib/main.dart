@@ -1,4 +1,6 @@
 // drift InsertMode not used here; rely on default insert behavior
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -324,6 +326,10 @@ class _MyHomePageState extends State<MyHomePage>
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
   late IntakeLogService _intakeService;
+  
+  // Time Island state
+  Map<String, dynamic>? _nextMedication;
+  Timer? _islandUpdateTimer;
 
   @override
   void initState() {
@@ -338,13 +344,33 @@ class _MyHomePageState extends State<MyHomePage>
       curve: Curves.easeInOut,
     );
     loadTodaysIntakes();
+    _updateTimeIsland();
+    _startIslandUpdateTimer();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     _scrollController.dispose();
+    _islandUpdateTimer?.cancel();
     super.dispose();
+  }
+
+  void _startIslandUpdateTimer() {
+    // Update every second to keep island fresh
+    _islandUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateTimeIsland();
+    });
+  }
+
+  Future<void> _updateTimeIsland() async {
+    final nextMed = await _intakeService.getNextMedication();
+    if (mounted) {
+      setState(() {
+        _nextMedication = nextMed;
+      });
+      controller.update();
+    }
   }
 
   Future<void> loadTodaysIntakes() async {
@@ -353,6 +379,9 @@ class _MyHomePageState extends State<MyHomePage>
     setState(() {
       _groupedIntakes = grouped;
     });
+
+    // Update time island after loading intakes
+    await _updateTimeIsland();
 
     // Scroll to next intake
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -442,6 +471,9 @@ class _MyHomePageState extends State<MyHomePage>
       final wasTaken = newStatus == MedicationStatus.taken;
       await _intakeService.updateIntakeStatus(intakeId, wasTaken);
       await loadTodaysIntakes();
+      
+      // Update time island immediately after taking medication
+      await _updateTimeIsland();
 
       if (mounted) {
         final colors = Theme.of(context).colorScheme;
@@ -490,14 +522,14 @@ class _MyHomePageState extends State<MyHomePage>
     _toggleSpeedDial();
     await context.push('/add-single-entry');
     // Refresh after returning from adding entry
-    loadTodaysIntakes();
+    await loadTodaysIntakes();
   }
 
   void _onAddNewMedication() async {
     _toggleSpeedDial();
     await context.push('/add-medication');
     // Refresh after returning from adding medication
-    loadTodaysIntakes();
+    await loadTodaysIntakes();
   }
 
   String _getMedicationUnit(MedicationType type) {
@@ -551,11 +583,20 @@ class _MyHomePageState extends State<MyHomePage>
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: TimeIsland(
-                totalDuration: const Duration(minutes: 30),
-                remainingDuration: const Duration(minutes: 5),
-                controller: controller,
-              ),
+              child: _nextMedication != null
+                  ? TimeIsland(
+                      medicationName: (_nextMedication!['medication'] as Medication).name,
+                      totalDuration: const Duration(minutes: 30),
+                      remainingDuration: _nextMedication!['timeUntil'] as Duration,
+                      isOverdue: _nextMedication!['isOverdue'] as bool,
+                      controller: controller,
+                    )
+                  : TimeIsland(
+                      totalDuration: const Duration(minutes: 30),
+                      remainingDuration: const Duration(minutes: 30),
+                      isOverdue: false,
+                      controller: controller,
+                    ),
             ),
           ),
           Expanded(

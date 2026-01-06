@@ -134,9 +134,7 @@ class _AdvancedMedicationPlanningScreenState
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected
-              ? colors.primaryContainer
-              : colors.surfaceContainerHighest,
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? colors.primary : Colors.transparent,
