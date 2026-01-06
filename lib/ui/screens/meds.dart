@@ -161,7 +161,12 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.only(
+                left: 8,
+                right: 8,
+                top: 8,
+                bottom: 88,
+              ),
               itemCount: medications.length,
               itemBuilder: (context, index) {
                 final med = medications[index];

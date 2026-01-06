@@ -491,7 +491,11 @@ class _MyHomePageState extends State<MyHomePage>
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.only(
+                      left: 16.0,
+                      right: 16.0,
+                      bottom: 88.0,
+                    ),
                     itemCount: _groupedIntakes.length,
                     itemBuilder: (context, index) {
                       final timeKey = _groupedIntakes.keys.elementAt(index);
