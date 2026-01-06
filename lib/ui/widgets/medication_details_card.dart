@@ -44,6 +44,13 @@ class MedicationDetailsCard extends StatelessWidget {
 
   String _getTimesText() {
     if (times.isEmpty) return '';
+    
+    // For interval medications (Vsakih X ur/dni), use comma-separated list
+    if (frequency.startsWith('Vsakih')) {
+      return 'ob ${times.join(', ')}';
+    }
+    
+    // For other medications, use "in" for the last item
     if (times.length == 1) {
       return 'ob ${times[0]}';
     }
@@ -55,6 +62,8 @@ class MedicationDetailsCard extends StatelessWidget {
     final quantity = await showQuantitySelector(
       context,
       initialValue: 1,
+      minValue: -pillsRemaining, // Allow negative to zero out
+      maxValue: 999,
       label: 'Število ${getMedicationUnitShort(medType, 5)}',
     );
     if (quantity != null) {

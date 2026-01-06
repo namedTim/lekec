@@ -195,7 +195,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                     try {
                       final db = ref.read(databaseProvider);
                       final currentRemaining = med['remaining'] as int;
-                      final newRemaining = currentRemaining + quantity;
+                      final newRemaining = (currentRemaining + quantity).clamp(0, 9999);
                       
                       await (db.update(db.medications)
                             ..where((t) => t.id.equals(med['id'] as int)))
@@ -206,13 +206,16 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                       );
                       
                       if (mounted) {
+                        final absQuantity = quantity.abs();
                         ScaffoldMessenger.of(context).clearSnackBars();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Dodano $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}',
+                              quantity >= 0
+                                  ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
+                                  : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
                             ),
-                            backgroundColor: Colors.green,
+                            backgroundColor: quantity >= 0 ? Colors.green : Colors.orange,
                           ),
                         );
                         _refreshMedications();

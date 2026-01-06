@@ -76,7 +76,6 @@ class MedicationService {
             break;
           case 'hourInterval':
             final hours = rule.intervalHours ?? 0;
-            frequency = 'Vsakih $hours ${hours == 1 ? 'uro' : hours < 5 ? 'ure' : 'ur'}';
             // Load today's scheduled times for this plan
             if (plan != null) {
               final today = DateTime.now();
@@ -95,9 +94,28 @@ class MedicationService {
                 return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
               }).toList();
             }
+            frequency = 'Vsakih $hours ${hours == 1 ? 'uro' : hours < 5 ? 'ure' : 'ur'}';
             break;
           case 'dayInterval':
             final days = rule.intervalDays ?? 0;
+            // Load today's scheduled times for this plan
+            if (plan != null) {
+              final today = DateTime.now();
+              final startOfDay = DateTime(today.year, today.month, today.day);
+              final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+              
+              final scheduledTimes = await (db.select(db.medicationIntakeLogs)
+                    ..where((t) => t.planId.equals(plan.id))
+                    ..where((t) => t.scheduledTime.isBiggerOrEqualValue(startOfDay))
+                    ..where((t) => t.scheduledTime.isSmallerOrEqualValue(endOfDay))
+                    ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+                  .get();
+              
+              times = scheduledTimes.map((log) {
+                final time = log.scheduledTime;
+                return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+              }).toList();
+            }
             frequency = 'Vsakih $days ${days == 1 ? 'dan' : days == 2 ? 'dneva' : days < 5 ? 'dni' : 'dni'}';
             break;
           case 'weekly':
