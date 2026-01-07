@@ -260,6 +260,25 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               }
             },
           ),
+          const SizedBox(height: 16),
+          _DevCard(
+            icon: Symbols.medication,
+            color: Colors.pink,
+            title: "Test Next Medication Notification",
+            subtitle: "Schedule notification for next intake in 30 seconds",
+            onTap: () async {
+              final notificationService = NotificationService();
+              await notificationService.scheduleTestMedicationNotification(db);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Medication notification scheduled for 30s - tap it to test scroll"),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );

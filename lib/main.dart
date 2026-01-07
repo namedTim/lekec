@@ -437,6 +437,34 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
+  void scrollToIntake(int intakeId) {
+    if (_groupedIntakes.isEmpty || !_scrollController.hasClients) return;
+
+    // Find the time slot containing this intake
+    int targetIndex = -1;
+    for (int i = 0; i < _groupedIntakes.keys.length; i++) {
+      final timeKey = _groupedIntakes.keys.elementAt(i);
+      final intakes = _groupedIntakes[timeKey] ?? [];
+      if (intakes.any((intake) => intake['intake'].id == intakeId)) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    if (targetIndex >= 0) {
+      // Scroll to the time slot containing the intake
+      final offset = (targetIndex * 120.0).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   Future<void> _deleteOneTimeEntry(int intakeId) async {
     final confirmed = await showConfirmationDialog(
       context,

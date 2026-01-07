@@ -4,9 +4,9 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
-import '../../database/tables/medications.dart' show MedicationType, MedicationStatus;
-import '../../ui/screens/medication_frequency_selection.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
+import '../../main.dart' show homePageKey;
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -95,7 +95,13 @@ class NotificationService {
 
   void _onNotificationTap(NotificationResponse response) {
     developer.log('Notification tapped: ${response.payload}', name: 'NotificationService');
-    // TODO: Navigate to specific medication or mark as taken
+    
+    // Parse intake ID from payload
+    final intakeId = int.tryParse(response.payload ?? '');
+    if (intakeId != null) {
+      // Navigate to home page and scroll to the specific intake
+      homePageKey.currentState?.scrollToIntake(intakeId);
+    }
   }
 
   /// Schedule notification for a medication intake
@@ -550,5 +556,108 @@ class NotificationService {
     developer.log('Total pending notifications after scheduling: ${pending.length}', 
       name: 'NotificationService');
     developer.log('=== END MULTIPLE TEST SCHEDULING ===', name: 'NotificationService');
+  }
+
+  /// Schedule a test notification for the next medication intake in 30 seconds
+  /// This is for testing the scroll-to-intake functionality
+  Future<void> scheduleTestMedicationNotification(AppDatabase db) async {
+    if (!_initialized) await initialize();
+
+    final now = DateTime.now();
+    final testTime = now.add(const Duration(seconds: 30));
+    
+    // Get the next upcoming intake
+    final upcomingIntakes = await (db.select(db.medicationIntakeLogs)
+      ..where((log) => log.scheduledTime.isBiggerThanValue(now))
+      ..where((log) => log.wasTaken.equals(false))
+      ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)])
+      ..limit(1))
+      .get();
+
+    if (upcomingIntakes.isEmpty) {
+      developer.log('No upcoming intakes found for test notification', 
+        name: 'NotificationService');
+      return;
+    }
+
+    final intake = upcomingIntakes.first;
+
+    // Get medication details
+    final medication = await (db.select(db.medications)
+      ..where((m) => m.id.equals(intake.medicationId)))
+      .getSingleOrNull();
+
+    if (medication == null) {
+      developer.log('Medication not found for test notification', 
+        name: 'NotificationService');
+      return;
+    }
+
+    // Get plan details for dosage
+    final plan = await (db.select(db.medicationPlans)
+      ..where((p) => p.id.equals(intake.planId)))
+      .getSingleOrNull();
+
+    String dosageText = '';
+    if (plan != null) {
+      final dosageCount = plan.dosageAmount.toInt();
+      dosageText = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+    }
+
+    final tzTestTime = tz.TZDateTime(
+      tz.local,
+      testTime.year,
+      testTime.month,
+      testTime.day,
+      testTime.hour,
+      testTime.minute,
+      testTime.second,
+    );
+    
+    developer.log('=== TEST MEDICATION NOTIFICATION (30s) ===', name: 'NotificationService');
+    developer.log('Medication: ${medication.name}', name: 'NotificationService');
+    developer.log('Dosage: $dosageText', name: 'NotificationService');
+    developer.log('Intake ID: ${intake.id}', name: 'NotificationService');
+    developer.log('Will fire at: $testTime', name: 'NotificationService');
+    
+    const androidDetails = AndroidNotificationDetails(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      channelDescription: 'Opomniki za jemanje zdravil',
+      importance: Importance.max,
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+      ticker: 'Test medication reminder',
+    );
+
+    const notificationDetails = NotificationDetails(android: androidDetails);
+
+    try {
+      await _notifications.zonedSchedule(
+        999990, // Special ID for test
+        'Vzemite ${medication.name}',
+        dosageText.isNotEmpty ? 'Vzemite $dosageText' : 'Čas za jemanje zdravila',
+        tzTestTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: intake.id.toString(), // Use actual intake ID so tap navigation works
+      );
+      
+      developer.log('✓ Scheduled test medication notification (ID: 999990)', 
+        name: 'NotificationService');
+      
+      final pending = await _notifications.pendingNotificationRequests();
+      final found = pending.any((n) => n.id == 999990);
+      developer.log('Found in pending: $found', name: 'NotificationService');
+      
+    } catch (e, st) {
+      developer.log('✗ Failed to schedule test medication notification', 
+        error: e, stackTrace: st, name: 'NotificationService');
+    }
+    
+    developer.log('=== END TEST MEDICATION NOTIFICATION ===', name: 'NotificationService');
   }
 }
