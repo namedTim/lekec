@@ -40,6 +40,62 @@ class _QuantitySelectorState extends State<QuantitySelector> {
     }
   }
 
+  Future<void> _showManualInput() async {
+    final controller = TextEditingController(text: _value.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Vnesi količino'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: widget.label,
+            hintText: '${widget.minValue} - ${widget.maxValue}',
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            final parsed = int.tryParse(value);
+            if (parsed != null &&
+                parsed >= widget.minValue &&
+                parsed <= widget.maxValue) {
+              Navigator.of(context).pop(parsed);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Prekliči'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text);
+              if (parsed != null &&
+                  parsed >= widget.minValue &&
+                  parsed <= widget.maxValue) {
+                Navigator.of(context).pop(parsed);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Vnesi število med ${widget.minValue} in ${widget.maxValue}'),
+                  ),
+                );
+              }
+            },
+            child: const Text('V redu'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      setState(() => _value = result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -67,13 +123,26 @@ class _QuantitySelectorState extends State<QuantitySelector> {
               ),
             ),
             const SizedBox(width: 24),
-            Container(
-              width: 60,
-              alignment: Alignment.center,
-              child: Text(
-                _value.toString(),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+            InkWell(
+              onTap: _showManualInput,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 60,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: colors.outline.withOpacity(0.5),
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _value.toString(),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colors.primary,
+                  ),
                 ),
               ),
             ),

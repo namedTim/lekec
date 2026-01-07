@@ -170,7 +170,7 @@ class IntakeScheduleGenerator {
           minute,
         );
         
-        if (scheduled.isAfter(start) && scheduled.isBefore(end)) {
+        if ((scheduled.isAfter(start) || scheduled.isAtSameMomentAs(start)) && scheduled.isBefore(end)) {
           times.add(scheduled);
         }
       }
@@ -213,7 +213,7 @@ class IntakeScheduleGenerator {
             minute,
           );
           
-          if (scheduled.isAfter(start) && scheduled.isBefore(end)) {
+          if ((scheduled.isAfter(start) || scheduled.isAtSameMomentAs(start)) && scheduled.isBefore(end)) {
             times.add(scheduled);
           }
         }
@@ -253,16 +253,14 @@ class IntakeScheduleGenerator {
       startMinute,
     );
     
-    // If start time today is before start, begin from start
-    if (current.isBefore(start)) {
-      current = start;
+    // If start time today is before the plan start, move to the same time on the next day
+    while (current.isBefore(start)) {
+      current = current.add(const Duration(days: 1));
     }
     
     // Generate entries every N hours
     while (current.isBefore(end)) {
-      if (current.isAfter(start) || current.isAtSameMomentAs(start)) {
-        times.add(current);
-      }
+      times.add(current);
       current = current.add(Duration(hours: rule.intervalHours!));
     }
     
@@ -298,7 +296,7 @@ class IntakeScheduleGenerator {
           minute,
         );
         
-        if (scheduled.isAfter(start) && scheduled.isBefore(end)) {
+        if ((scheduled.isAfter(start) || scheduled.isAtSameMomentAs(start)) && scheduled.isBefore(end)) {
           times.add(scheduled);
         }
       }
@@ -346,7 +344,7 @@ class IntakeScheduleGenerator {
             minute,
           );
           
-          if (scheduled.isAfter(start) && scheduled.isBefore(end)) {
+          if ((scheduled.isAfter(start) || scheduled.isAtSameMomentAs(start)) && scheduled.isBefore(end)) {
             times.add(scheduled);
           }
         }
