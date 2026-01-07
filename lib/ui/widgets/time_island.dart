@@ -90,12 +90,29 @@ class _TimeIslandState extends State<TimeIsland> {
     if (widget.medicationName == null) return '--';
     if (_isFinished) return 'Vzemite zdravilo';
 
-    final minutes = _remaining.inMinutes;
+    final days = _remaining.inDays;
+    final hours = _remaining.inHours % 24;
+    final minutes = _remaining.inMinutes % 60;
     final seconds = _remaining.inSeconds % 60;
 
+    if (days > 0) {
+      if (hours > 0) {
+        return '$days d $hours h';
+      }
+      return '$days d';
+    }
+    
+    if (hours > 0) {
+      if (minutes > 0) {
+        return '$hours h $minutes min';
+      }
+      return '$hours h';
+    }
+    
     if (minutes > 0) {
       return '$minutes min';
     }
+    
     return '${seconds}s';
   }
 

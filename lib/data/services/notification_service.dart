@@ -6,6 +6,7 @@ import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationType, MedicationStatus;
 import '../../ui/screens/medication_frequency_selection.dart';
+import '../../helpers/medication_unit_helper.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -272,9 +273,8 @@ class NotificationService {
         continue;
       }
 
-      final dosage = plan.dosageAmount != null
-          ? '${plan.dosageAmount!.toStringAsFixed(0)} ${_getMedicationTypeUnit(medication.medType)}'
-          : null;
+      final dosageCount = plan.dosageAmount.toInt();
+      final dosage = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
 
       await scheduleIntakeNotification(
         id: intake.id,
@@ -287,45 +287,6 @@ class NotificationService {
     final count = await getPendingNotificationsCount();
     developer.log('Scheduled $count notifications successfully', 
       name: 'NotificationService');
-  }
-
-  String _getMedicationTypeUnit(MedicationType type) {
-    switch (type) {
-      case MedicationType.pills:
-        return 'tableto/e';
-      case MedicationType.capsules:
-        return 'kapsulo/e';
-      case MedicationType.drops:
-        return 'kapljic/o';
-      case MedicationType.milliliters:
-        return 'ml';
-      case MedicationType.grams:
-        return 'g';
-      case MedicationType.milligrams:
-        return 'mg';
-      case MedicationType.micrograms:
-        return 'µg';
-      case MedicationType.units:
-        return 'enot/o';
-      case MedicationType.puffs:
-        return 'vpih/ov';
-      case MedicationType.patches:
-        return 'obliž/ev';
-      case MedicationType.injections:
-        return 'injekcijo/e';
-      case MedicationType.ampules:
-        return 'ampulo/e';
-      case MedicationType.portions:
-        return 'porcijo/e';
-      case MedicationType.pieces:
-        return 'kos/ov';
-      case MedicationType.sprays:
-        return 'pršil/o';
-      case MedicationType.tablespoons:
-        return 'žlico/e';
-      case MedicationType.applications:
-        return 'aplikacijo/e';
-    }
   }
 
   /// Show an immediate test notification

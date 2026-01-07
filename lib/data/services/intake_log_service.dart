@@ -23,23 +23,44 @@ class IntakeLogService {
 
     if (upcomingIntakes.isEmpty) return null;
 
-    // Find the next or current overdue medication
+    // Find the next medication to take
     MedicationIntakeLog? nextIntake;
     
-    // First check for overdue medications (within 3 minutes grace period)
+    // Check for medications within the "ready to take" window (up to 5 minutes past scheduled time)
     for (final intake in upcomingIntakes) {
       final scheduledTime = intake.scheduledTime;
       final timeDiff = now.difference(scheduledTime);
       
-      // If it's overdue (past scheduled time) but within 3 minutes, prioritize it
-      if (timeDiff.inSeconds >= 0 && timeDiff.inMinutes < 3) {
+      // If it's within 5 minutes past scheduled time, show it as ready to take
+      if (timeDiff.inSeconds >= 0 && timeDiff.inMinutes < 5) {
+        nextIntake = intake;
+        break;
+      }
+      
+      // If it's more than 5 minutes past, skip to the next medication
+      if (timeDiff.inMinutes >= 5) {
+        continue;
+      }
+      
+      // If it's future, this is the next one
+      if (timeDiff.inSeconds < 0) {
         nextIntake = intake;
         break;
       }
     }
     
-    // If no overdue medication, get the next upcoming one
-    nextIntake ??= upcomingIntakes.first;
+    // If no medication found (all overdue by more than 5 minutes), get the next upcoming one
+    if (nextIntake == null) {
+      for (final intake in upcomingIntakes) {
+        if (now.isBefore(intake.scheduledTime)) {
+          nextIntake = intake;
+          break;
+        }
+      }
+    }
+    
+    // If still no medication found, return null
+    if (nextIntake == null) return null;
 
     // Load medication details
     Medication? medication;

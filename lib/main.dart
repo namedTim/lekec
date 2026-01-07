@@ -26,8 +26,6 @@ import 'ui/screens/cyclic_configure.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'package:lekec/database/tables/medications.dart' hide MedicationStatus;
-import '/ui/screens/medication_frequency_selection.dart' show FrequencyOption;
-
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
 import 'ui/components/confirmation_dialog.dart';
