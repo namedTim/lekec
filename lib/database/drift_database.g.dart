@@ -322,6 +322,17 @@ class $MedicationsTable extends Medications
         requiredDuringInsert: false,
         defaultValue: const Constant(0),
       ).withConverter<MedicationStatus>($MedicationsTable.$converterstatus);
+  static const VerificationMeta _intakeAdviceMeta = const VerificationMeta(
+    'intakeAdvice',
+  );
+  @override
+  late final GeneratedColumn<String> intakeAdvice = GeneratedColumn<String>(
+    'intake_advice',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -331,6 +342,7 @@ class $MedicationsTable extends Medications
     nationalCode,
     medType,
     status,
+    intakeAdvice,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -379,6 +391,15 @@ class $MedicationsTable extends Medications
         ),
       );
     }
+    if (data.containsKey('intake_advice')) {
+      context.handle(
+        _intakeAdviceMeta,
+        intakeAdvice.isAcceptableOrUnknown(
+          data['intake_advice']!,
+          _intakeAdviceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -420,6 +441,10 @@ class $MedicationsTable extends Medications
           data['${effectivePrefix}status'],
         )!,
       ),
+      intakeAdvice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intake_advice'],
+      ),
     );
   }
 
@@ -442,6 +467,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   final int? nationalCode;
   final MedicationType medType;
   final MedicationStatus status;
+  final String? intakeAdvice;
   const Medication({
     required this.id,
     required this.name,
@@ -450,6 +476,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     this.nationalCode,
     required this.medType,
     required this.status,
+    this.intakeAdvice,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -475,6 +502,9 @@ class Medication extends DataClass implements Insertable<Medication> {
         $MedicationsTable.$converterstatus.toSql(status),
       );
     }
+    if (!nullToAbsent || intakeAdvice != null) {
+      map['intake_advice'] = Variable<String>(intakeAdvice);
+    }
     return map;
   }
 
@@ -493,6 +523,9 @@ class Medication extends DataClass implements Insertable<Medication> {
           : Value(nationalCode),
       medType: Value(medType),
       status: Value(status),
+      intakeAdvice: intakeAdvice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(intakeAdvice),
     );
   }
 
@@ -513,6 +546,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       status: $MedicationsTable.$converterstatus.fromJson(
         serializer.fromJson<int>(json['status']),
       ),
+      intakeAdvice: serializer.fromJson<String?>(json['intakeAdvice']),
     );
   }
   @override
@@ -530,6 +564,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       'status': serializer.toJson<int>(
         $MedicationsTable.$converterstatus.toJson(status),
       ),
+      'intakeAdvice': serializer.toJson<String?>(intakeAdvice),
     };
   }
 
@@ -541,6 +576,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     Value<int?> nationalCode = const Value.absent(),
     MedicationType? medType,
     MedicationStatus? status,
+    Value<String?> intakeAdvice = const Value.absent(),
   }) => Medication(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -551,6 +587,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     nationalCode: nationalCode.present ? nationalCode.value : this.nationalCode,
     medType: medType ?? this.medType,
     status: status ?? this.status,
+    intakeAdvice: intakeAdvice.present ? intakeAdvice.value : this.intakeAdvice,
   );
   Medication copyWithCompanion(MedicationsCompanion data) {
     return Medication(
@@ -565,6 +602,9 @@ class Medication extends DataClass implements Insertable<Medication> {
           : this.nationalCode,
       medType: data.medType.present ? data.medType.value : this.medType,
       status: data.status.present ? data.status.value : this.status,
+      intakeAdvice: data.intakeAdvice.present
+          ? data.intakeAdvice.value
+          : this.intakeAdvice,
     );
   }
 
@@ -577,7 +617,8 @@ class Medication extends DataClass implements Insertable<Medication> {
           ..write('notes: $notes, ')
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('intakeAdvice: $intakeAdvice')
           ..write(')'))
         .toString();
   }
@@ -591,6 +632,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     nationalCode,
     medType,
     status,
+    intakeAdvice,
   );
   @override
   bool operator ==(Object other) =>
@@ -602,7 +644,8 @@ class Medication extends DataClass implements Insertable<Medication> {
           other.notes == this.notes &&
           other.nationalCode == this.nationalCode &&
           other.medType == this.medType &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.intakeAdvice == this.intakeAdvice);
 }
 
 class MedicationsCompanion extends UpdateCompanion<Medication> {
@@ -613,6 +656,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<int?> nationalCode;
   final Value<MedicationType> medType;
   final Value<MedicationStatus> status;
+  final Value<String?> intakeAdvice;
   const MedicationsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -621,6 +665,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.nationalCode = const Value.absent(),
     this.medType = const Value.absent(),
     this.status = const Value.absent(),
+    this.intakeAdvice = const Value.absent(),
   });
   MedicationsCompanion.insert({
     this.id = const Value.absent(),
@@ -630,6 +675,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.nationalCode = const Value.absent(),
     required MedicationType medType,
     this.status = const Value.absent(),
+    this.intakeAdvice = const Value.absent(),
   }) : name = Value(name),
        medType = Value(medType);
   static Insertable<Medication> custom({
@@ -640,6 +686,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Expression<int>? nationalCode,
     Expression<int>? medType,
     Expression<int>? status,
+    Expression<String>? intakeAdvice,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -649,6 +696,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       if (nationalCode != null) 'national_code': nationalCode,
       if (medType != null) 'med_type': medType,
       if (status != null) 'status': status,
+      if (intakeAdvice != null) 'intake_advice': intakeAdvice,
     });
   }
 
@@ -660,6 +708,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Value<int?>? nationalCode,
     Value<MedicationType>? medType,
     Value<MedicationStatus>? status,
+    Value<String?>? intakeAdvice,
   }) {
     return MedicationsCompanion(
       id: id ?? this.id,
@@ -669,6 +718,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       nationalCode: nationalCode ?? this.nationalCode,
       medType: medType ?? this.medType,
       status: status ?? this.status,
+      intakeAdvice: intakeAdvice ?? this.intakeAdvice,
     );
   }
 
@@ -700,6 +750,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
         $MedicationsTable.$converterstatus.toSql(status.value),
       );
     }
+    if (intakeAdvice.present) {
+      map['intake_advice'] = Variable<String>(intakeAdvice.value);
+    }
     return map;
   }
 
@@ -712,7 +765,8 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
           ..write('notes: $notes, ')
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('intakeAdvice: $intakeAdvice')
           ..write(')'))
         .toString();
   }
@@ -3066,6 +3120,7 @@ typedef $$MedicationsTableCreateCompanionBuilder =
       Value<int?> nationalCode,
       required MedicationType medType,
       Value<MedicationStatus> status,
+      Value<String?> intakeAdvice,
     });
 typedef $$MedicationsTableUpdateCompanionBuilder =
     MedicationsCompanion Function({
@@ -3076,6 +3131,7 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
       Value<int?> nationalCode,
       Value<MedicationType> medType,
       Value<MedicationStatus> status,
+      Value<String?> intakeAdvice,
     });
 
 final class $$MedicationsTableReferences
@@ -3180,6 +3236,11 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
+  ColumnFilters<String> get intakeAdvice => $composableBuilder(
+    column: $table.intakeAdvice,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> medicationPlansRefs(
     Expression<bool> Function($$MedicationPlansTableFilterComposer f) f,
   ) {
@@ -3274,6 +3335,11 @@ class $$MedicationsTableOrderingComposer
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get intakeAdvice => $composableBuilder(
+    column: $table.intakeAdvice,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MedicationsTableAnnotationComposer
@@ -3309,6 +3375,11 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<MedicationStatus, int> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get intakeAdvice => $composableBuilder(
+    column: $table.intakeAdvice,
+    builder: (column) => column,
+  );
 
   Expression<T> medicationPlansRefs<T extends Object>(
     Expression<T> Function($$MedicationPlansTableAnnotationComposer a) f,
@@ -3400,6 +3471,7 @@ class $$MedicationsTableTableManager
                 Value<int?> nationalCode = const Value.absent(),
                 Value<MedicationType> medType = const Value.absent(),
                 Value<MedicationStatus> status = const Value.absent(),
+                Value<String?> intakeAdvice = const Value.absent(),
               }) => MedicationsCompanion(
                 id: id,
                 name: name,
@@ -3408,6 +3480,7 @@ class $$MedicationsTableTableManager
                 nationalCode: nationalCode,
                 medType: medType,
                 status: status,
+                intakeAdvice: intakeAdvice,
               ),
           createCompanionCallback:
               ({
@@ -3418,6 +3491,7 @@ class $$MedicationsTableTableManager
                 Value<int?> nationalCode = const Value.absent(),
                 required MedicationType medType,
                 Value<MedicationStatus> status = const Value.absent(),
+                Value<String?> intakeAdvice = const Value.absent(),
               }) => MedicationsCompanion.insert(
                 id: id,
                 name: name,
@@ -3426,6 +3500,7 @@ class $$MedicationsTableTableManager
                 nationalCode: nationalCode,
                 medType: medType,
                 status: status,
+                intakeAdvice: intakeAdvice,
               ),
           withReferenceMapper: (p0) => p0
               .map(

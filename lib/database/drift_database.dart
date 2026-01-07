@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -40,6 +40,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           // Add status column to medications table with default value of 0 (active)
           await m.addColumn(medications, medications.status);
+        }
+        if (from < 3) {
+          // Add intakeAdvice column to medications table
+          await m.addColumn(medications, medications.intakeAdvice);
         }
       },
     );

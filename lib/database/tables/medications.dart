@@ -33,4 +33,5 @@ class Medications extends Table {
   IntColumn get nationalCode => integer().nullable()();
   IntColumn get medType => intEnum<MedicationType>()();
   IntColumn get status => intEnum<MedicationStatus>().withDefault(const Constant(0))();
+  TextColumn get intakeAdvice => text().nullable()();
 }

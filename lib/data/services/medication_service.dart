@@ -33,13 +33,23 @@ class MedicationService {
   }
 
   /// Soft delete a medication by ID (mark as deleted)
+  /// Also deletes future intake logs
   Future<void> deleteMedication(int medicationId) async {
+    final now = DateTime.now();
+    
+    // Mark medication as deleted
     await (db.update(db.medications)..where((m) => m.id.equals(medicationId)))
         .write(
       MedicationsCompanion(
         status: drift.Value(MedicationStatus.deleted),
       ),
     );
+
+    // Delete all future intake logs (keep historical data)
+    await (db.delete(db.medicationIntakeLogs)
+          ..where((log) => log.medicationId.equals(medicationId))
+          ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+        .go();
   }
 
   /// Load all medications with their plan details and schedule info

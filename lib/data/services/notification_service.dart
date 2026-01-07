@@ -488,14 +488,14 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     final intervals = [
-      1,    // 1 minute
-      2,    // 2 minutes
-      5,    // 5 minutes
-      7,    // 7 minutes
-      10,   // 10 minutes
-      20,   // 20 minutes
-      30,   // 30 minutes
-      60,   // 1 hour
+      1,
+      2,
+      5,
+      7,
+      10,
+      20,
+      30,
+      60,
     ];
 
     developer.log('=== SCHEDULING MULTIPLE TEST NOTIFICATIONS ===', name: 'NotificationService');

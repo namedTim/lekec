@@ -12,7 +12,7 @@ import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
-import 'dart:convert';
+import 'medication_detail_screen.dart';
 import 'package:lekec/main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
@@ -191,14 +191,35 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                 final med = medications[index];
                 final dosageAmount = med['dosage'] as double;
                 final dosageCount = dosageAmount.toInt();
-                return MedicationDetailsCard(
-                  medName: med['name'] as String,
-                  dosage: '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
-                  pillsRemaining: med['remaining'] as int,
-                  frequency: med['frequency'] as String,
-                  times: med['times'] as List<String>,
-                  medType: med['medType'] as MedicationType,
-                  onAddMedication: (quantity) async {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => MedicationDetailScreen(
+                          medicationId: med['id'] as int,
+                          medicationName: med['name'] as String,
+                          medType: med['medType'] as MedicationType,
+                          pillsRemaining: med['remaining'] as int,
+                          dosageAmount: dosageAmount,
+                          frequency: med['frequency'] as String,
+                          times: med['times'] as List<String>,
+                          intakeAdvice: null,
+                          onDelete: () => _deleteMedication(
+                            med['id'] as int,
+                            med['name'] as String,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: MedicationDetailsCard(
+                    medName: med['name'] as String,
+                    dosage: '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
+                    pillsRemaining: med['remaining'] as int,
+                    frequency: med['frequency'] as String,
+                    times: med['times'] as List<String>,
+                    medType: med['medType'] as MedicationType,
+                    onAddMedication: (quantity) async {
                     try {
                       final db = ref.read(databaseProvider);
                       final currentRemaining = med['remaining'] as int;
@@ -243,9 +264,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                     med['id'] as int,
                     med['name'] as String,
                   ),
-                );
-              },
-            );
+                ),
+              );
+            },
+          );
           },
         );
       case MedsTab.users:
