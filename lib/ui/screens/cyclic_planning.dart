@@ -8,11 +8,13 @@ import 'package:lekec/database/tables/medications.dart';
 class CyclicPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final String intakeAdvice;
 
   const CyclicPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.intakeAdvice,
   });
 
   @override
@@ -196,6 +198,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
       'medType': widget.medType,
       'takingDays': takingDays,
       'pauseDays': pauseDays,
+      'intakeAdvice': widget.intakeAdvice,
     });
   }
 }

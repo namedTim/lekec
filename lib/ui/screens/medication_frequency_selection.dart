@@ -14,11 +14,13 @@ enum FrequencyOption {
 class MedicationFrequencySelectionScreen extends StatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final String intakeAdvice;
 
   const MedicationFrequencySelectionScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.intakeAdvice,
   });
 
   @override
@@ -58,6 +60,7 @@ class _MedicationFrequencySelectionScreenState
         extra: {
           'name': widget.medicationName,
           'medType': widget.medType,
+          'intakeAdvice': widget.intakeAdvice,
         },
       );
     } else {
@@ -67,6 +70,7 @@ class _MedicationFrequencySelectionScreenState
           'name': widget.medicationName,
           'medType': widget.medType,
           'frequency': _selectedFrequency,
+          'intakeAdvice': widget.intakeAdvice,
         },
       );
     }

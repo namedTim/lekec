@@ -14,11 +14,13 @@ enum AdvancedScheduleType {
 class AdvancedMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final String intakeAdvice;
 
   const AdvancedMedicationPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.intakeAdvice,
   });
 
   @override
@@ -201,24 +203,28 @@ class _AdvancedMedicationPlanningScreenState
         context.push('/add-medication/advanced-planning/interval', extra: {
           'name': widget.medicationName,
           'medType': widget.medType,
+          'intakeAdvice': widget.intakeAdvice,
         });
         break;
       case AdvancedScheduleType.multipleTimes:
         context.push('/add-medication/advanced-planning/multiple-times', extra: {
           'name': widget.medicationName,
           'medType': widget.medType,
+          'intakeAdvice': widget.intakeAdvice,
         });
         break;
       case AdvancedScheduleType.specificDays:
         context.push('/add-medication/advanced-planning/specific-days', extra: {
           'name': widget.medicationName,
           'medType': widget.medType,
+          'intakeAdvice': widget.intakeAdvice,
         });
         break;
       case AdvancedScheduleType.cyclic:
         context.push('/add-medication/advanced-planning/cyclic', extra: {
           'name': widget.medicationName,
           'medType': widget.medType,
+          'intakeAdvice': widget.intakeAdvice,
         });
         break;
     }

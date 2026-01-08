@@ -9,11 +9,13 @@ enum IntervalType { hours, days }
 class IntervalPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final String intakeAdvice;
 
   const IntervalPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.intakeAdvice,
   });
 
   @override
@@ -202,6 +204,7 @@ class _IntervalPlanningScreenState
       'medType': widget.medType,
       'intervalType': _selectedType,
       'intervalValue': _intervalValue,
+      'intakeAdvice': widget.intakeAdvice,
     });
   }
 }

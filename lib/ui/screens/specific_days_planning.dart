@@ -7,11 +7,13 @@ import 'package:lekec/database/tables/medications.dart';
 class SpecificDaysPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final String intakeAdvice;
 
   const SpecificDaysPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.intakeAdvice,
   });
 
   @override
@@ -157,6 +159,7 @@ class _SpecificDaysPlanningScreenState
           'name': widget.medicationName,
           'medType': widget.medType,
           'selectedDays': _selectedDays.toList(),
+          'intakeAdvice': widget.intakeAdvice,
         });
   }
 }

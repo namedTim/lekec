@@ -9,12 +9,14 @@ import 'package:lekec/ui/screens/interval_planning.dart';
 import 'package:lekec/features/meds/providers/medications_provider.dart';
 import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
 import 'package:lekec/main.dart' show homePageKey;
+import 'package:lekec/ui/components/quantity_selector.dart';
 
 class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final IntervalType intervalType;
   final int intervalValue;
+  final String intakeAdvice;
 
   const IntervalConfigureScreen({
     super.key,
@@ -22,6 +24,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.intervalType,
     required this.intervalValue,
+    required this.intakeAdvice,
   });
 
   @override
@@ -32,6 +35,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
 class _IntervalConfigureScreenState
     extends ConsumerState<IntervalConfigureScreen> {
   TimeOfDay? _startTime;
+  int _initialQuantity = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +145,68 @@ class _IntervalConfigureScreenState
                 ),
               ),
 
+              const SizedBox(height: 24),
+
+              // Initial quantity card
+              InkWell(
+                onTap: () async {
+                  final quantity = await showQuantitySelector(
+                    context,
+                    initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+                    minValue: 0,
+                    maxValue: 999,
+                    label: 'Začetna zaloga',
+                  );
+                  if (quantity != null) {
+                    setState(() => _initialQuantity = quantity);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Symbols.inventory_2,
+                        color: colors.primary,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Začetna zaloga',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _initialQuantity > 0 ? '$_initialQuantity' : 'Ni nastavljeno',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: _initialQuantity > 0 ? null : colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Symbols.arrow_forward_ios,
+                        color: colors.onSurfaceVariant,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const Spacer(),
 
               FilledButton(
@@ -175,11 +241,16 @@ class _IntervalConfigureScreenState
     final scheduleGenerator = ref.read(intakeScheduleGeneratorProvider);
 
     try {
+      // Use initial quantity if set
+      final initialQuantity = _initialQuantity > 0 ? _initialQuantity.toDouble() : null;
+
       // Find or create medication
       final medicationId = await medicationService.createMedication(
         MedicationsCompanion(
           name: drift.Value(widget.medicationName),
           medType: drift.Value(widget.medType),
+          intakeAdvice: drift.Value(widget.intakeAdvice),
+          dosagesRemaining: drift.Value(initialQuantity),
         ),
       );
 
@@ -190,7 +261,7 @@ class _IntervalConfigureScreenState
         medicationId: medicationId,
         startDate: DateTime.now(),
         dosageAmount: 1.0, // TODO: Get from dosage selection screen
-        initialQuantity: null, // TODO: Get from quantity screen
+        initialQuantity: initialQuantity,
         isHourInterval: widget.intervalType == IntervalType.hours,
         intervalValue: widget.intervalValue,
         startTime: startTime,

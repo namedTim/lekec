@@ -19,11 +19,15 @@ class AddMedicationScreen extends ConsumerStatefulWidget {
 class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _medicationNameController = TextEditingController();
+  final _customIntakeAdviceController = TextEditingController();
   MedicationType _selectedType = MedicationType.pills;
+  String _selectedIntakeAdvice = 'Ni posebnosti';
+  bool _showCustomAdviceField = false;
 
   @override
   void dispose() {
     _medicationNameController.dispose();
+    _customIntakeAdviceController.dispose();
     super.dispose();
   }
 
@@ -51,19 +55,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
 
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
-      // final db = ref.read(databaseProvider);
-      // 
-      // final medicationCompanion = MedicationsCompanion(
-      //   name: drift.Value(_medicationNameController.text),
-      //   medType: drift.Value(_selectedType),
-      // );
-      //
-      // try {
-      //   final id = await db.into(db.medications).insert(medicationCompanion);
-      //   developer.log('Medication added', name: 'AddMedication');
-      // } catch (e) {
-      //   developer.log('Error adding medication', name: 'AddMedication', error: e);
-      // }
+      // Determine final intake advice
+      final intakeAdvice = _selectedIntakeAdvice == 'Po meri'
+          ? _customIntakeAdviceController.text.trim()
+          : _selectedIntakeAdvice;
 
       if (mounted) {
         context.push(
@@ -71,6 +66,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
           extra: {
             'name': _medicationNameController.text,
             'medType': _selectedType,
+            'intakeAdvice': intakeAdvice,
           },
         );
       }
@@ -181,6 +177,78 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                     }
                   },
                 ),
+
+                const SizedBox(height: 24),
+
+                // Intake Advice Dropdown
+                DropdownButtonFormField<String>(
+                  value: _selectedIntakeAdvice,
+                  isExpanded: true,
+                  alignment: Alignment.center,
+                  decoration: InputDecoration(
+                    labelText: 'Priporočilo pred zaužitjem',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  selectedItemBuilder: (BuildContext context) {
+                    return ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map<Widget>((String value) {
+                      return Center(
+                        child: Text(
+                          value,
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }).toList();
+                  },
+                  items: ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map((String value) {
+                    return DropdownMenuItem(
+                      value: value,
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: screenWidth * 0.6,
+                        child: Text(
+                          value,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedIntakeAdvice = value;
+                        _showCustomAdviceField = value == 'Po meri';
+                      });
+                    }
+                  },
+                ),
+
+                // Custom advice text field (shown when "Po meri" is selected)
+                if (_showCustomAdviceField) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _customIntakeAdviceController,
+                    decoration: InputDecoration(
+                      labelText: 'Prilagojeno priporočilo',
+                      hintText: 'Vnesite svoje priporočilo',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                    ),
+                    validator: (value) {
+                      if (_selectedIntakeAdvice == 'Po meri' && (value == null || value.trim().isEmpty)) {
+                        return 'Vnesite priporočilo';
+                      }
+                      return null;
+                    },
+                    maxLines: 2,
+                  ),
+                ],
 
                 const SizedBox(height: 48),
                 

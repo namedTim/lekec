@@ -6,7 +6,8 @@ import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
-import '../../main.dart' show homePageKey;
+import '../../main.dart' show homePageKey, db, rootNavigatorKey;
+import 'package:go_router/go_router.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -99,8 +100,19 @@ class NotificationService {
     // Parse intake ID from payload
     final intakeId = int.tryParse(response.payload ?? '');
     if (intakeId != null) {
-      // Navigate to home page and scroll to the specific intake
-      homePageKey.currentState?.scrollToIntake(intakeId);
+      // Navigate to home page (index 1 in bottom nav)
+      final context = rootNavigatorKey.currentContext;
+      if (context != null) {
+        // Navigate to home page
+        context.go('/');
+        
+        // Wait for navigation to complete, then scroll to the intake
+        Future.delayed(const Duration(milliseconds: 300), () {
+          homePageKey.currentState?.scrollToIntake(intakeId);
+        });
+        
+        developer.log('Navigated to home and scrolling to intake $intakeId', name: 'NotificationService');
+      }
     }
   }
 

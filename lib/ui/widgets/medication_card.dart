@@ -23,6 +23,7 @@ class MedicationCard extends StatefulWidget {
     this.onDelete,
     this.enableLeftSwipe = true,
     this.enableRightSwipe = true,
+    this.isNextMedication = false,
   });
 
   final String medName;
@@ -38,6 +39,7 @@ class MedicationCard extends StatefulWidget {
   final VoidCallback? onDelete;
   final bool enableLeftSwipe;
   final bool enableRightSwipe;
+  final bool isNextMedication;
 
   @override
   State<MedicationCard> createState() => _MedicationCardState();
@@ -107,6 +109,12 @@ class _MedicationCardState extends State<MedicationCard> {
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(20),
+          border: widget.isNextMedication
+              ? Border.all(
+                  color: const Color(0xFF22C55E), // Green color
+                  width: 3,
+                )
+              : null,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,

@@ -163,6 +163,7 @@ class MedicationService {
         'frequency': frequency,
         'times': times,
         'medType': medication.medType,
+        'intakeAdvice': medication.intakeAdvice,
         'plan': plan,
       });
     }

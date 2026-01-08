@@ -40,6 +40,7 @@ import 'helpers/medication_unit_helper.dart';
 export 'ui/widgets/medication_card.dart' show MedicationStatus;
 
 late final AppDatabase db;
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,7 @@ void main() async {
 }
 
 final _router = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   routes: [
     StatefulShellRoute.indexedStack(
@@ -121,6 +123,7 @@ final _router = GoRouter(
         return MedicationFrequencySelectionScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -142,6 +145,7 @@ final _router = GoRouter(
         return AdvancedMedicationPlanningScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -152,6 +156,7 @@ final _router = GoRouter(
         return IntervalPlanningScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -164,6 +169,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           intervalType: extra['intervalType'] as IntervalType,
           intervalValue: extra['intervalValue'] as int,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -174,6 +180,7 @@ final _router = GoRouter(
         return MultipleTimesPlanningScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -185,6 +192,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           timesPerDay: extra['timesPerDay'] as int,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -195,6 +203,7 @@ final _router = GoRouter(
         return SpecificDaysPlanningScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -206,6 +215,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           selectedDays: List<int>.from(extra['selectedDays'] as List),
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -216,6 +226,7 @@ final _router = GoRouter(
         return CyclicPlanningScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -228,6 +239,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           takingDays: extra['takingDays'] as int,
           pauseDays: extra['pauseDays'] as int,
+          intakeAdvice: extra['intakeAdvice'] as String,
         );
       },
     ),
@@ -391,7 +403,7 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
-  Future<void> loadTodaysIntakes() async {
+  Future<void> loadTodaysIntakes({bool autoScroll = true}) async {
     final grouped = await _intakeService.loadTodaysIntakes();
 
     setState(() {
@@ -401,10 +413,12 @@ class _MyHomePageState extends State<MyHomePage>
     // Update time island after loading intakes
     await _updateTimeIsland();
 
-    // Scroll to next intake
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToNextIntake();
-    });
+    // Scroll to next intake only if autoScroll is true
+    if (autoScroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToNextIntake();
+      });
+    }
   }
 
   void _scrollToNextIntake() {
@@ -477,7 +491,7 @@ class _MyHomePageState extends State<MyHomePage>
 
     try {
       await _intakeService.deleteOneTimeEntry(intakeId);
-      await loadTodaysIntakes();
+      await loadTodaysIntakes(autoScroll: false);
 
       if (mounted) {
         final colors = Theme.of(context).colorScheme;
@@ -518,7 +532,7 @@ class _MyHomePageState extends State<MyHomePage>
     try {
       final wasTaken = newStatus == MedicationStatus.taken;
       await _intakeService.updateIntakeStatus(intakeId, wasTaken);
-      await loadTodaysIntakes();
+      await loadTodaysIntakes(autoScroll: false);
       
       // Update time island immediately after taking medication
       await _updateTimeIsland();
@@ -572,14 +586,14 @@ class _MyHomePageState extends State<MyHomePage>
     _toggleSpeedDial();
     await context.push('/add-single-entry');
     // Refresh after returning from adding entry
-    await loadTodaysIntakes();
+    await loadTodaysIntakes(autoScroll: false);
   }
 
   void _onAddNewMedication() async {
     _toggleSpeedDial();
     await context.push('/add-medication');
     // Refresh after returning from adding medication
-    await loadTodaysIntakes();
+    await loadTodaysIntakes(autoScroll: false);
   }
 
   @override
@@ -644,6 +658,10 @@ class _MyHomePageState extends State<MyHomePage>
                         hour,
                         minute,
                       );
+                      // Add 10 minute grace period before marking as "not taken"
+                      final gracePeriodEnd = slotTime.add(const Duration(minutes: 10));
+                      // 10 minute window for green border
+                      final borderWindowEnd = slotTime.add(const Duration(minutes: 10));
                       final isPast = slotTime.isBefore(now);
 
                       return Column(
@@ -662,11 +680,21 @@ class _MyHomePageState extends State<MyHomePage>
                             MedicationStatus status;
                             if (intake.wasTaken) {
                               status = MedicationStatus.taken;
-                            } else if (isPast) {
+                            } else if (now.isAfter(gracePeriodEnd)) {
+                              // Only mark as not taken after 10 minute grace period
                               status = MedicationStatus.notTaken;
                             } else {
                               status = MedicationStatus.upcoming;
                             }
+
+                            // Check if this is the next medication to take
+                            // Show border only when: time has arrived, within 10 min window, not yet taken
+                            final isInBorderWindow = now.isAfter(slotTime) && 
+                                                     now.isBefore(borderWindowEnd);
+                            final isNextMed = _nextMedication != null &&
+                                (_nextMedication!['intake'] as MedicationIntakeLog?)?.id == intake.id &&
+                                status == MedicationStatus.upcoming &&
+                                isInBorderWindow;
 
                             // For one-time entries, dosage is stored in the intake log
                             final dosageAmount = plan?.dosageAmount ?? 1.0;
@@ -686,6 +714,7 @@ class _MyHomePageState extends State<MyHomePage>
                               isOneTimeEntry: isOneTime,
                               enableLeftSwipe: true,
                               enableRightSwipe: !isOneTime, // One-time entries can't be marked as taken (already taken)
+                              isNextMedication: isNextMed,
                               onStatusChanged: isOneTime ? null : (newStatus) async {
                                 await _updateIntakeStatus(intake.id, newStatus);
                               },
