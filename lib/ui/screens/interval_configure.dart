@@ -36,6 +36,8 @@ class _IntervalConfigureScreenState
     extends ConsumerState<IntervalConfigureScreen> {
   TimeOfDay? _startTime;
   int _initialQuantity = 0;
+  int _dosageAmount = 1;
+  bool _isSaving = false;
 
   @override
   Widget build(BuildContext context) {
@@ -90,11 +92,7 @@ class _IntervalConfigureScreenState
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Symbols.schedule,
-                        color: colors.primary,
-                        size: 32,
-                      ),
+                      Icon(Symbols.schedule, color: colors.primary, size: 32),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
@@ -127,11 +125,7 @@ class _IntervalConfigureScreenState
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Symbols.info,
-                      color: colors.primary,
-                      size: 20,
-                    ),
+                    Icon(Symbols.info, color: colors.primary, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -146,6 +140,62 @@ class _IntervalConfigureScreenState
               ),
 
               const SizedBox(height: 24),
+
+              // Količina na vnos card
+              InkWell(
+                onTap: () async {
+                  final quantity = await showQuantitySelector(
+                    context,
+                    initialValue: _dosageAmount,
+                    minValue: 1,
+                    maxValue: 99,
+                    label: 'Količina na vnos',
+                  );
+                  if (quantity != null) {
+                    setState(() => _dosageAmount = quantity);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Symbols.pill, color: colors.primary, size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Količina na vnos',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_dosageAmount',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Symbols.arrow_forward_ios,
+                        color: colors.onSurfaceVariant,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Initial quantity card
               InkWell(
@@ -188,10 +238,14 @@ class _IntervalConfigureScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _initialQuantity > 0 ? '$_initialQuantity' : 'Ni nastavljeno',
+                              _initialQuantity > 0
+                                  ? '$_initialQuantity'
+                                  : 'Ni nastavljeno',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: _initialQuantity > 0 ? null : colors.onSurfaceVariant,
+                                color: _initialQuantity > 0
+                                    ? null
+                                    : colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -210,16 +264,18 @@ class _IntervalConfigureScreenState
               const Spacer(),
 
               FilledButton(
-                onPressed: _startTime != null ? _handleSave : null,
+                onPressed: _startTime != null && !_isSaving
+                    ? _handleSave
+                    : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Shrani',
-                  style: TextStyle(
+                child: Text(
+                  _isSaving ? 'Shranjujem...' : 'Shrani',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -234,7 +290,11 @@ class _IntervalConfigureScreenState
   }
 
   void _handleSave() async {
-    if (_startTime == null) return;
+    if (_startTime == null || _isSaving) return;
+
+    setState(() {
+      _isSaving = true;
+    });
 
     final medicationService = ref.read(medicationServiceProvider);
     final planService = ref.read(planServiceProvider);
@@ -242,7 +302,9 @@ class _IntervalConfigureScreenState
 
     try {
       // Use initial quantity if set
-      final initialQuantity = _initialQuantity > 0 ? _initialQuantity.toDouble() : null;
+      final initialQuantity = _initialQuantity > 0
+          ? _initialQuantity.toDouble()
+          : null;
 
       // Find or create medication
       final medicationId = await medicationService.createMedication(
@@ -255,12 +317,13 @@ class _IntervalConfigureScreenState
       );
 
       // Create interval plan
-      final startTime = '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}';
+      final startTime =
+          '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}';
       await planService.createIntervalPlan(
         userId: 1, // TODO: Get from auth
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: 1.0, // TODO: Get from dosage selection screen
+        dosageAmount: _dosageAmount.toDouble(),
         initialQuantity: initialQuantity,
         isHourInterval: widget.intervalType == IntervalType.hours,
         intervalValue: widget.intervalValue,
@@ -277,22 +340,24 @@ class _IntervalConfigureScreenState
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Navigate to home and refresh
         context.go('/');
-        
+
         // Wait a moment for navigation to complete, then refresh
         await Future.delayed(const Duration(milliseconds: 100));
         homePageKey.currentState?.loadTodaysIntakes();
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }

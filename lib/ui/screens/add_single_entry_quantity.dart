@@ -87,6 +87,7 @@ class _AddSingleEntryQuantityScreenState
       await intakeLogService.createOneTimeEntry(
         medicationId: medicationId,
         userId: 1, // TODO: Get from current user
+        dosageAmount: _quantity.toDouble(),
       );
 
       if (mounted) {
@@ -107,10 +108,7 @@ class _AddSingleEntryQuantityScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -166,13 +164,17 @@ class _AddSingleEntryQuantityScreenState
                     // Decrement button
                     Container(
                       decoration: BoxDecoration(
-                        color: _quantity > 1 ? colors.primary : colors.surfaceContainerHigh,
+                        color: _quantity > 1
+                            ? colors.primary
+                            : colors.surfaceContainerHigh,
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         onPressed: _quantity > 1 ? _decrement : null,
                         icon: const Icon(Symbols.remove),
-                        color: _quantity > 1 ? colors.onPrimary : colors.onSurfaceVariant,
+                        color: _quantity > 1
+                            ? colors.onPrimary
+                            : colors.onSurfaceVariant,
                         iconSize: 28,
                       ),
                     ),
@@ -214,13 +216,17 @@ class _AddSingleEntryQuantityScreenState
                     // Increment button
                     Container(
                       decoration: BoxDecoration(
-                        color: _quantity < 99 ? colors.primary : colors.surfaceContainerHigh,
+                        color: _quantity < 99
+                            ? colors.primary
+                            : colors.surfaceContainerHigh,
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         onPressed: _quantity < 99 ? _increment : null,
                         icon: const Icon(Symbols.add),
-                        color: _quantity < 99 ? colors.onPrimary : colors.onSurfaceVariant,
+                        color: _quantity < 99
+                            ? colors.onPrimary
+                            : colors.onSurfaceVariant,
                         iconSize: 28,
                       ),
                     ),
@@ -240,10 +246,7 @@ class _AddSingleEntryQuantityScreenState
                 ),
                 child: const Text(
                   'Shrani',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),

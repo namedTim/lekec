@@ -33,6 +33,8 @@ class _MultipleTimesSelectTimesScreenState
     extends ConsumerState<MultipleTimesSelectTimesScreen> {
   List<TimeOfDay?> _times = [];
   int _initialQuantity = 0;
+  int _dosageAmount = 1;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -131,18 +133,20 @@ class _MultipleTimesSelectTimesScreenState
                                   children: [
                                     Text(
                                       '${index + 1}. vnos',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colors.onSurfaceVariant,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                          ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _times[index] != null
                                           ? '${_times[index]!.hour.toString().padLeft(2, '0')}:${_times[index]!.minute.toString().padLeft(2, '0')}'
                                           : 'Izberite čas',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -164,6 +168,62 @@ class _MultipleTimesSelectTimesScreenState
                   },
                 ),
               ),
+
+              // Količina na vnos card
+              InkWell(
+                onTap: () async {
+                  final quantity = await showQuantitySelector(
+                    context,
+                    initialValue: _dosageAmount,
+                    minValue: 1,
+                    maxValue: 99,
+                    label: 'Količina na vnos',
+                  );
+                  if (quantity != null) {
+                    setState(() => _dosageAmount = quantity);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Symbols.pill, color: colors.primary, size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Količina na vnos',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_dosageAmount',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Symbols.arrow_forward_ios,
+                        color: colors.onSurfaceVariant,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Initial quantity card
               InkWell(
@@ -206,10 +266,14 @@ class _MultipleTimesSelectTimesScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _initialQuantity > 0 ? '$_initialQuantity' : 'Ni nastavljeno',
+                              _initialQuantity > 0
+                                  ? '$_initialQuantity'
+                                  : 'Ni nastavljeno',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: _initialQuantity > 0 ? null : colors.onSurfaceVariant,
+                                color: _initialQuantity > 0
+                                    ? null
+                                    : colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -227,16 +291,16 @@ class _MultipleTimesSelectTimesScreenState
               const SizedBox(height: 16),
 
               FilledButton(
-                onPressed: allTimesSelected ? _handleSave : null,
+                onPressed: allTimesSelected && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Shrani',
-                  style: TextStyle(
+                child: Text(
+                  _isSaving ? 'Shranjujem...' : 'Shrani',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -251,7 +315,11 @@ class _MultipleTimesSelectTimesScreenState
   }
 
   void _handleSave() async {
-    if (_times.any((t) => t == null)) return;
+    if (_times.any((t) => t == null) || _isSaving) return;
+
+    setState(() {
+      _isSaving = true;
+    });
 
     final medicationService = ref.read(medicationServiceProvider);
     final planService = ref.read(planServiceProvider);
@@ -259,7 +327,9 @@ class _MultipleTimesSelectTimesScreenState
 
     try {
       // Use initial quantity if set
-      final initialQuantity = _initialQuantity > 0 ? _initialQuantity.toDouble() : null;
+      final initialQuantity = _initialQuantity > 0
+          ? _initialQuantity.toDouble()
+          : null;
 
       // Find or create medication
       final medicationId = await medicationService.createMedication(
@@ -273,7 +343,10 @@ class _MultipleTimesSelectTimesScreenState
 
       // Convert times to string list
       final times = _times
-          .map((t) => '${t!.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+          .map(
+            (t) =>
+                '${t!.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+          )
           .toList();
 
       // Create daily plan with multiple times
@@ -281,7 +354,7 @@ class _MultipleTimesSelectTimesScreenState
         userId: 1, // TODO: Get from auth
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: 1.0, // TODO: Get from dosage selection screen
+        dosageAmount: _dosageAmount.toDouble(),
         initialQuantity: initialQuantity,
         ruleType: 'daily',
         times: times,
@@ -305,12 +378,14 @@ class _MultipleTimesSelectTimesScreenState
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }

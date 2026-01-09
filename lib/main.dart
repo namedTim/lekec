@@ -691,10 +691,17 @@ class _MyHomePageState extends State<MyHomePage>
                                 MedicationStatus status;
                                 if (intake.wasTaken) {
                                   status = MedicationStatus.taken;
-                                } else if (now.isAfter(gracePeriodEnd)) {
-                                  // Only mark as not taken after 10 minute grace period
+                                } else if (intake.takenTime != null) {
+                                  // User explicitly marked as not taken (takenTime is set but wasTaken is false)
                                   status = MedicationStatus.notTaken;
+                                } else if (now.isAfter(gracePeriodEnd)) {
+                                  // Automatically mark as not taken after 10 minute grace period
+                                  status = MedicationStatus.notTaken;
+                                } else if (isPast) {
+                                  // During grace period - show as upcoming (clock) if user hasn't acted yet
+                                  status = MedicationStatus.upcoming;
                                 } else {
+                                  // Future medication (time hasn't arrived yet)
                                   status = MedicationStatus.upcoming;
                                 }
 
@@ -716,6 +723,10 @@ class _MyHomePageState extends State<MyHomePage>
                                 final dosageAmount = plan?.dosageAmount ?? 1.0;
                                 final dosageCount = dosageAmount.toInt();
 
+                                // Enable swipes only if time has passed (isPast)
+                                // For future medications, disable swiping
+                                final canSwipe = isPast && !isOneTime;
+
                                 return MedicationCard(
                                   medName: medication.name,
                                   dosage:
@@ -729,9 +740,8 @@ class _MyHomePageState extends State<MyHomePage>
                                   userId: '1',
                                   status: status,
                                   isOneTimeEntry: isOneTime,
-                                  enableLeftSwipe: true,
-                                  enableRightSwipe:
-                                      !isOneTime, // One-time entries can't be marked as taken (already taken)
+                                  enableLeftSwipe: canSwipe,
+                                  enableRightSwipe: canSwipe,
                                   isNextMedication: isNextMed,
                                   onStatusChanged: isOneTime
                                       ? null

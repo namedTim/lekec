@@ -10,7 +10,7 @@ class MedicationIntakeLogs extends Table {
   IntColumn get medicationId => integer().references(Medications, #id)();
   IntColumn get userId => integer().references(Users, #id)();
   DateTimeColumn get scheduledTime => dateTime()();
-  DateTimeColumn get takenTime => dateTime().nullable()();
+  DateTimeColumn get takenTime => dateTime().nullable()(); // Set when user takes ANY action (taken or not taken)
 
   BoolColumn get wasTaken => boolean().withDefault(const Constant(false))();
 }
