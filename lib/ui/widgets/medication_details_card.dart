@@ -44,12 +44,12 @@ class MedicationDetailsCard extends StatelessWidget {
 
   String _getTimesText() {
     if (times.isEmpty) return '';
-    
-    // For interval medications (Vsakih X ur/dni), use comma-separated list
+
+    // For interval medications (Vsakih X ur/dni), show next time only
     if (frequency.startsWith('Vsakih')) {
-      return 'ob ${times.join(', ')}';
+      return times.isNotEmpty ? 'naslednjič ob ${times[0]}' : '';
     }
-    
+
     // For other medications, use "in" for the last item
     if (times.length == 1) {
       return 'ob ${times[0]}';
@@ -144,7 +144,10 @@ class MedicationDetailsCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          '$frequency ${_getTimesText()}',
+                          frequency.startsWith('Vsakih') &&
+                                  _getTimesText().isNotEmpty
+                              ? '$frequency, ${_getTimesText()}'
+                              : '$frequency ${_getTimesText()}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
