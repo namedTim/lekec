@@ -35,7 +35,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     switch (type) {
       case MedicationType.pills: return 'Tablete';
       case MedicationType.ampules: return 'Ampule';
-      case MedicationType.applications: return 'Aplikacije';
+      case MedicationType.applications: return 'Nanosi';
       case MedicationType.capsules: return 'Kapsule';
       case MedicationType.drops: return 'Kapljice';
       case MedicationType.grams: return 'Grami';

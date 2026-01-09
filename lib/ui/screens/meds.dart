@@ -27,6 +27,13 @@ class MedsScreen extends ConsumerStatefulWidget {
 class _MedsScreenState extends ConsumerState<MedsScreen> {
   MedsTab _selectedTab = MedsTab.medications;
   int _refreshKey = 0;
+  final ValueNotifier<bool> _fabExpandedNotifier = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _fabExpandedNotifier.dispose();
+    super.dispose();
+  }
 
   void _refreshMedications() {
     setState(() {
@@ -79,48 +86,70 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<MedsTab>(
-                  segments: const [
-                    ButtonSegment<MedsTab>(
-                      value: MedsTab.medications,
-                      label: Text('Zdravila'),
-                      icon: Icon(Symbols.pill),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<MedsTab>(
+                      segments: const [
+                        ButtonSegment<MedsTab>(
+                          value: MedsTab.medications,
+                          label: Text('Zdravila'),
+                          icon: Icon(Symbols.pill),
+                        ),
+                        ButtonSegment<MedsTab>(
+                          value: MedsTab.users,
+                          label: Text('Uporabniki'),
+                          icon: Icon(Symbols.group),
+                        ),
+                        ButtonSegment<MedsTab>(
+                          value: MedsTab.settings,
+                          label: Text('Nastavitve'),
+                          icon: Icon(Symbols.settings),
+                        ),
+                      ],
+                      selected: {_selectedTab},
+                      onSelectionChanged: (Set<MedsTab> newSelection) {
+                        setState(() {
+                          _selectedTab = newSelection.first;
+                        });
+                      },
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity(horizontal: -2),
+                      ),
                     ),
-                    ButtonSegment<MedsTab>(
-                      value: MedsTab.users,
-                      label: Text('Uporabniki'),
-                      icon: Icon(Symbols.group),
-                    ),
-                    ButtonSegment<MedsTab>(
-                      value: MedsTab.settings,
-                      label: Text('Nastavitve'),
-                      icon: Icon(Symbols.settings),
-                    ),
-                  ],
-                  selected: {_selectedTab},
-                  onSelectionChanged: (Set<MedsTab> newSelection) {
-                    setState(() {
-                      _selectedTab = newSelection.first;
-                    });
-                  },
-                  style: ButtonStyle(
-                    visualDensity: VisualDensity(horizontal: -2),
                   ),
                 ),
-              ),
+                Expanded(child: _buildContent()),
+              ],
             ),
-            Expanded(child: _buildContent()),
-          ],
-        ),
+          ),
+          // Full-screen barrier when FAB is expanded
+          ValueListenableBuilder<bool>(
+            valueListenable: _fabExpandedNotifier,
+            builder: (context, isExpanded, child) {
+              if (!isExpanded) return const SizedBox.shrink();
+              return Positioned.fill(
+                child: GestureDetector(
+                  onTap: () {
+                    _fabExpandedNotifier.value = false;
+                  },
+                  child: Container(color: Colors.black.withOpacity(0.01)),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       floatingActionButton: SpeedDialFab(
+        onExpandedChanged: (expanded) {
+          _fabExpandedNotifier.value = expanded;
+        },
         options: [
           SpeedDialOption(
             label: 'Dodaj enkraten vnos',
@@ -149,7 +178,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   Widget _buildContent() {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    
+
     switch (_selectedTab) {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
@@ -165,7 +194,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
             final medications = snapshot.data ?? [];
-            
+
             if (medications.isEmpty) {
               return Center(
                 child: Text(
@@ -211,60 +240,66 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                   },
                   child: MedicationDetailsCard(
                     medName: med['name'] as String,
-                    dosage: '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
+                    dosage:
+                        '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
                     pillsRemaining: med['remaining'] as int,
                     frequency: med['frequency'] as String,
                     times: med['times'] as List<String>,
                     medType: med['medType'] as MedicationType,
                     onAddMedication: (quantity) async {
-                    try {
-                      final db = ref.read(databaseProvider);
-                      final currentRemaining = med['remaining'] as int;
-                      final newRemaining = (currentRemaining + quantity).clamp(0, 9999);
-                      
-                      await (db.update(db.medications)
-                            ..where((t) => t.id.equals(med['id'] as int)))
-                          .write(
-                        MedicationsCompanion(
-                          dosagesRemaining: drift.Value(newRemaining.toDouble()),
-                        ),
-                      );
-                      
-                      if (mounted) {
-                        final absQuantity = quantity.abs();
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              quantity >= 0
-                                  ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
-                                  : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
+                      try {
+                        final db = ref.read(databaseProvider);
+                        final currentRemaining = med['remaining'] as int;
+                        final newRemaining = (currentRemaining + quantity)
+                            .clamp(0, 9999);
+
+                        await (db.update(
+                          db.medications,
+                        )..where((t) => t.id.equals(med['id'] as int))).write(
+                          MedicationsCompanion(
+                            dosagesRemaining: drift.Value(
+                              newRemaining.toDouble(),
                             ),
-                            backgroundColor: quantity >= 0 ? Colors.green : Colors.orange,
                           ),
                         );
-                        _refreshMedications();
+
+                        if (mounted) {
+                          final absQuantity = quantity.abs();
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                quantity >= 0
+                                    ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
+                                    : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
+                              ),
+                              backgroundColor: quantity >= 0
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
+                          );
+                          _refreshMedications();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Napaka: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Napaka: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  onDelete: () => _deleteMedication(
-                    med['id'] as int,
-                    med['name'] as String,
+                    },
+                    onDelete: () => _deleteMedication(
+                      med['id'] as int,
+                      med['name'] as String,
+                    ),
                   ),
-                ),
-              );
-            },
-          );
+                );
+              },
+            );
           },
         );
       case MedsTab.users:

@@ -337,7 +337,7 @@ class _MyHomePageState extends State<MyHomePage>
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
   late IntakeLogService _intakeService;
-  
+
   // Time Island state
   Map<String, dynamic>? _nextMedication;
   Timer? _islandUpdateTimer;
@@ -533,7 +533,7 @@ class _MyHomePageState extends State<MyHomePage>
       final wasTaken = newStatus == MedicationStatus.taken;
       await _intakeService.updateIntakeStatus(intakeId, wasTaken);
       await loadTodaysIntakes(autoScroll: false);
-      
+
       // Update time island immediately after taking medication
       await _updateTimeIsland();
 
@@ -602,132 +602,171 @@ class _MyHomePageState extends State<MyHomePage>
     final colors = theme.colorScheme;
 
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _nextMedication != null
-                  ? TimeIsland(
-                      medicationName: (_nextMedication!['medication'] as Medication).name,
-                      totalDuration: const Duration(minutes: 30),
-                      remainingDuration: _nextMedication!['timeUntil'] as Duration,
-                      isOverdue: _nextMedication!['isOverdue'] as bool,
-                      controller: controller,
-                    )
-                  : TimeIsland(
-                      totalDuration: const Duration(minutes: 30),
-                      remainingDuration: const Duration(minutes: 30),
-                      isOverdue: false,
-                      controller: controller,
-                    ),
-            ),
-          ),
-          Expanded(
-            child: _groupedIntakes.isEmpty
-                ? Center(
-                    child: Text(
-                      'Ni načrtovanih zdravil za danes',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colors.onSurfaceVariant,
+          Column(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _nextMedication != null
+                      ? TimeIsland(
+                          medicationName:
+                              (_nextMedication!['medication'] as Medication)
+                                  .name,
+                          totalDuration: const Duration(minutes: 30),
+                          remainingDuration:
+                              _nextMedication!['timeUntil'] as Duration,
+                          isOverdue: _nextMedication!['isOverdue'] as bool,
+                          controller: controller,
+                        )
+                      : TimeIsland(
+                          totalDuration: const Duration(minutes: 30),
+                          remainingDuration: const Duration(minutes: 30),
+                          isOverdue: false,
+                          controller: controller,
+                        ),
+                ),
+              ),
+              Expanded(
+                child: _groupedIntakes.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Ni načrtovanih zdravil za danes',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          bottom: 88.0,
+                        ),
+                        itemCount: _groupedIntakes.length,
+                        itemBuilder: (context, index) {
+                          final timeKey = _groupedIntakes.keys.elementAt(index);
+                          final intakesAtTime = _groupedIntakes[timeKey]!;
+
+                          // Determine if this time slot is in the past
+                          final now = DateTime.now();
+                          final parts = timeKey.split(':');
+                          final hour = int.parse(parts[0]);
+                          final minute = int.parse(parts[1]);
+                          final slotTime = DateTime(
+                            now.year,
+                            now.month,
+                            now.day,
+                            hour,
+                            minute,
+                          );
+                          // Add 10 minute grace period before marking as "not taken"
+                          final gracePeriodEnd = slotTime.add(
+                            const Duration(minutes: 10),
+                          );
+                          // 10 minute window for green border
+                          final borderWindowEnd = slotTime.add(
+                            const Duration(minutes: 10),
+                          );
+                          final isPast = slotTime.isBefore(now);
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TimeSlot(time: timeKey, isPast: isPast),
+                              ...intakesAtTime.map((intakeData) {
+                                final medication =
+                                    intakeData['medication'] as Medication;
+                                final plan =
+                                    intakeData['plan'] as MedicationPlan?;
+                                final intake =
+                                    intakeData['intake'] as MedicationIntakeLog;
+                                final isOneTime =
+                                    intakeData['isOneTimeEntry'] as bool;
+
+                                // Determine status based on wasTaken and time
+                                MedicationStatus status;
+                                if (intake.wasTaken) {
+                                  status = MedicationStatus.taken;
+                                } else if (now.isAfter(gracePeriodEnd)) {
+                                  // Only mark as not taken after 10 minute grace period
+                                  status = MedicationStatus.notTaken;
+                                } else {
+                                  status = MedicationStatus.upcoming;
+                                }
+
+                                // Check if this is the next medication to take
+                                // Show border only when: time has arrived, within 10 min window, not yet taken
+                                final isInBorderWindow =
+                                    now.isAfter(slotTime) &&
+                                    now.isBefore(borderWindowEnd);
+                                final isNextMed =
+                                    _nextMedication != null &&
+                                    (_nextMedication!['intake']
+                                                as MedicationIntakeLog?)
+                                            ?.id ==
+                                        intake.id &&
+                                    status == MedicationStatus.upcoming &&
+                                    isInBorderWindow;
+
+                                // For one-time entries, dosage is stored in the intake log
+                                final dosageAmount = plan?.dosageAmount ?? 1.0;
+                                final dosageCount = dosageAmount.toInt();
+
+                                return MedicationCard(
+                                  medName: medication.name,
+                                  dosage:
+                                      '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                  medicineRemaining:
+                                      '', // TODO: Calculate remaining
+                                  pillCount:
+                                      0, // TODO: Calculate from inventory
+                                  showName: false,
+                                  username: 'jaz', // TODO: Get from user
+                                  userId: '1',
+                                  status: status,
+                                  isOneTimeEntry: isOneTime,
+                                  enableLeftSwipe: true,
+                                  enableRightSwipe:
+                                      !isOneTime, // One-time entries can't be marked as taken (already taken)
+                                  isNextMedication: isNextMed,
+                                  onStatusChanged: isOneTime
+                                      ? null
+                                      : (newStatus) async {
+                                          await _updateIntakeStatus(
+                                            intake.id,
+                                            newStatus,
+                                          );
+                                        },
+                                  onDelete: isOneTime
+                                      ? () async {
+                                          await _deleteOneTimeEntry(intake.id);
+                                        }
+                                      : null,
+                                );
+                              }),
+                            ],
+                          );
+                        },
                       ),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(
-                      left: 16.0,
-                      right: 16.0,
-                      bottom: 88.0,
-                    ),
-                    itemCount: _groupedIntakes.length,
-                    itemBuilder: (context, index) {
-                      final timeKey = _groupedIntakes.keys.elementAt(index);
-                      final intakesAtTime = _groupedIntakes[timeKey]!;
-
-                      // Determine if this time slot is in the past
-                      final now = DateTime.now();
-                      final parts = timeKey.split(':');
-                      final hour = int.parse(parts[0]);
-                      final minute = int.parse(parts[1]);
-                      final slotTime = DateTime(
-                        now.year,
-                        now.month,
-                        now.day,
-                        hour,
-                        minute,
-                      );
-                      // Add 10 minute grace period before marking as "not taken"
-                      final gracePeriodEnd = slotTime.add(const Duration(minutes: 10));
-                      // 10 minute window for green border
-                      final borderWindowEnd = slotTime.add(const Duration(minutes: 10));
-                      final isPast = slotTime.isBefore(now);
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TimeSlot(time: timeKey, isPast: isPast),
-                          ...intakesAtTime.map((intakeData) {
-                            final medication =
-                                intakeData['medication'] as Medication;
-                            final plan = intakeData['plan'] as MedicationPlan?;
-                            final intake =
-                                intakeData['intake'] as MedicationIntakeLog;
-                            final isOneTime = intakeData['isOneTimeEntry'] as bool;
-
-                            // Determine status based on wasTaken and time
-                            MedicationStatus status;
-                            if (intake.wasTaken) {
-                              status = MedicationStatus.taken;
-                            } else if (now.isAfter(gracePeriodEnd)) {
-                              // Only mark as not taken after 10 minute grace period
-                              status = MedicationStatus.notTaken;
-                            } else {
-                              status = MedicationStatus.upcoming;
-                            }
-
-                            // Check if this is the next medication to take
-                            // Show border only when: time has arrived, within 10 min window, not yet taken
-                            final isInBorderWindow = now.isAfter(slotTime) && 
-                                                     now.isBefore(borderWindowEnd);
-                            final isNextMed = _nextMedication != null &&
-                                (_nextMedication!['intake'] as MedicationIntakeLog?)?.id == intake.id &&
-                                status == MedicationStatus.upcoming &&
-                                isInBorderWindow;
-
-                            // For one-time entries, dosage is stored in the intake log
-                            final dosageAmount = plan?.dosageAmount ?? 1.0;
-                            final dosageCount = dosageAmount.toInt();
-
-                            return MedicationCard(
-                              medName: medication.name,
-                              dosage:
-                                  '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                              medicineRemaining:
-                                  '', // TODO: Calculate remaining
-                              pillCount: 0, // TODO: Calculate from inventory
-                              showName: false,
-                              username: 'jaz', // TODO: Get from user
-                              userId: '1',
-                              status: status,
-                              isOneTimeEntry: isOneTime,
-                              enableLeftSwipe: true,
-                              enableRightSwipe: !isOneTime, // One-time entries can't be marked as taken (already taken)
-                              isNextMedication: isNextMed,
-                              onStatusChanged: isOneTime ? null : (newStatus) async {
-                                await _updateIntakeStatus(intake.id, newStatus);
-                              },
-                              onDelete: isOneTime ? () async {
-                                await _deleteOneTimeEntry(intake.id);
-                              } : null,
-                            );
-                          }),
-                        ],
-                      );
-                    },
-                  ),
+              ),
+            ],
           ),
+          // Full-screen barrier when FAB is expanded
+          if (_isExpanded)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  if (_isExpanded) {
+                    _toggleSpeedDial();
+                  }
+                },
+                child: Container(color: Colors.black.withOpacity(0.01)),
+              ),
+            ),
         ],
       ),
       floatingActionButton: Column(

@@ -30,7 +30,7 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
       case MedicationType.ampules:
         return 'Ampule';
       case MedicationType.applications:
-        return 'Aplikacije';
+        return 'Nanosi';
       case MedicationType.capsules:
         return 'Kapsule';
       case MedicationType.drops:

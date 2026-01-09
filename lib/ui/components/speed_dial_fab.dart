@@ -21,11 +21,13 @@ class SpeedDialFab extends StatefulWidget {
     required this.options,
     this.mainIcon = Symbols.pill,
     this.tooltip = 'Dodaj',
+    this.onExpandedChanged,
   });
 
   final List<SpeedDialOption> options;
   final IconData mainIcon;
   final String tooltip;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   State<SpeedDialFab> createState() => _SpeedDialFabState();
@@ -64,12 +66,23 @@ class _SpeedDialFabState extends State<SpeedDialFab>
       } else {
         _animationController.reverse();
       }
+      widget.onExpandedChanged?.call(_isExpanded);
     });
   }
 
   void _handleOptionPressed(VoidCallback onPressed) {
     _toggleSpeedDial();
     onPressed();
+  }
+
+  void closeSpeedDial() {
+    if (_isExpanded) {
+      setState(() {
+        _isExpanded = false;
+        _animationController.reverse();
+        widget.onExpandedChanged?.call(false);
+      });
+    }
   }
 
   @override
