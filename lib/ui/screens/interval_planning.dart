@@ -68,7 +68,7 @@ class _IntervalPlanningScreenState
                   Expanded(
                     child: _buildTypeButton(
                       type: IntervalType.hours,
-                      label: 'Every X hours',
+                      label: 'Vsakih X ur',
                       icon: Symbols.schedule,
                       colors: colors,
                     ),
@@ -77,7 +77,7 @@ class _IntervalPlanningScreenState
                   Expanded(
                     child: _buildTypeButton(
                       type: IntervalType.days,
-                      label: 'X Days',
+                      label: 'Vsakih X dni',
                       icon: Symbols.calendar_today,
                       colors: colors,
                     ),
@@ -88,7 +88,7 @@ class _IntervalPlanningScreenState
 
               // Remind every
               Text(
-                'Remind every',
+                'Opomni vsakih',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

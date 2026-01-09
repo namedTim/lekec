@@ -7,7 +7,7 @@ class AppColors {
   static const Color primaryLight = Color.fromARGB(255, 110, 231, 126);  // light container
 
   // Neutral surfaces (no blue tint)
-  static const Color backgroundLight = Color(0xFFF6F7F6);
+  static const Color backgroundLight = Color(0xFFFAFAF8);
   static const Color surfaceLight = Color(0xFFE3E5E3);
 
   static const Color backgroundDark = Color(0xFF141414);

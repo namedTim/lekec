@@ -115,6 +115,13 @@ class _MedicationCardState extends State<MedicationCard> {
                   width: 3,
                 )
               : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,

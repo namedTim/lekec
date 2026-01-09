@@ -110,6 +110,15 @@ class MedicationService {
                 return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
               }).toList();
             }
+            
+            // Fallback to the start time from rule if no intakes scheduled yet
+            if (times.isEmpty && rule.timesOfDay != null) {
+              final timesList = (jsonDecode(rule.timesOfDay!) as List)
+                  .map((e) => e.toString())
+                  .toList();
+              times = timesList;
+            }
+            
             frequency = 'Vsakih $hours ${hours == 1 ? 'uro' : hours < 5 ? 'ure' : 'ur'}';
             break;
           case 'dayInterval':
@@ -132,6 +141,15 @@ class MedicationService {
                 return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
               }).toList();
             }
+            
+            // Fallback to the start time from rule if no intakes scheduled yet
+            if (times.isEmpty && rule.timesOfDay != null) {
+              final timesList = (jsonDecode(rule.timesOfDay!) as List)
+                  .map((e) => e.toString())
+                  .toList();
+              times = timesList;
+            }
+            
             frequency = 'Vsakih $days ${days == 1 ? 'dan' : days == 2 ? 'dneva' : days < 5 ? 'dni' : 'dni'}';
             break;
           case 'weekly':

@@ -267,7 +267,7 @@ class _IntervalConfigureScreenState
         startTime: startTime,
       );
 
-      // Generate schedule
+      // Generate schedule for the new plan
       await scheduleGenerator.generateScheduledIntakes();
 
       if (mounted) {
@@ -277,11 +277,13 @@ class _IntervalConfigureScreenState
             backgroundColor: Colors.green,
           ),
         );
+        
+        // Navigate to home and refresh
         context.go('/');
-        // Trigger refresh of home page
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          homePageKey.currentState?.loadTodaysIntakes();
-        });
+        
+        // Wait a moment for navigation to complete, then refresh
+        await Future.delayed(const Duration(milliseconds: 100));
+        homePageKey.currentState?.loadTodaysIntakes();
       }
     } catch (e) {
       if (mounted) {

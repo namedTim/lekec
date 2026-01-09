@@ -164,15 +164,12 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
-            final allMedications = snapshot.data ?? [];
-            // Filter out "Po potrebi" medications (as needed)
-            final medications = allMedications
-                .where((med) => med['frequency'] != 'Po potrebi')
-                .toList();
+            final medications = snapshot.data ?? [];
+            
             if (medications.isEmpty) {
               return Center(
                 child: Text(
-                  'Ni zdravil z aktivnimi opomniki.',
+                  'Ni dodanih zdravil.',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),
