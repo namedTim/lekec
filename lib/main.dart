@@ -725,7 +725,9 @@ class _MyHomePageState extends State<MyHomePage>
 
                                 // Enable swipes only if time has passed (isPast)
                                 // For future medications, disable swiping
-                                final canSwipe = isPast && !isOneTime;
+                                // For one-time entries, only enable left swipe (delete)
+                                final canSwipeScheduled = isPast && !isOneTime;
+                                final canDeleteOneTime = isPast && isOneTime;
 
                                 return MedicationCard(
                                   medName: medication.name,
@@ -740,8 +742,8 @@ class _MyHomePageState extends State<MyHomePage>
                                   userId: '1',
                                   status: status,
                                   isOneTimeEntry: isOneTime,
-                                  enableLeftSwipe: canSwipe,
-                                  enableRightSwipe: canSwipe,
+                                  enableLeftSwipe: canSwipeScheduled || canDeleteOneTime,
+                                  enableRightSwipe: canSwipeScheduled,
                                   isNextMedication: isNextMed,
                                   onStatusChanged: isOneTime
                                       ? null
