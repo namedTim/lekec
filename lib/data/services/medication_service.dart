@@ -63,9 +63,10 @@ class MedicationService {
         await (db.select(
           db.medications,
         )..where((m) => m.status.equalsValue(MedicationStatus.active))).join([
-          drift.leftOuterJoin(
+          drift.innerJoin(
             db.medicationPlans,
-            db.medicationPlans.medicationId.equalsExp(db.medications.id),
+            db.medicationPlans.medicationId.equalsExp(db.medications.id) &
+                db.medicationPlans.isActive.equals(true),
           ),
           drift.leftOuterJoin(
             db.medicationScheduleRules,
