@@ -24,6 +24,7 @@ import 'ui/screens/specific_days_planning.dart';
 import 'ui/screens/specific_days_select_times.dart';
 import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
+import 'ui/screens/alarm_notification_screen.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'package:lekec/database/tables/medications.dart' hide MedicationStatus;
@@ -46,35 +47,91 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  db = AppDatabase();
+  try {
+    print('=== INITIALIZING APP ===');
+    
+    print('1. Creating database...');
+    db = AppDatabase();
+    print('✓ Database created');
 
-  // Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+    // Initialize alarm service FIRST before anything else
+    print('2. Initializing alarm service...');
+    await Alarm.init();
+    print('✓ Alarm service initialized');
 
-  // Generate upcoming intake schedules
-  final scheduleGenerator = IntakeScheduleGenerator(db);
-  await scheduleGenerator.generateScheduledIntakes();
+    // Initialize notification service
+    print('3. Initializing notification service...');
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    print('✓ Notification service initialized');
 
-  // Schedule notifications for upcoming intakes
-  await notificationService.scheduleAllUpcomingNotifications(db);
+    // Generate upcoming intake schedules
+    print('4. Generating intake schedules...');
+    final scheduleGenerator = IntakeScheduleGenerator(db);
+    await scheduleGenerator.generateScheduledIntakes();
+    print('✓ Intake schedules generated');
 
-  // Initialize and schedule background tasks
-  final backgroundService = BackgroundTaskService();
-  await backgroundService.initialize();
-  await backgroundService.scheduleScheduleGeneration();
-  await backgroundService.scheduleNotificationRefresh();
+    // Schedule notifications for upcoming intakes
+    print('5. Scheduling notifications...');
+    await notificationService.scheduleAllUpcomingNotifications(db);
+    print('✓ Notifications scheduled');
 
-  // Initialize alarm service
-  WidgetsFlutterBinding.ensureInitialized();
-  await Alarm.init();
+    // Initialize and schedule background tasks
+    print('6. Initializing background service...');
+    final backgroundService = BackgroundTaskService();
+    await backgroundService.initialize();
+    await backgroundService.scheduleScheduleGeneration();
+    await backgroundService.scheduleNotificationRefresh();
+    print('✓ Background service initialized');
 
-  runApp(
-    ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
-      child: const MyApp(),
-    ),
-  );
+    print('7. Starting app...');
+    runApp(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(db)],
+        child: const MyApp(),
+      ),
+    );
+    print('✓ App started');
+  } catch (e, stackTrace) {
+    print('❌ ERROR IN MAIN: $e');
+    print('STACK TRACE: $stackTrace');
+    // Still run the app with minimal initialization to show the error
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.red,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Initialization Error',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '$e',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '$stackTrace',
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final _router = GoRouter(
@@ -262,6 +319,20 @@ final _router = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/alarm',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return AlarmNotificationScreen(
+          intakeId: extra['intakeId'] as int,
+          medicationId: extra['medicationId'] as int,
+          medicationName: extra['medicationName'] as String,
+          dosage: extra['dosage'] as String,
+          medType: extra['medType'] as MedicationType,
+          scheduledTime: extra['scheduledTime'] as DateTime,
+        );
+      },
+    ),
   ],
 );
 
@@ -305,11 +376,74 @@ class ScaffoldWithNavBar extends StatelessWidget {
   }
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _setupAlarmListener();
+  }
+
+  void _setupAlarmListener() {
+    Alarm.ringStream.stream.listen((alarmSettings) async {
+      try {
+        // When an alarm rings, fetch the medication details and navigate to alarm screen
+        final intakeId = alarmSettings.id;
+        
+        // Get intake details from database
+        final intake = await (db.select(db.medicationIntakeLogs)
+              ..where((log) => log.id.equals(intakeId)))
+            .getSingleOrNull();
+        
+        if (intake == null) return;
+        
+        // Get medication details
+        final medication = await (db.select(db.medications)
+              ..where((m) => m.id.equals(intake.medicationId)))
+            .getSingleOrNull();
+        
+        if (medication == null) return;
+        
+        // Get plan details for dosage
+        final plan = await (db.select(db.medicationPlans)
+              ..where((p) => p.id.equals(intake.planId)))
+            .getSingleOrNull();
+        
+        String dosage = '';
+        if (plan != null) {
+          final dosageCount = plan.dosageAmount.toInt();
+          dosage = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+        }
+        
+        // Navigate to alarm screen
+        if (mounted) {
+          final context = rootNavigatorKey.currentContext;
+          if (context != null) {
+            context.push('/alarm', extra: {
+              'intakeId': intakeId,
+              'medicationId': medication.id,
+              'medicationName': medication.name,
+              'dosage': dosage,
+              'medType': medication.medType,
+              'scheduledTime': intake.scheduledTime,
+            });
+          }
+        }
+      } catch (e, stackTrace) {
+        print('ERROR IN ALARM LISTENER: $e');
+        print('STACK TRACE: $stackTrace');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(

@@ -4,7 +4,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
-import '../../database/tables/medications.dart' show MedicationStatus;
+import '../../database/tables/medications.dart'
+    show MedicationStatus, MedicationType;
 import '../../helpers/medication_unit_helper.dart';
 import '../../main.dart' show homePageKey, db, rootNavigatorKey;
 import 'package:go_router/go_router.dart';
@@ -294,8 +295,9 @@ class NotificationService {
   Future<void> scheduleAllUpcomingNotifications(AppDatabase db) async {
     if (!_initialized) await initialize();
 
-    // Cancel existing notifications first
+    // Cancel existing notifications and alarms first
     await cancelAllNotifications();
+    await Alarm.stopAll();
 
     // Get all upcoming intake entries (next 7 days to avoid scheduling too many)
     final now = DateTime.now();
@@ -347,12 +349,26 @@ class NotificationService {
       final dosage =
           '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
 
-      await scheduleIntakeNotification(
-        id: intake.id,
-        medicationName: medication.name,
-        scheduledTime: intake.scheduledTime,
-        dosage: dosage,
-      );
+      // Check if this is a critical reminder medication
+      if (medication.criticalReminder) {
+        // Schedule alarm instead of regular notification
+        await scheduleAlarmForIntake(
+          intakeId: intake.id,
+          medicationId: medication.id,
+          medicationName: medication.name,
+          scheduledTime: intake.scheduledTime,
+          dosage: dosage,
+          medType: medication.medType,
+        );
+      } else {
+        // Schedule regular notification
+        await scheduleIntakeNotification(
+          id: intake.id,
+          medicationName: medication.name,
+          scheduledTime: intake.scheduledTime,
+          dosage: dosage,
+        );
+      }
     }
 
     final count = await getPendingNotificationsCount();
@@ -800,7 +816,6 @@ class NotificationService {
     );
   }
 
-
   /// Trigger a test alarm in 10 seconds
   Future<void> triggerAlarm() async {
     // check permissions
@@ -830,5 +845,59 @@ class NotificationService {
     await Alarm.set(alarmSettings: alarmSettings);
 
     print('Alarm set for $alarmTime');
+  }
+
+  /// Schedule an alarm for a critical medication intake
+  Future<void> scheduleAlarmForIntake({
+    required int intakeId,
+    required int medicationId,
+    required String medicationName,
+    required DateTime scheduledTime,
+    required String dosage,
+    required MedicationType medType,
+  }) async {
+    // Don't schedule if time is in the past
+    if (scheduledTime.isBefore(DateTime.now())) {
+      developer.log(
+        'Skipping past alarm for $medicationName at $scheduledTime',
+        name: 'NotificationService',
+      );
+      return;
+    }
+
+    final alarmSettings = AlarmSettings(
+      id: intakeId,
+      dateTime: scheduledTime,
+      assetAudioPath: 'assets/alarms/R2d2.mp3',
+      loopAudio: true,
+      vibrate: true,
+      androidFullScreenIntent: true,
+      volumeSettings: VolumeSettings.fade(
+        volume: 0.8,
+        fadeDuration: Duration(seconds: 5),
+        volumeEnforced: true,
+      ),
+      notificationSettings: NotificationSettings(
+        title: 'VZEMITE $medicationName',
+        body: 'Odmerek: $dosage',
+        stopButton: 'Ustavi alarm',
+        icon: 'notification_icon',
+      ),
+    );
+
+    try {
+      await Alarm.set(alarmSettings: alarmSettings);
+      developer.log(
+        'Successfully scheduled alarm for $medicationName at $scheduledTime (ID: $intakeId)',
+        name: 'NotificationService',
+      );
+    } catch (e, st) {
+      developer.log(
+        'Failed to schedule alarm for $medicationName',
+        error: e,
+        stackTrace: st,
+        name: 'NotificationService',
+      );
+    }
   }
 }

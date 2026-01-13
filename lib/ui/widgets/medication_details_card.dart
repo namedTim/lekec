@@ -13,6 +13,7 @@ class MedicationDetailsCard extends StatelessWidget {
     required this.frequency,
     required this.times,
     required this.medType,
+    this.criticalReminder = false,
     this.onAddMedication,
     this.onDelete,
   });
@@ -23,6 +24,7 @@ class MedicationDetailsCard extends StatelessWidget {
   final String frequency; // e.g., "2x dnevno", "1x dnevno"
   final List<String> times; // e.g., ["8:00", "20:00"]
   final MedicationType medType;
+  final bool criticalReminder;
   final Function(int)? onAddMedication;
   final VoidCallback? onDelete;
 
@@ -117,12 +119,27 @@ class MedicationDetailsCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Medicine name
-                  Text(
-                    medName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  // Medicine name with alarm icon
+                  Row(
+                    children: [
+                      if (criticalReminder) ...[
+                        Icon(
+                          Symbols.alarm,
+                          size: 20,
+                          color: colors.error,
+                          fill: 1,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(
+                          medName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 6),

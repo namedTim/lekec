@@ -222,6 +222,7 @@ class MedicationService {
         'times': times,
         'medType': medication.medType,
         'intakeAdvice': medication.intakeAdvice,
+        'criticalReminder': medication.criticalReminder,
         'plan': plan,
       });
     }

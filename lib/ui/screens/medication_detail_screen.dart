@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:drift/drift.dart' as drift;
 import '../../database/tables/medications.dart';
+import '../../database/drift_database.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/confirmation_dialog.dart';
+import '../../main.dart' show db;
+import '../../data/services/notification_service.dart';
 
-class MedicationDetailScreen extends StatelessWidget {
+class MedicationDetailScreen extends StatefulWidget {
   final int medicationId;
   final String medicationName;
   final MedicationType medType;
@@ -13,6 +17,7 @@ class MedicationDetailScreen extends StatelessWidget {
   final String frequency;
   final List<String> times;
   final String? intakeAdvice;
+  final bool criticalReminder;
   final VoidCallback onDelete;
 
   const MedicationDetailScreen({
@@ -25,14 +30,54 @@ class MedicationDetailScreen extends StatelessWidget {
     required this.frequency,
     required this.times,
     this.intakeAdvice,
+    required this.criticalReminder,
     required this.onDelete,
   });
+
+  @override
+  State<MedicationDetailScreen> createState() => _MedicationDetailScreenState();
+}
+
+class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
+  late bool _criticalReminder;
+
+  @override
+  void initState() {
+    super.initState();
+    _criticalReminder = widget.criticalReminder;
+  }
+
+  Future<void> _toggleCriticalReminder(bool value) async {
+    setState(() {
+      _criticalReminder = value;
+    });
+
+    // Update database
+    await (db.update(db.medications)
+          ..where((m) => m.id.equals(widget.medicationId)))
+        .write(MedicationsCompanion(criticalReminder: drift.Value(value)));
+
+    // Reschedule notifications/alarms
+    final notificationService = NotificationService();
+    await notificationService.scheduleAllUpcomingNotifications(db);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value ? 'Kritični alarm vklopljen' : 'Kritični alarm izklopljen',
+          ),
+          backgroundColor: value ? Colors.red : Colors.grey,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final dosageCount = dosageAmount.toInt();
+    final dosageCount = widget.dosageAmount.toInt();
 
     return Scaffold(
       appBar: AppBar(
@@ -50,30 +95,36 @@ class MedicationDetailScreen extends StatelessWidget {
                   icon: Symbols.medication,
                   title: 'Ime zdravila',
                   child: Text(
-                    medicationName,
+                    widget.medicationName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Intake Advice Card
                 _DetailCard(
                   icon: Symbols.info,
                   title: 'Priporočilo pred zaužitjem',
                   child: Text(
-                    intakeAdvice?.isEmpty ?? true ? 'Ni podatka' : intakeAdvice!,
+                    widget.intakeAdvice?.isEmpty ?? true
+                        ? 'Ni podatka'
+                        : widget.intakeAdvice!,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontStyle: intakeAdvice?.isEmpty ?? true ? FontStyle.italic : FontStyle.normal,
-                      color: intakeAdvice?.isEmpty ?? true ? colors.onSurfaceVariant.withOpacity(0.6) : null,
+                      fontStyle: widget.intakeAdvice?.isEmpty ?? true
+                          ? FontStyle.italic
+                          : FontStyle.normal,
+                      color: widget.intakeAdvice?.isEmpty ?? true
+                          ? colors.onSurfaceVariant.withOpacity(0.6)
+                          : null,
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Stock/Supply Card
                 _DetailCard(
                   icon: Symbols.inventory_2,
@@ -81,7 +132,10 @@ class MedicationDetailScreen extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: colors.primaryContainer,
                         borderRadius: BorderRadius.circular(8),
@@ -96,7 +150,7 @@ class MedicationDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'še $pillsRemaining ${getMedicationUnitShort(medType, pillsRemaining)}',
+                            'še ${widget.pillsRemaining} ${getMedicationUnitShort(widget.medType, widget.pillsRemaining)}',
                             style: theme.textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colors.onPrimaryContainer,
@@ -107,23 +161,23 @@ class MedicationDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Dosage Card
                 _DetailCard(
                   icon: Symbols.science,
                   title: 'Odmerek',
                   child: Text(
-                    '$dosageCount ${getMedicationUnit(medType, dosageCount)}',
+                    '$dosageCount ${getMedicationUnit(widget.medType, dosageCount)}',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Reminders/Schedule Card
                 _DetailCard(
                   icon: Symbols.schedule,
@@ -132,17 +186,17 @@ class MedicationDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        frequency,
+                        widget.frequency,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (times.isNotEmpty) ...[
+                      if (widget.times.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: times.map((time) {
+                          children: widget.times.map((time) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -166,6 +220,46 @@ class MedicationDetailScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 16),
+
+                // Critical Reminder Card
+                _DetailCard(
+                  icon: _criticalReminder ? Symbols.alarm : Symbols.alarm_off,
+                  title: 'Kritični opomnik',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _criticalReminder
+                            ? 'Alarm bo predvajal zvok, dokler ga ne ustavite'
+                            : 'Običajna obvestila z zvokom',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        value: _criticalReminder,
+                        onChanged: _toggleCriticalReminder,
+                        title: Text(
+                          'Vklopi kritični alarm',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _criticalReminder
+                              ? 'Glasen alarm s prisilnim predvajanjem'
+                              : 'Standardna tiha obvestila',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        activeColor: colors.error,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -178,13 +272,14 @@ class MedicationDetailScreen extends StatelessWidget {
                   context: context,
                   builder: (context) => ConfirmationDialog(
                     title: 'Izbriši zdravilo?',
-                    message: 'Ali ste prepričani, da želite izbrisati zdravilo "$medicationName"?',
+                    message:
+                        'Ali ste prepričani, da želite izbrisati zdravilo "${widget.medicationName}"?',
                     confirmText: 'Izbriši',
                     cancelText: 'Prekliči',
                   ),
                 );
                 if (confirmed == true && context.mounted) {
-                  onDelete();
+                  widget.onDelete();
                   Navigator.of(context).pop();
                 }
               },
@@ -228,11 +323,7 @@ class _DetailCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: colors.primary,
-                ),
+                Icon(icon, size: 24, color: colors.primary),
                 const SizedBox(width: 8),
                 Text(
                   title,

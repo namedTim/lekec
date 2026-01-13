@@ -230,6 +230,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                           frequency: med['frequency'] as String,
                           times: med['times'] as List<String>,
                           intakeAdvice: med['intakeAdvice'] as String?,
+                          criticalReminder: med['criticalReminder'] as bool? ?? false,
                           onDelete: () => _deleteMedication(
                             med['id'] as int,
                             med['name'] as String,
@@ -246,6 +247,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                     frequency: med['frequency'] as String,
                     times: med['times'] as List<String>,
                     medType: med['medType'] as MedicationType,
+                    criticalReminder: med['criticalReminder'] as bool? ?? false,
                     onAddMedication: (quantity) async {
                       try {
                         final db = ref.read(databaseProvider);
