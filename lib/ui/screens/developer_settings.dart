@@ -279,6 +279,25 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               }
             },
           ),
+          const SizedBox(height: 16),
+          _DevCard(
+            icon: Symbols.medication,
+            color: Colors.pink,
+            title: "Test Alarm",
+            subtitle: "Schedule notification for next intake in 30 seconds",
+            onTap: () async {
+              final notificationService = NotificationService();
+              await notificationService.triggerAlarm();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Alarm triggered"),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );

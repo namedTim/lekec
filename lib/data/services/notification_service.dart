@@ -8,13 +8,16 @@ import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
 import '../../main.dart' show homePageKey, db, rootNavigatorKey;
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:alarm/alarm.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   Future<void> initialize() async {
@@ -35,16 +38,23 @@ class NotificationService {
       showBadge: true,
     );
 
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
       // Create the notification channel
       await androidPlugin.createNotificationChannel(androidChannel);
-      developer.log('Created Android notification channel', name: 'NotificationService');
+      developer.log(
+        'Created Android notification channel',
+        name: 'NotificationService',
+      );
     }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -65,38 +75,51 @@ class NotificationService {
     await _requestPermissions();
 
     _initialized = true;
-    developer.log('Notification service initialized', name: 'NotificationService');
+    developer.log(
+      'Notification service initialized',
+      name: 'NotificationService',
+    );
   }
 
   Future<void> _requestPermissions() async {
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
       // Request notification permission
       final granted = await androidPlugin.requestNotificationsPermission();
-      developer.log('Notification permission granted: $granted', name: 'NotificationService');
-      
+      developer.log(
+        'Notification permission granted: $granted',
+        name: 'NotificationService',
+      );
+
       // Request exact alarm permission for Android 12+
-      final exactAlarmGranted = await androidPlugin.requestExactAlarmsPermission();
-      developer.log('Exact alarm permission granted: $exactAlarmGranted', name: 'NotificationService');
+      final exactAlarmGranted = await androidPlugin
+          .requestExactAlarmsPermission();
+      developer.log(
+        'Exact alarm permission granted: $exactAlarmGranted',
+        name: 'NotificationService',
+      );
     }
 
-    final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
-    
+    final iosPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+
     if (iosPlugin != null) {
-      await iosPlugin.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      await iosPlugin.requestPermissions(alert: true, badge: true, sound: true);
     }
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    developer.log('Notification tapped: ${response.payload}', name: 'NotificationService');
-    
+    developer.log(
+      'Notification tapped: ${response.payload}',
+      name: 'NotificationService',
+    );
+
     // Parse intake ID from payload
     final intakeId = int.tryParse(response.payload ?? '');
     if (intakeId != null) {
@@ -105,13 +128,16 @@ class NotificationService {
       if (context != null) {
         // Navigate to home page
         context.go('/');
-        
+
         // Wait for navigation to complete, then scroll to the intake
         Future.delayed(const Duration(milliseconds: 300), () {
           homePageKey.currentState?.scrollToIntake(intakeId);
         });
-        
-        developer.log('Navigated to home and scrolling to intake $intakeId', name: 'NotificationService');
+
+        developer.log(
+          'Navigated to home and scrolling to intake $intakeId',
+          name: 'NotificationService',
+        );
       }
     }
   }
@@ -127,16 +153,27 @@ class NotificationService {
 
     final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
     final tzNow = tz.TZDateTime.now(tz.local);
-    
-    developer.log('Scheduling notification ID $id for $medicationName', name: 'NotificationService');
-    developer.log('  Scheduled time: $tzScheduledTime', name: 'NotificationService');
+
+    developer.log(
+      'Scheduling notification ID $id for $medicationName',
+      name: 'NotificationService',
+    );
+    developer.log(
+      '  Scheduled time: $tzScheduledTime',
+      name: 'NotificationService',
+    );
     developer.log('  Current time: $tzNow', name: 'NotificationService');
-    developer.log('  Is future: ${tzScheduledTime.isAfter(tzNow)}', name: 'NotificationService');
-    
+    developer.log(
+      '  Is future: ${tzScheduledTime.isAfter(tzNow)}',
+      name: 'NotificationService',
+    );
+
     // Don't schedule if time is in the past
     if (tzScheduledTime.isBefore(tzNow)) {
-      developer.log('Skipping past notification for $medicationName at $scheduledTime', 
-        name: 'NotificationService');
+      developer.log(
+        'Skipping past notification for $medicationName at $scheduledTime',
+        name: 'NotificationService',
+      );
       return;
     }
 
@@ -162,9 +199,7 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    final body = dosage != null 
-        ? 'Vzemite $dosage'
-        : 'Čas za jemanje zdravila';
+    final body = dosage != null ? 'Vzemite $dosage' : 'Čas za jemanje zdravila';
 
     try {
       await _notifications.zonedSchedule(
@@ -174,7 +209,8 @@ class NotificationService {
         tzScheduledTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: id.toString(),
       );
 
@@ -213,10 +249,12 @@ class NotificationService {
   /// Log all pending notifications to debug console
   Future<void> logPendingNotifications() async {
     final pending = await _notifications.pendingNotificationRequests();
-    
-    developer.log('=== PENDING NOTIFICATIONS (${pending.length}) ===', 
-      name: 'NotificationService');
-    
+
+    developer.log(
+      '=== PENDING NOTIFICATIONS (${pending.length}) ===',
+      name: 'NotificationService',
+    );
+
     for (final notification in pending) {
       developer.log(
         'ID: ${notification.id}, '
@@ -226,22 +264,29 @@ class NotificationService {
         name: 'NotificationService',
       );
     }
-    
-    developer.log('=== END PENDING NOTIFICATIONS ===', 
-      name: 'NotificationService');
+
+    developer.log(
+      '=== END PENDING NOTIFICATIONS ===',
+      name: 'NotificationService',
+    );
   }
 
   /// Check if exact alarm permission is granted (Android 12+)
   Future<bool> checkExactAlarmPermission() async {
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
       final canSchedule = await androidPlugin.canScheduleExactNotifications();
-      developer.log('Can schedule exact alarms: $canSchedule', name: 'NotificationService');
+      developer.log(
+        'Can schedule exact alarms: $canSchedule',
+        name: 'NotificationService',
+      );
       return canSchedule ?? false;
     }
-    
+
     return false;
   }
 
@@ -256,43 +301,51 @@ class NotificationService {
     final now = DateTime.now();
     final weekAhead = now.add(const Duration(days: 7));
 
-    final upcomingIntakes = await (db.select(db.medicationIntakeLogs)
-      ..where((log) => log.scheduledTime.isBiggerThanValue(now))
-      ..where((log) => log.scheduledTime.isSmallerThanValue(weekAhead))
-      ..where((log) => log.wasTaken.equals(false))
-      ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)]))
-      .get();
+    final upcomingIntakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((log) => log.scheduledTime.isBiggerThanValue(now))
+              ..where((log) => log.scheduledTime.isSmallerThanValue(weekAhead))
+              ..where((log) => log.wasTaken.equals(false))
+              ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)]))
+            .get();
 
-    developer.log('Scheduling ${upcomingIntakes.length} notifications', 
-      name: 'NotificationService');
+    developer.log(
+      'Scheduling ${upcomingIntakes.length} notifications',
+      name: 'NotificationService',
+    );
 
     for (final intake in upcomingIntakes) {
       // Get medication details
-      final medication = await (db.select(db.medications)
-        ..where((m) => m.id.equals(intake.medicationId)))
-        .getSingleOrNull();
+      final medication = await (db.select(
+        db.medications,
+      )..where((m) => m.id.equals(intake.medicationId))).getSingleOrNull();
 
       // Skip if medication was deleted or not found
       if (medication == null || medication.status == MedicationStatus.deleted) {
-        developer.log('Skipping intake ${intake.id}: medication ${intake.medicationId} ${medication == null ? "not found" : "deleted"}', 
-          name: 'NotificationService');
+        developer.log(
+          'Skipping intake ${intake.id}: medication ${intake.medicationId} ${medication == null ? "not found" : "deleted"}',
+          name: 'NotificationService',
+        );
         continue;
       }
 
       // Get plan details for dosage
-      final plan = await (db.select(db.medicationPlans)
-        ..where((p) => p.id.equals(intake.planId)))
-        .getSingleOrNull();
+      final plan = await (db.select(
+        db.medicationPlans,
+      )..where((p) => p.id.equals(intake.planId))).getSingleOrNull();
 
       // Skip if plan was deleted
       if (plan == null) {
-        developer.log('Skipping intake ${intake.id}: plan ${intake.planId} not found', 
-          name: 'NotificationService');
+        developer.log(
+          'Skipping intake ${intake.id}: plan ${intake.planId} not found',
+          name: 'NotificationService',
+        );
         continue;
       }
 
       final dosageCount = plan.dosageAmount.toInt();
-      final dosage = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+      final dosage =
+          '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
 
       await scheduleIntakeNotification(
         id: intake.id,
@@ -303,8 +356,10 @@ class NotificationService {
     }
 
     final count = await getPendingNotificationsCount();
-    developer.log('Scheduled $count notifications successfully', 
-      name: 'NotificationService');
+    developer.log(
+      'Scheduled $count notifications successfully',
+      name: 'NotificationService',
+    );
   }
 
   /// Show an immediate test notification
@@ -349,18 +404,27 @@ class NotificationService {
 
     final now = DateTime.now();
     final testTime = now.add(const Duration(seconds: 10));
-    
+
     developer.log('Current time: $now', name: 'NotificationService');
-    developer.log('Scheduling test notification for: $testTime', name: 'NotificationService');
-    
+    developer.log(
+      'Scheduling test notification for: $testTime',
+      name: 'NotificationService',
+    );
+
     final tzNow = tz.TZDateTime.now(tz.local);
     final tzTestTime = tz.TZDateTime.from(testTime, tz.local);
-    
+
     developer.log('TZ Current time: $tzNow', name: 'NotificationService');
     developer.log('TZ Test time: $tzTestTime', name: 'NotificationService');
-    developer.log('Is test time in future? ${tzTestTime.isAfter(tzNow)}', name: 'NotificationService');
-    developer.log('Difference in seconds: ${tzTestTime.difference(tzNow).inSeconds}', name: 'NotificationService');
-    
+    developer.log(
+      'Is test time in future? ${tzTestTime.isAfter(tzNow)}',
+      name: 'NotificationService',
+    );
+    developer.log(
+      'Difference in seconds: ${tzTestTime.difference(tzNow).inSeconds}',
+      name: 'NotificationService',
+    );
+
     // Try direct scheduling without going through scheduleIntakeNotification
     const androidDetails = AndroidNotificationDetails(
       'medication_reminders',
@@ -384,18 +448,29 @@ class NotificationService {
         tzTestTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
-      
-      developer.log('✓ zonedSchedule call completed successfully', name: 'NotificationService');
-      
+
+      developer.log(
+        '✓ zonedSchedule call completed successfully',
+        name: 'NotificationService',
+      );
+
       // Verify it was scheduled
       final pending = await _notifications.pendingNotificationRequests();
       final found = pending.any((n) => n.id == 999998);
-      developer.log('Notification in pending list: $found', name: 'NotificationService');
-      
+      developer.log(
+        'Notification in pending list: $found',
+        name: 'NotificationService',
+      );
     } catch (e, st) {
-      developer.log('✗ Failed to schedule notification', error: e, stackTrace: st, name: 'NotificationService');
+      developer.log(
+        '✗ Failed to schedule notification',
+        error: e,
+        stackTrace: st,
+        name: 'NotificationService',
+      );
     }
   }
 
@@ -405,7 +480,7 @@ class NotificationService {
 
     final now = DateTime.now();
     final testTime = now.add(const Duration(seconds: 30));
-    
+
     // Create timezone-aware datetime
     final tzTestTime = tz.TZDateTime(
       tz.local,
@@ -416,13 +491,19 @@ class NotificationService {
       testTime.minute,
       testTime.second,
     );
-    
-    developer.log('=== BASIC TEST NOTIFICATION (30s) ===', name: 'NotificationService');
+
+    developer.log(
+      '=== BASIC TEST NOTIFICATION (30s) ===',
+      name: 'NotificationService',
+    );
     developer.log('Local time now: $now', name: 'NotificationService');
     developer.log('Will fire at: $testTime', name: 'NotificationService');
     developer.log('TZ time: $tzTestTime', name: 'NotificationService');
-    developer.log('Seconds until fire: ${testTime.difference(now).inSeconds}', name: 'NotificationService');
-    
+    developer.log(
+      'Seconds until fire: ${testTime.difference(now).inSeconds}',
+      name: 'NotificationService',
+    );
+
     const androidDetails = AndroidNotificationDetails(
       'medication_reminders',
       'Opomniki za zdravila',
@@ -447,51 +528,69 @@ class NotificationService {
         tzTestTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
-      
-      developer.log('✓ Scheduled 30s test notification (ID: 999997)', name: 'NotificationService');
-      
+
+      developer.log(
+        '✓ Scheduled 30s test notification (ID: 999997)',
+        name: 'NotificationService',
+      );
+
       // Check if it's in the queue
       final pending = await _notifications.pendingNotificationRequests();
       final found = pending.where((n) => n.id == 999997).toList();
-      developer.log('Found in pending: ${found.isNotEmpty}', name: 'NotificationService');
+      developer.log(
+        'Found in pending: ${found.isNotEmpty}',
+        name: 'NotificationService',
+      );
       if (found.isNotEmpty) {
-        developer.log('Pending notification: ${found.first}', name: 'NotificationService');
+        developer.log(
+          'Pending notification: ${found.first}',
+          name: 'NotificationService',
+        );
       }
-      
     } catch (e, st) {
-      developer.log('✗ Failed to schedule 30s test', error: e, stackTrace: st, name: 'NotificationService');
+      developer.log(
+        '✗ Failed to schedule 30s test',
+        error: e,
+        stackTrace: st,
+        name: 'NotificationService',
+      );
     }
   }
 
   /// Check all notification settings and permissions
   Future<Map<String, dynamic>> checkNotificationStatus() async {
     final status = <String, dynamic>{};
-    
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    
+
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
     if (androidPlugin != null) {
-      status['canScheduleExact'] = await androidPlugin.canScheduleExactNotifications() ?? false;
-      status['notificationPermission'] = await androidPlugin.areNotificationsEnabled() ?? false;
-      
+      status['canScheduleExact'] =
+          await androidPlugin.canScheduleExactNotifications() ?? false;
+      status['notificationPermission'] =
+          await androidPlugin.areNotificationsEnabled() ?? false;
+
       final pending = await _notifications.pendingNotificationRequests();
       status['pendingCount'] = pending.length;
-      
+
       // Get active notifications
       final active = await _notifications.getActiveNotifications();
       status['activeCount'] = active.length;
     }
-    
+
     status['initialized'] = _initialized;
-    
+
     developer.log('=== NOTIFICATION STATUS ===', name: 'NotificationService');
     status.forEach((key, value) {
       developer.log('$key: $value', name: 'NotificationService');
     });
     developer.log('=== END STATUS ===', name: 'NotificationService');
-    
+
     return status;
   }
 
@@ -499,21 +598,15 @@ class NotificationService {
   Future<void> scheduleMultipleTestNotifications() async {
     if (!_initialized) await initialize();
 
-    final intervals = [
-      1,
-      2,
-      5,
-      7,
-      10,
-      20,
-      30,
-      60,
-    ];
+    final intervals = [1, 2, 5, 7, 10, 20, 30, 60];
 
-    developer.log('=== SCHEDULING MULTIPLE TEST NOTIFICATIONS ===', name: 'NotificationService');
-    
+    developer.log(
+      '=== SCHEDULING MULTIPLE TEST NOTIFICATIONS ===',
+      name: 'NotificationService',
+    );
+
     final now = DateTime.now();
-    
+
     for (int i = 0; i < intervals.length; i++) {
       final minutes = intervals[i];
       final testTime = now.add(Duration(minutes: minutes));
@@ -527,9 +620,7 @@ class NotificationService {
         testTime.second,
       );
 
-      final timeLabel = minutes < 60 
-          ? '$minutes min'
-          : '${minutes ~/ 60} h';
+      final timeLabel = minutes < 60 ? '$minutes min' : '${minutes ~/ 60} h';
 
       const androidDetails = AndroidNotificationDetails(
         'medication_reminders',
@@ -553,21 +644,33 @@ class NotificationService {
           tzTestTime,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
         );
 
-        developer.log('✓ Scheduled notification for $timeLabel (ID: $notificationId) at $testTime', 
-          name: 'NotificationService');
+        developer.log(
+          '✓ Scheduled notification for $timeLabel (ID: $notificationId) at $testTime',
+          name: 'NotificationService',
+        );
       } catch (e, st) {
-        developer.log('✗ Failed to schedule $timeLabel notification', 
-          error: e, stackTrace: st, name: 'NotificationService');
+        developer.log(
+          '✗ Failed to schedule $timeLabel notification',
+          error: e,
+          stackTrace: st,
+          name: 'NotificationService',
+        );
       }
     }
 
     final pending = await _notifications.pendingNotificationRequests();
-    developer.log('Total pending notifications after scheduling: ${pending.length}', 
-      name: 'NotificationService');
-    developer.log('=== END MULTIPLE TEST SCHEDULING ===', name: 'NotificationService');
+    developer.log(
+      'Total pending notifications after scheduling: ${pending.length}',
+      name: 'NotificationService',
+    );
+    developer.log(
+      '=== END MULTIPLE TEST SCHEDULING ===',
+      name: 'NotificationService',
+    );
   }
 
   /// Schedule a test notification for the next medication intake in 30 seconds
@@ -577,43 +680,49 @@ class NotificationService {
 
     final now = DateTime.now();
     final testTime = now.add(const Duration(seconds: 30));
-    
+
     // Get the next upcoming intake
-    final upcomingIntakes = await (db.select(db.medicationIntakeLogs)
-      ..where((log) => log.scheduledTime.isBiggerThanValue(now))
-      ..where((log) => log.wasTaken.equals(false))
-      ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)])
-      ..limit(1))
-      .get();
+    final upcomingIntakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((log) => log.scheduledTime.isBiggerThanValue(now))
+              ..where((log) => log.wasTaken.equals(false))
+              ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)])
+              ..limit(1))
+            .get();
 
     if (upcomingIntakes.isEmpty) {
-      developer.log('No upcoming intakes found for test notification', 
-        name: 'NotificationService');
+      developer.log(
+        'No upcoming intakes found for test notification',
+        name: 'NotificationService',
+      );
       return;
     }
 
     final intake = upcomingIntakes.first;
 
     // Get medication details
-    final medication = await (db.select(db.medications)
-      ..where((m) => m.id.equals(intake.medicationId)))
-      .getSingleOrNull();
+    final medication = await (db.select(
+      db.medications,
+    )..where((m) => m.id.equals(intake.medicationId))).getSingleOrNull();
 
     if (medication == null) {
-      developer.log('Medication not found for test notification', 
-        name: 'NotificationService');
+      developer.log(
+        'Medication not found for test notification',
+        name: 'NotificationService',
+      );
       return;
     }
 
     // Get plan details for dosage
-    final plan = await (db.select(db.medicationPlans)
-      ..where((p) => p.id.equals(intake.planId)))
-      .getSingleOrNull();
+    final plan = await (db.select(
+      db.medicationPlans,
+    )..where((p) => p.id.equals(intake.planId))).getSingleOrNull();
 
     String dosageText = '';
     if (plan != null) {
       final dosageCount = plan.dosageAmount.toInt();
-      dosageText = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+      dosageText =
+          '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
     }
 
     final tzTestTime = tz.TZDateTime(
@@ -625,13 +734,19 @@ class NotificationService {
       testTime.minute,
       testTime.second,
     );
-    
-    developer.log('=== TEST MEDICATION NOTIFICATION (30s) ===', name: 'NotificationService');
-    developer.log('Medication: ${medication.name}', name: 'NotificationService');
+
+    developer.log(
+      '=== TEST MEDICATION NOTIFICATION (30s) ===',
+      name: 'NotificationService',
+    );
+    developer.log(
+      'Medication: ${medication.name}',
+      name: 'NotificationService',
+    );
     developer.log('Dosage: $dosageText', name: 'NotificationService');
     developer.log('Intake ID: ${intake.id}', name: 'NotificationService');
     developer.log('Will fire at: $testTime', name: 'NotificationService');
-    
+
     const androidDetails = AndroidNotificationDetails(
       'medication_reminders',
       'Opomniki za zdravila',
@@ -650,26 +765,70 @@ class NotificationService {
       await _notifications.zonedSchedule(
         999990, // Special ID for test
         'Vzemite ${medication.name}',
-        dosageText.isNotEmpty ? 'Vzemite $dosageText' : 'Čas za jemanje zdravila',
+        dosageText.isNotEmpty
+            ? 'Vzemite $dosageText'
+            : 'Čas za jemanje zdravila',
         tzTestTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        payload: intake.id.toString(), // Use actual intake ID so tap navigation works
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: intake.id
+            .toString(), // Use actual intake ID so tap navigation works
       );
-      
-      developer.log('✓ Scheduled test medication notification (ID: 999990)', 
-        name: 'NotificationService');
-      
+
+      developer.log(
+        '✓ Scheduled test medication notification (ID: 999990)',
+        name: 'NotificationService',
+      );
+
       final pending = await _notifications.pendingNotificationRequests();
       final found = pending.any((n) => n.id == 999990);
       developer.log('Found in pending: $found', name: 'NotificationService');
-      
     } catch (e, st) {
-      developer.log('✗ Failed to schedule test medication notification', 
-        error: e, stackTrace: st, name: 'NotificationService');
+      developer.log(
+        '✗ Failed to schedule test medication notification',
+        error: e,
+        stackTrace: st,
+        name: 'NotificationService',
+      );
     }
-    
-    developer.log('=== END TEST MEDICATION NOTIFICATION ===', name: 'NotificationService');
+
+    developer.log(
+      '=== END TEST MEDICATION NOTIFICATION ===',
+      name: 'NotificationService',
+    );
+  }
+
+
+  /// Trigger a test alarm in 10 seconds
+  Future<void> triggerAlarm() async {
+    // check permissions
+    DateTime now = DateTime.now();
+    DateTime alarmTime = now.add(Duration(seconds: 10));
+
+    final alarmSettings = AlarmSettings(
+      id: 42,
+      dateTime: alarmTime,
+      assetAudioPath: 'assets/alarms/R2d2.mp3',
+      loopAudio: true,
+      vibrate: true,
+      androidFullScreenIntent: true,
+      volumeSettings: VolumeSettings.fade(
+        volume: 0.8,
+        fadeDuration: Duration(seconds: 5),
+        volumeEnforced: true,
+      ),
+      notificationSettings: const NotificationSettings(
+        title: 'Dev alarm',
+        body: ' This is a test alarm notification',
+        stopButton: ' Stop Alarm',
+        icon: 'notification_icon',
+      ),
+    );
+
+    await Alarm.set(alarmSettings: alarmSettings);
+
+    print('Alarm set for $alarmTime');
   }
 }

@@ -1,6 +1,7 @@
 // drift InsertMode not used here; rely on default insert behavior
 import 'dart:async';
 
+import 'package:alarm/alarm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -63,6 +64,10 @@ void main() async {
   await backgroundService.initialize();
   await backgroundService.scheduleScheduleGeneration();
   await backgroundService.scheduleNotificationRefresh();
+
+  // Initialize alarm service
+  WidgetsFlutterBinding.ensureInitialized();
+  await Alarm.init();
 
   runApp(
     ProviderScope(
