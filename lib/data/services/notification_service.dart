@@ -815,7 +815,7 @@ class NotificationService {
       vibrate: true,
       androidFullScreenIntent: true,
       volumeSettings: VolumeSettings.fade(
-        volume: 0.8,
+        volume: 0.0,
         fadeDuration: Duration(seconds: 5),
         volumeEnforced: true,
       ),

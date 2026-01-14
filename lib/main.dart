@@ -2,9 +2,11 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lekec/ui/screens/ring.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:lekec/database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
@@ -68,6 +70,7 @@ void main() async {
   // Initialize alarm service
   WidgetsFlutterBinding.ensureInitialized();
   await Alarm.init();
+  await Alarm.setWarningNotificationOnKill("Aktivnost opozoril", "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.");
 
   runApp(
     ProviderScope(
@@ -348,6 +351,12 @@ class _MyHomePageState extends State<MyHomePage>
   Timer? _islandUpdateTimer;
   Timer? _dayChangeTimer;
 
+  List<AlarmSettings> alarms = [];
+
+
+  static StreamSubscription<AlarmSet>? ringSubscription;
+  static StreamSubscription<AlarmSet>? updateSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -364,6 +373,35 @@ class _MyHomePageState extends State<MyHomePage>
     _updateTimeIsland();
     _startIslandUpdateTimer();
     _startDayChangeTimer();
+    ringSubscription ??= Alarm.ringing.listen(ringingAlarmsChanged);
+    updateSubscription ??= Alarm.scheduled.listen((_) {
+      unawaited(loadAlarms());
+    });
+  }
+
+  Future<void> loadAlarms() async {
+    final updatedAlarms = await Alarm.getAlarms();
+    updatedAlarms.sort((a, b) => a.dateTime.isBefore(b.dateTime) ? 0 : 1);
+    setState(() {
+      alarms = updatedAlarms;
+    });
+  }
+
+  Future<void> ringingAlarmsChanged(AlarmSet alarms) async {
+    if (alarms.alarms.isEmpty) return;
+    
+    // Use the root navigator key to ensure alarm appears over ALL screens
+    final navigatorState = rootNavigatorKey.currentState;
+    if (navigatorState == null) return;
+    
+    await navigatorState.push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            ExampleAlarmRingScreen(alarmSettings: alarms.alarms.first),
+        fullscreenDialog: true,
+      ),
+    );
+    unawaited(loadAlarms());
   }
 
   @override
