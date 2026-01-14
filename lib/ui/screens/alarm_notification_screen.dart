@@ -76,21 +76,8 @@ class _AlarmNotificationScreenState extends State<AlarmNotificationScreen>
   }
 
   String _getTimeText() {
-    final now = DateTime.now();
     final scheduled = widget.scheduledTime;
-
-    if (now.difference(scheduled).inMinutes < 1) {
-      return 'ZDAJ';
-    } else if (now.isAfter(scheduled)) {
-      final diff = now.difference(scheduled);
-      if (diff.inHours > 0) {
-        return '${diff.inHours} ur zamude';
-      } else {
-        return '${diff.inMinutes} min zamude';
-      }
-    } else {
-      return '${scheduled.hour.toString().padLeft(2, '0')}:${scheduled.minute.toString().padLeft(2, '0')}';
-    }
+    return '${scheduled.hour.toString().padLeft(2, '0')}:${scheduled.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -186,7 +173,7 @@ class _AlarmNotificationScreenState extends State<AlarmNotificationScreen>
                         // Medication name
                         Text(
                           widget.medicationName,
-                          style: theme.textTheme.headlineMedium?.copyWith(
+                          style: theme.textTheme.displaySmall?.copyWith(
                             color: colors.onError,
                             fontWeight: FontWeight.w700,
                           ),
