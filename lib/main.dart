@@ -45,6 +45,39 @@ export 'ui/widgets/medication_card.dart' show MedicationStatus;
 late final AppDatabase db;
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+// Global alarm subscriptions - active regardless of which screen is shown
+StreamSubscription<AlarmSet>? _globalRingSubscription;
+StreamSubscription<AlarmSet>? _globalUpdateSubscription;
+
+// Global alarm ring handler - works from any screen
+Future<void> _handleAlarmRinging(AlarmSet alarms) async {
+  if (alarms.alarms.isEmpty) return;
+  
+  // Use the root navigator key to ensure alarm appears over ALL screens
+  final navigatorState = rootNavigatorKey.currentState;
+  if (navigatorState == null) {
+    // Navigator not ready yet, retry after a short delay
+    await Future.delayed(const Duration(milliseconds: 100));
+    return _handleAlarmRinging(alarms);
+  }
+  
+  // Check if alarm ring screen is already showing
+  final currentRoute = ModalRoute.of(navigatorState.context);
+  if (currentRoute?.settings.name == '/ring' || 
+      navigatorState.context.widget is ExampleAlarmRingScreen) {
+    return; // Already showing alarm screen
+  }
+  
+  await navigatorState.push(
+    MaterialPageRoute<void>(
+      builder: (context) =>
+          ExampleAlarmRingScreen(alarmSettings: alarms.alarms.first),
+      fullscreenDialog: true,
+      settings: const RouteSettings(name: '/ring'),
+    ),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -71,6 +104,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Alarm.init();
   await Alarm.setWarningNotificationOnKill("Aktivnost opozoril", "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.");
+
+  // Set up global alarm listeners BEFORE running the app
+  // This ensures alarms work regardless of which screen is active
+  _globalRingSubscription = Alarm.ringing.listen(_handleAlarmRinging);
+  _globalUpdateSubscription = Alarm.scheduled.listen((_) {
+    // Update can be handled at app level if needed
+  });
 
   runApp(
     ProviderScope(
@@ -353,10 +393,6 @@ class _MyHomePageState extends State<MyHomePage>
 
   List<AlarmSettings> alarms = [];
 
-
-  static StreamSubscription<AlarmSet>? ringSubscription;
-  static StreamSubscription<AlarmSet>? updateSubscription;
-
   @override
   void initState() {
     super.initState();
@@ -373,22 +409,7 @@ class _MyHomePageState extends State<MyHomePage>
     _updateTimeIsland();
     _startIslandUpdateTimer();
     _startDayChangeTimer();
-    ringSubscription ??= Alarm.ringing.listen(ringingAlarmsChanged);
-    updateSubscription ??= Alarm.scheduled.listen((_) {
-      unawaited(loadAlarms());
-    });
-    // Check for already ringing alarms immediately on app start
-    //checkForRingingAlarms();
-  }
-  
-  Future<void> checkForRingingAlarms() async {
-    // Check the current ringing state from the stream
-    final ringingAlarms = Alarm.ringing.value;
-    if (ringingAlarms.alarms.isNotEmpty) {
-      // Slight delay to ensure navigation is ready
-      await Future.delayed(const Duration(milliseconds: 50));
-      await ringingAlarmsChanged(ringingAlarms);
-    }
+    loadAlarms();
   }
 
   Future<void> loadAlarms() async {
@@ -397,23 +418,6 @@ class _MyHomePageState extends State<MyHomePage>
     setState(() {
       alarms = updatedAlarms;
     });
-  }
-
-  Future<void> ringingAlarmsChanged(AlarmSet alarms) async {
-    if (alarms.alarms.isEmpty) return;
-    
-    // Use the root navigator key to ensure alarm appears over ALL screens
-    final navigatorState = rootNavigatorKey.currentState;
-    if (navigatorState == null) return;
-    
-    await navigatorState.push(
-      MaterialPageRoute<void>(
-        builder: (context) =>
-            ExampleAlarmRingScreen(alarmSettings: alarms.alarms.first),
-        fullscreenDialog: true,
-      ),
-    );
-    unawaited(loadAlarms());
   }
 
   @override
