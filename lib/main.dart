@@ -377,6 +377,18 @@ class _MyHomePageState extends State<MyHomePage>
     updateSubscription ??= Alarm.scheduled.listen((_) {
       unawaited(loadAlarms());
     });
+    // Check for already ringing alarms immediately on app start
+    //checkForRingingAlarms();
+  }
+  
+  Future<void> checkForRingingAlarms() async {
+    // Check the current ringing state from the stream
+    final ringingAlarms = Alarm.ringing.value;
+    if (ringingAlarms.alarms.isNotEmpty) {
+      // Slight delay to ensure navigation is ready
+      await Future.delayed(const Duration(milliseconds: 50));
+      await ringingAlarmsChanged(ringingAlarms);
+    }
   }
 
   Future<void> loadAlarms() async {
