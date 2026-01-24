@@ -59,14 +59,13 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Insert test user and log output",
             onTap: () async {
               try {
-                final insertedId = await db.into(db.users).insert(
-                  UsersCompanion.insert(
-                    name: 'Test User',
-                  ),
-                );
+                final insertedId = await db
+                    .into(db.users)
+                    .insert(UsersCompanion.insert(name: 'Test User'));
 
                 final allUsers = await db.select(db.users).get();
-                final output = 'Inserted user id: $insertedId\nAll users: $allUsers';
+                final output =
+                    'Inserted user id: $insertedId\nAll users: $allUsers';
                 print(output);
 
                 if (context.mounted) {
@@ -120,7 +119,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Notification scheduled for 10 seconds from now"),
+                    content: Text(
+                      "Notification scheduled for 10 seconds from now",
+                    ),
                     duration: Duration(seconds: 3),
                   ),
                 );
@@ -135,7 +136,8 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "View count of scheduled notifications",
             onTap: () async {
               final notificationService = NotificationService();
-              final count = await notificationService.getPendingNotificationsCount();
+              final count = await notificationService
+                  .getPendingNotificationsCount();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -155,7 +157,8 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             onTap: () async {
               final notificationService = NotificationService();
               await notificationService.logPendingNotifications();
-              final count = await notificationService.getPendingNotificationsCount();
+              final count = await notificationService
+                  .getPendingNotificationsCount();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -174,14 +177,15 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Verify if app can schedule exact alarms",
             onTap: () async {
               final notificationService = NotificationService();
-              final canSchedule = await notificationService.checkExactAlarmPermission();
+              final canSchedule = await notificationService
+                  .checkExactAlarmPermission();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      canSchedule 
-                        ? "✓ Exact alarm permission granted" 
-                        : "✗ Exact alarm permission NOT granted - go to Settings"
+                      canSchedule
+                          ? "✓ Exact alarm permission granted"
+                          : "✗ Exact alarm permission NOT granted - go to Settings",
                     ),
                     backgroundColor: canSchedule ? Colors.green : Colors.red,
                     duration: const Duration(seconds: 5),
@@ -217,14 +221,16 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Check all permissions and notification status",
             onTap: () async {
               final notificationService = NotificationService();
-              final status = await notificationService.checkNotificationStatus();
+              final status = await notificationService
+                  .checkNotificationStatus();
               if (context.mounted) {
-                final message = 'Initialized: ${status['initialized']}\n'
+                final message =
+                    'Initialized: ${status['initialized']}\n'
                     'Notifications enabled: ${status['notificationPermission']}\n'
                     'Exact alarm: ${status['canScheduleExact']}\n'
                     'Pending: ${status['pendingCount']}\n'
                     'Active: ${status['activeCount']}';
-                
+
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -253,7 +259,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Scheduled 8 test notifications - check logs"),
+                    content: Text(
+                      "Scheduled 8 test notifications - check logs",
+                    ),
                     duration: Duration(seconds: 4),
                   ),
                 );
@@ -272,7 +280,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Medication notification scheduled for 30s - tap it to test scroll"),
+                    content: Text(
+                      "Medication notification scheduled for 30s - tap it to test scroll",
+                    ),
                     duration: Duration(seconds: 4),
                   ),
                 );
@@ -341,15 +351,13 @@ class _DevCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: Theme.of(context).textTheme.titleLarge),
+                    Text(title, style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: Colors.grey[600]),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                     ),
                   ],
                 ),

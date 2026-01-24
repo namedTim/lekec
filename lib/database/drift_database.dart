@@ -5,12 +5,12 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'package:lekec/database/tables/medication_intake_log.dart';
-import 'package:lekec/database/tables/medication_plans.dart';
-import 'package:lekec/database/tables/medication_schedule_rule.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/database/tables/users.dart';
-import 'package:lekec/database/tables/app_settings.dart';
+import 'tables/medication_intake_log.dart';
+import 'tables/medication_plans.dart';
+import 'tables/medication_schedule_rule.dart';
+import 'tables/medications.dart';
+import 'tables/users.dart';
+import 'tables/app_settings.dart';
 
 part 'drift_database.g.dart';
 
@@ -55,9 +55,6 @@ LazyDatabase _openConnection() {
     final dir = await getApplicationDocumentsDirectory();
     final file = File(p.join(dir.path, 'app_database.sqlite'));
 
-    return NativeDatabase.createInBackground(
-      file,
-      logStatements: true,
-    );
+    return NativeDatabase.createInBackground(file, logStatements: true);
   });
 }

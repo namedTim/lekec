@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/ui/screens/interval_planning.dart';
-import 'package:lekec/features/meds/providers/medications_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/main.dart' show homePageKey;
-import 'package:lekec/ui/components/quantity_selector.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import 'interval_planning.dart';
+import '../../features/meds/providers/medications_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../main.dart' show homePageKey;
+import '../components/quantity_selector.dart';
 
 class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;

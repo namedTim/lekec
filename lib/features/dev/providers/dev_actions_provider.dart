@@ -23,8 +23,8 @@ class DevActions {
     //await MockDataService(db).insertMock();
   }
 }
+
 @riverpod
 DevActions devActions(Ref ref) {
   return DevActions(ref.watch(databaseProvider));
 }
-

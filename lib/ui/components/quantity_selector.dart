@@ -80,7 +80,8 @@ class _QuantitySelectorState extends State<QuantitySelector> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        'Vnesi število med ${widget.minValue} in ${widget.maxValue}'),
+                      'Vnesi število med ${widget.minValue} in ${widget.maxValue}',
+                    ),
                   ),
                 );
               }

@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart' show MedicationStatus;
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/helpers/medication_unit_helper.dart';
-import 'package:lekec/ui/components/history_time_slot.dart';
-import 'package:lekec/data/services/history_service.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
+import '../../features/core/providers/database_provider.dart';
+import '../../helpers/medication_unit_helper.dart';
+import '../components/history_time_slot.dart';
+import '../../data/services/history_service.dart';
 
-enum HistoryFilter {
-  all,
-  taken,
-  missed,
-}
+enum HistoryFilter { all, taken, missed }
 
 class MedsHistoryScreen extends ConsumerStatefulWidget {
   const MedsHistoryScreen({super.key});
@@ -57,7 +53,8 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.9) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.9) {
       if (!_isLoading && _hasMore) {
         _loadMoreHistory();
       }
@@ -98,7 +95,8 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
 
     for (final entry in _allEntries) {
       final date = entry['date'] as DateTime;
-      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final dateKey =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
       grouped.putIfAbsent(dateKey, () => []);
       grouped[dateKey]!.add(entry);
@@ -203,107 +201,116 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
               child: _allEntries.isEmpty && _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _allEntries.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Ni zgodovine',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: colors.onSurfaceVariant,
+                  ? Center(
+                      child: Text(
+                        'Ni zgodovine',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        bottom: 80,
+                      ),
+                      itemCount: groupedHistory.length + (_hasMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        // Show loading indicator at the end
+                        if (index == groupedHistory.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+
+                        final dateKey = groupedHistory.keys.elementAt(index);
+                        final entries = groupedHistory[dateKey]!;
+                        final date = entries.first['date'] as DateTime;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Date header
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 16,
+                                bottom: 12,
+                              ),
+                              child: HistoryTimeSlot(
+                                text: _formatDate(date),
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.only(
-                            left: 16,
-                            right: 16,
-                            bottom: 80,
-                          ),
-                          itemCount: groupedHistory.length + (_hasMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            // Show loading indicator at the end
-                            if (index == groupedHistory.length) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Center(child: CircularProgressIndicator()),
-                              );
-                            }
 
-                            final dateKey = groupedHistory.keys.elementAt(index);
-                            final entries = groupedHistory[dateKey]!;
-                            final date = entries.first['date'] as DateTime;
+                            // Medications for this day
+                            ...entries.map((entry) {
+                              final intake =
+                                  entry['intake'] as MedicationIntakeLog;
+                              final medication =
+                                  entry['medication'] as Medication;
+                              final plan = entry['plan'] as MedicationPlan?;
+                              final dosageAmount = plan?.dosageAmount ?? 1.0;
+                              final dosageCount = dosageAmount.toInt();
 
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Date header
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 16, bottom: 12),
-                                  child: HistoryTimeSlot(
-                                    text: _formatDate(date),
-                                    fontSize: 14,
-                                  ),
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-
-                                // Medications for this day
-                                ...entries.map((entry) {
-                                  final intake = entry['intake'] as MedicationIntakeLog;
-                                  final medication = entry['medication'] as Medication;
-                                  final plan = entry['plan'] as MedicationPlan?;
-                                  final dosageAmount = plan?.dosageAmount ?? 1.0;
-                                  final dosageCount = dosageAmount.toInt();
-
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: colors.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Medication info
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                medication.name,
-                                                style: theme.textTheme.titleMedium?.copyWith(
+                                child: Row(
+                                  children: [
+                                    // Medication info
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            medication.name,
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
                                                   fontWeight: FontWeight.bold,
                                                 ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                                style: theme.textTheme.bodyMedium?.copyWith(
-                                                  color: colors.onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ],
                                           ),
-                                        ),
-
-                                        const SizedBox(width: 16),
-
-                                        // Time and status
-                                        HistoryTimeSlot(
-                                          text: _formatTime(intake.scheduledTime),
-                                          backgroundColor: intake.wasTaken 
-                                              ? Colors.green.shade100 
-                                              : Colors.red.shade100,
-                                          textColor: intake.wasTaken 
-                                              ? Colors.green.shade700 
-                                              : Colors.red.shade700,
-                                          fontSize: 13,
-                                        ),
-                                      ],
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      colors.onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  );
-                                }),
-                              ],
-                            );
-                          },
-                        ),
+
+                                    const SizedBox(width: 16),
+
+                                    // Time and status
+                                    HistoryTimeSlot(
+                                      text: _formatTime(intake.scheduledTime),
+                                      backgroundColor: intake.wasTaken
+                                          ? Colors.green.shade100
+                                          : Colors.red.shade100,
+                                      textColor: intake.wasTaken
+                                          ? Colors.green.shade700
+                                          : Colors.red.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        );
+                      },
+                    ),
             ),
           ],
         ),

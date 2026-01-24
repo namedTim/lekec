@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
 class CyclicPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -134,11 +134,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Symbols.info,
-                      color: colors.primary,
-                      size: 20,
-                    ),
+                    Icon(Symbols.info, color: colors.primary, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -164,10 +160,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -193,12 +186,15 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
     }
 
     // Navigate to time configuration
-    context.push('/add-medication/advanced-planning/cyclic/configure', extra: {
-      'name': widget.medicationName,
-      'medType': widget.medType,
-      'takingDays': takingDays,
-      'pauseDays': pauseDays,
-      'intakeAdvice': widget.intakeAdvice,
-    });
+    context.push(
+      '/add-medication/advanced-planning/cyclic/configure',
+      extra: {
+        'name': widget.medicationName,
+        'medType': widget.medType,
+        'takingDays': takingDays,
+        'pauseDays': pauseDays,
+        'intakeAdvice': widget.intakeAdvice,
+      },
+    );
   }
 }

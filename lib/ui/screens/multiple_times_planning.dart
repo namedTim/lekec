@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
 class MultipleTimesPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -79,16 +79,13 @@ class _MultipleTimesPlanningScreenState
                   value: _timesPerDay,
                   isExpanded: true,
                   underline: const SizedBox(),
-                  items: List.generate(
-                    10,
-                    (index) {
-                      final value = index + 1;
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text('$value-krat dnevno'),
-                      );
-                    },
-                  ),
+                  items: List.generate(10, (index) {
+                    final value = index + 1;
+                    return DropdownMenuItem(
+                      value: value,
+                      child: Text('$value-krat dnevno'),
+                    );
+                  }),
                   onChanged: (value) {
                     if (value != null) {
                       setState(() => _timesPerDay = value);
@@ -109,10 +106,7 @@ class _MultipleTimesPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -125,12 +119,14 @@ class _MultipleTimesPlanningScreenState
 
   void _handleContinue() {
     // Navigate to time selection screen
-    context.push('/add-medication/advanced-planning/multiple-times/times',
-        extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'timesPerDay': _timesPerDay,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+    context.push(
+      '/add-medication/advanced-planning/multiple-times/times',
+      extra: {
+        'name': widget.medicationName,
+        'medType': widget.medType,
+        'timesPerDay': _timesPerDay,
+        'intakeAdvice': widget.intakeAdvice,
+      },
+    );
   }
 }

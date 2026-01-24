@@ -19,11 +19,13 @@ class SettingsView extends ConsumerWidget {
             children: [
               ListTile(
                 title: const Text('Izgled aplikacije'),
-                subtitle: Text(themeMode.when(
-                  data: (mode) => _getThemeModeName(mode),
-                  loading: () => 'Pridobivanje nastavitve...',
-                  error: (_, __) => 'NaN',
-                )),
+                subtitle: Text(
+                  themeMode.when(
+                    data: (mode) => _getThemeModeName(mode),
+                    loading: () => 'Pridobivanje nastavitve...',
+                    error: (_, __) => 'NaN',
+                  ),
+                ),
                 leading: const Icon(Symbols.brightness_6),
               ),
               Padding(

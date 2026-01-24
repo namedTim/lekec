@@ -2,9 +2,24 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Brand greens
-  static const Color primary = Color.fromARGB(255, 31, 191, 31);       // main brand green
-  static const Color primaryDark = Color.fromARGB(255, 23, 158, 46);   // dark container
-  static const Color primaryLight = Color.fromARGB(255, 110, 231, 126);  // light container
+  static const Color primary = Color.fromARGB(
+    255,
+    31,
+    191,
+    31,
+  ); // main brand green
+  static const Color primaryDark = Color.fromARGB(
+    255,
+    23,
+    158,
+    46,
+  ); // dark container
+  static const Color primaryLight = Color.fromARGB(
+    255,
+    110,
+    231,
+    126,
+  ); // light container
 
   // Neutral surfaces (no blue tint)
   static const Color backgroundLight = Color(0xFFFAFAF8);

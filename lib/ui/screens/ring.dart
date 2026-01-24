@@ -40,7 +40,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -60,7 +60,9 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen> {
                   RawMaterialButton(
                     onPressed: () async => Alarm.set(
                       alarmSettings: widget.alarmSettings.copyWith(
-                        dateTime: DateTime.now().add(const Duration(minutes: 1)),
+                        dateTime: DateTime.now().add(
+                          const Duration(minutes: 1),
+                        ),
                       ),
                     ),
                     child: Text(

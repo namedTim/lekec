@@ -82,8 +82,7 @@ class _TimeIslandState extends State<TimeIsland> {
   double get _progress {
     if (_isFinished) return 1;
     return 1 -
-        (_remaining.inSeconds / widget.totalDuration.inSeconds)
-            .clamp(0, 1);
+        (_remaining.inSeconds / widget.totalDuration.inSeconds).clamp(0, 1);
   }
 
   String get _timeText {
@@ -101,18 +100,18 @@ class _TimeIslandState extends State<TimeIsland> {
       }
       return '$days d';
     }
-    
+
     if (hours > 0) {
       if (minutes > 0) {
         return '$hours h $minutes min';
       }
       return '$hours h';
     }
-    
+
     if (minutes > 0) {
       return '$minutes min';
     }
-    
+
     return '${seconds}s';
   }
 
@@ -149,9 +148,7 @@ class _TimeIslandState extends State<TimeIsland> {
 
           // Show medication name or time
           Text(
-            _isFinished 
-                ? (widget.medicationName ?? '--')
-                : _timeText,
+            _isFinished ? (widget.medicationName ?? '--') : _timeText,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: _isFinished ? colors.primary : colors.onSurface,

@@ -800,7 +800,6 @@ class NotificationService {
     );
   }
 
-
   /// Trigger a test alarm in 10 seconds
   Future<void> triggerAlarm() async {
     // check permissions

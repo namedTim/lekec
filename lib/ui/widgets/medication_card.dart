@@ -87,13 +87,19 @@ class _MedicationCardState extends State<MedicationCard> {
         DismissDirection.endToStart: 0.3,
       },
       resizeDuration: null,
-      background: widget.enableLeftSwipe ? _buildSwipeBackground(colors, isLeft: true) : null,
-      secondaryBackground: widget.enableRightSwipe ? _buildSwipeBackground(colors, isLeft: false) : null,
+      background: widget.enableLeftSwipe
+          ? _buildSwipeBackground(colors, isLeft: true)
+          : null,
+      secondaryBackground: widget.enableRightSwipe
+          ? _buildSwipeBackground(colors, isLeft: false)
+          : null,
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.endToStart && widget.enableRightSwipe) {
+        if (direction == DismissDirection.endToStart &&
+            widget.enableRightSwipe) {
           // Swipe from right - mark as taken
           widget.onStatusChanged?.call(MedicationStatus.taken);
-        } else if (direction == DismissDirection.startToEnd && widget.enableLeftSwipe) {
+        } else if (direction == DismissDirection.startToEnd &&
+            widget.enableLeftSwipe) {
           // Swipe from left - delete one-time entry or mark as not taken
           if (widget.isOneTimeEntry) {
             widget.onDelete?.call();
@@ -154,8 +160,10 @@ class _MedicationCardState extends State<MedicationCard> {
                   // Remaining pills / info chip
                   if (widget.medicineRemaining.isNotEmpty)
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _getPillCountColor(widget.pillCount),
                         borderRadius: BorderRadius.circular(20),
@@ -179,8 +187,10 @@ class _MedicationCardState extends State<MedicationCard> {
             if (widget.showName)
               Container(
                 margin: const EdgeInsets.only(left: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: colors.primary,
                   borderRadius: BorderRadius.circular(16),
@@ -223,8 +233,8 @@ class _MedicationCardState extends State<MedicationCard> {
         // Toggle between taken and not taken
         if (widget.status == MedicationStatus.taken) {
           widget.onStatusChanged?.call(MedicationStatus.notTaken);
-        } else if (widget.status == MedicationStatus.notTaken || 
-                   widget.status == MedicationStatus.upcoming) {
+        } else if (widget.status == MedicationStatus.notTaken ||
+            widget.status == MedicationStatus.upcoming) {
           widget.onStatusChanged?.call(MedicationStatus.taken);
         }
       },
@@ -232,21 +242,19 @@ class _MedicationCardState extends State<MedicationCard> {
         margin: const EdgeInsets.only(left: 12),
         padding: const EdgeInsets.all(8),
         alignment: Alignment.center,
-        child: Icon(
-          icon,
-          color: iconColor,
-          size: 36,
-        ),
+        child: Icon(icon, color: iconColor, size: 36),
       ),
     );
   }
 
   Widget _buildSwipeBackground(ColorScheme colors, {required bool isLeft}) {
-    final backgroundColor = isLeft ? Colors.red.shade100 : Colors.green.shade100;
+    final backgroundColor = isLeft
+        ? Colors.red.shade100
+        : Colors.green.shade100;
     final iconColor = isLeft ? Colors.red : Colors.green;
     final icon = isLeft ? Symbols.cancel : Symbols.check_circle;
     final alignment = isLeft ? Alignment.centerLeft : Alignment.centerRight;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -255,11 +263,7 @@ class _MedicationCardState extends State<MedicationCard> {
       ),
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Icon(
-        icon,
-        color: iconColor,
-        size: 36,
-      ),
+      child: Icon(icon, color: iconColor, size: 36),
     );
   }
 }

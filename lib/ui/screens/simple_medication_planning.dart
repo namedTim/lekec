@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lekec/database/drift_database.dart';
+import '../../database/drift_database.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/ui/components/quantity_selector.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/data/services/notification_service.dart';
-import 'package:lekec/data/services/medication_service.dart';
-import 'package:lekec/data/services/plan_service.dart';
+import '../../database/tables/medications.dart';
+import '../components/quantity_selector.dart';
+import '../components/step_progress_indicator.dart';
+import '../../features/core/providers/database_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../data/services/notification_service.dart';
+import '../../data/services/medication_service.dart';
+import '../../data/services/plan_service.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
 import 'medication_frequency_selection.dart' show FrequencyOption;
-import 'package:lekec/main.dart' show homePageKey;
+import '../../main.dart' show homePageKey;
 
 class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -103,7 +103,7 @@ class _SimpleMedicationPlanningScreenState
 
   Future<void> _handleSave() async {
     if (_isSaving) return; // Prevent double-tap
-    
+
     // Validate required fields
     if (widget.frequency != FrequencyOption.asNeeded) {
       if (_startDate == null) {
@@ -337,7 +337,10 @@ class _SimpleMedicationPlanningScreenState
                       )
                     : const Text(
                         'Shrani',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
               ),
             ],

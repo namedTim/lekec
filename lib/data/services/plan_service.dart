@@ -26,15 +26,17 @@ class PlanService {
   }) async {
     // Update medication with initial quantity if provided
     if (initialQuantity != null) {
-      await (db.update(db.medications)
-            ..where((t) => t.id.equals(medicationId)))
-          .write(
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
       );
     }
 
     // Create medication plan
-    final planId = await db.into(db.medicationPlans).insert(
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
           MedicationPlansCompanion.insert(
             userId: userId,
             medicationId: medicationId,
@@ -46,7 +48,9 @@ class PlanService {
 
     // Create schedule rule (if not "as needed")
     if (ruleType != 'asNeeded' && times.isNotEmpty) {
-      await db.into(db.medicationScheduleRules).insert(
+      await db
+          .into(db.medicationScheduleRules)
+          .insert(
             MedicationScheduleRulesCompanion.insert(
               planId: planId,
               ruleType: ruleType,
@@ -72,15 +76,17 @@ class PlanService {
   }) async {
     // Update medication with initial quantity if provided
     if (initialQuantity != null) {
-      await (db.update(db.medications)
-            ..where((t) => t.id.equals(medicationId)))
-          .write(
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
       );
     }
 
     // Create medication plan
-    final planId = await db.into(db.medicationPlans).insert(
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
           MedicationPlansCompanion.insert(
             userId: userId,
             medicationId: medicationId,
@@ -91,7 +97,9 @@ class PlanService {
         );
 
     // Create schedule rule for interval
-    await db.into(db.medicationScheduleRules).insert(
+    await db
+        .into(db.medicationScheduleRules)
+        .insert(
           MedicationScheduleRulesCompanion.insert(
             planId: planId,
             ruleType: isHourInterval ? 'hourInterval' : 'dayInterval',
@@ -117,15 +125,17 @@ class PlanService {
   }) async {
     // Update medication with initial quantity if provided
     if (initialQuantity != null) {
-      await (db.update(db.medications)
-            ..where((t) => t.id.equals(medicationId)))
-          .write(
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
       );
     }
 
     // Create medication plan
-    final planId = await db.into(db.medicationPlans).insert(
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
           MedicationPlansCompanion.insert(
             userId: userId,
             medicationId: medicationId,
@@ -136,7 +146,9 @@ class PlanService {
         );
 
     // Create schedule rule for specific days
-    await db.into(db.medicationScheduleRules).insert(
+    await db
+        .into(db.medicationScheduleRules)
+        .insert(
           MedicationScheduleRulesCompanion.insert(
             planId: planId,
             ruleType: 'weekly',
@@ -162,15 +174,17 @@ class PlanService {
   }) async {
     // Update medication with initial quantity if provided
     if (initialQuantity != null) {
-      await (db.update(db.medications)
-            ..where((t) => t.id.equals(medicationId)))
-          .write(
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(initialQuantity)),
       );
     }
 
     // Create medication plan
-    final planId = await db.into(db.medicationPlans).insert(
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
           MedicationPlansCompanion.insert(
             userId: userId,
             medicationId: medicationId,
@@ -181,7 +195,9 @@ class PlanService {
         );
 
     // Create schedule rule for cyclic
-    await db.into(db.medicationScheduleRules).insert(
+    await db
+        .into(db.medicationScheduleRules)
+        .insert(
           MedicationScheduleRulesCompanion.insert(
             planId: planId,
             ruleType: 'cyclic',

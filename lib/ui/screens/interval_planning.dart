@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
 enum IntervalType { hours, days }
 
@@ -138,10 +138,7 @@ class _IntervalPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -199,12 +196,15 @@ class _IntervalPlanningScreenState
 
   void _handleContinue() {
     // Navigate to time selection or final configuration
-    context.push('/add-medication/advanced-planning/interval/configure', extra: {
-      'name': widget.medicationName,
-      'medType': widget.medType,
-      'intervalType': _selectedType,
-      'intervalValue': _intervalValue,
-      'intakeAdvice': widget.intakeAdvice,
-    });
+    context.push(
+      '/add-medication/advanced-planning/interval/configure',
+      extra: {
+        'name': widget.medicationName,
+        'medType': widget.medType,
+        'intervalType': _selectedType,
+        'intervalValue': _intervalValue,
+        'intakeAdvice': widget.intakeAdvice,
+      },
+    );
   }
 }

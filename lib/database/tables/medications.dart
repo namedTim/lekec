@@ -20,10 +20,7 @@ enum MedicationType {
   micrograms,
 }
 
-enum MedicationStatus {
-  active,
-  deleted,
-}
+enum MedicationStatus { active, deleted }
 
 class Medications extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -32,6 +29,7 @@ class Medications extends Table {
   TextColumn get notes => text().nullable()();
   IntColumn get nationalCode => integer().nullable()();
   IntColumn get medType => intEnum<MedicationType>()();
-  IntColumn get status => intEnum<MedicationStatus>().withDefault(const Constant(0))();
+  IntColumn get status =>
+      intEnum<MedicationStatus>().withDefault(const Constant(0))();
   TextColumn get intakeAdvice => text().nullable()();
 }

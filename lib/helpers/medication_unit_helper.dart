@@ -1,4 +1,4 @@
-import 'package:lekec/database/tables/medications.dart';
+import '../database/tables/medications.dart';
 
 /// Helper function for Slovenian pluralization rules
 /// 1 = singular, 2 = dual, 3-4 = plural, 5+ = genitive plural
@@ -24,17 +24,41 @@ String pluralizeSlovenian(
 String getMedicationUnit(MedicationType type, int count) {
   switch (type) {
     case MedicationType.pills:
-      return pluralizeSlovenian(count, 'tableta', 'tableti', 'tablete', 'tablet');
+      return pluralizeSlovenian(
+        count,
+        'tableta',
+        'tableti',
+        'tablete',
+        'tablet',
+      );
     case MedicationType.capsules:
-      return pluralizeSlovenian(count, 'kapsula', 'kapsuli', 'kapsule', 'kapsul');
+      return pluralizeSlovenian(
+        count,
+        'kapsula',
+        'kapsuli',
+        'kapsule',
+        'kapsul',
+      );
     case MedicationType.drops:
-      return pluralizeSlovenian(count, 'kapljica', 'kapljici', 'kapljice', 'kapljic');
+      return pluralizeSlovenian(
+        count,
+        'kapljica',
+        'kapljici',
+        'kapljice',
+        'kapljic',
+      );
     case MedicationType.milliliters:
       return 'ml';
     case MedicationType.sprays:
       return pluralizeSlovenian(count, 'brizg', 'brizga', 'brizgi', 'brizgov');
     case MedicationType.injections:
-      return pluralizeSlovenian(count, 'injekcija', 'injekciji', 'injekcije', 'injekcij');
+      return pluralizeSlovenian(
+        count,
+        'injekcija',
+        'injekciji',
+        'injekcije',
+        'injekcij',
+      );
     case MedicationType.patches:
       return pluralizeSlovenian(count, 'obliž', 'obliža', 'obliži', 'obližev');
     case MedicationType.puffs:
@@ -52,7 +76,13 @@ String getMedicationUnit(MedicationType type, int count) {
     case MedicationType.tablespoons:
       return pluralizeSlovenian(count, 'žlička', 'žlički', 'žličke', 'žličk');
     case MedicationType.portions:
-      return pluralizeSlovenian(count, 'porcija', 'porciji', 'porcije', 'porcij');
+      return pluralizeSlovenian(
+        count,
+        'porcija',
+        'porciji',
+        'porcije',
+        'porcij',
+      );
     case MedicationType.pieces:
       return pluralizeSlovenian(count, 'kos', 'kosa', 'kosi', 'kosov');
     case MedicationType.units:

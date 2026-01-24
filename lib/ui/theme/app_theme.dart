@@ -58,14 +58,9 @@ class AppTheme {
 
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(
-              color: AppColors.primary,
-              size: 26,
-            );
+            return const IconThemeData(color: AppColors.primary, size: 26);
           }
-          return const IconThemeData(
-            color: Color(0xFF6B7280),
-          );
+          return const IconThemeData(color: Color(0xFF6B7280));
         }),
       ),
 
@@ -82,6 +77,7 @@ class AppTheme {
       ),
     );
   }
+
   static ThemeData get dark {
     return ThemeData(
       useMaterial3: true,

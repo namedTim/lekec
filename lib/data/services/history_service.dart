@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
+import '../../database/drift_database.dart';
 
 class HistoryService {
   final AppDatabase db;
@@ -29,7 +29,8 @@ class HistoryService {
     ]);
 
     // Only show past and current medications (not future)
-    query = query..where(db.medicationIntakeLogs.scheduledTime.isSmallerOrEqualValue(now));
+    query = query
+      ..where(db.medicationIntakeLogs.scheduledTime.isSmallerOrEqualValue(now));
 
     // Apply filter
     if (onlyTaken == true) {
@@ -39,9 +40,10 @@ class HistoryService {
     }
 
     // Order by scheduled time descending (newest first)
-    query = query..orderBy([
-      drift.OrderingTerm.desc(db.medicationIntakeLogs.scheduledTime),
-    ]);
+    query = query
+      ..orderBy([
+        drift.OrderingTerm.desc(db.medicationIntakeLogs.scheduledTime),
+      ]);
 
     // Apply pagination
     query = query..limit(limit, offset: offset);

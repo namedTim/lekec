@@ -2,14 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
-enum AdvancedScheduleType {
-  interval,
-  multipleTimes,
-  specificDays,
-  cyclic,
-}
+enum AdvancedScheduleType { interval, multipleTimes, specificDays, cyclic }
 
 class AdvancedMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -107,10 +102,7 @@ class _AdvancedMedicationPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -148,7 +140,9 @@ class _AdvancedMedicationPlanningScreenState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? colors.primary : colors.surfaceContainerHigh,
+                color: isSelected
+                    ? colors.primary
+                    : colors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -165,30 +159,26 @@ class _AdvancedMedicationPlanningScreenState
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? colors.onPrimaryContainer
-                              : colors.onSurface,
-                        ),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? colors.onPrimaryContainer
+                          : colors.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     description,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isSelected
-                              ? colors.onPrimaryContainer
-                              : colors.onSurfaceVariant,
-                        ),
+                      color: isSelected
+                          ? colors.onPrimaryContainer
+                          : colors.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
             ),
             if (isSelected)
-              Icon(
-                Symbols.check_circle,
-                color: colors.primary,
-                size: 24,
-              ),
+              Icon(Symbols.check_circle, color: colors.primary, size: 24),
           ],
         ),
       ),
@@ -200,32 +190,44 @@ class _AdvancedMedicationPlanningScreenState
 
     switch (_selectedType!) {
       case AdvancedScheduleType.interval:
-        context.push('/add-medication/advanced-planning/interval', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/interval',
+          extra: {
+            'name': widget.medicationName,
+            'medType': widget.medType,
+            'intakeAdvice': widget.intakeAdvice,
+          },
+        );
         break;
       case AdvancedScheduleType.multipleTimes:
-        context.push('/add-medication/advanced-planning/multiple-times', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/multiple-times',
+          extra: {
+            'name': widget.medicationName,
+            'medType': widget.medType,
+            'intakeAdvice': widget.intakeAdvice,
+          },
+        );
         break;
       case AdvancedScheduleType.specificDays:
-        context.push('/add-medication/advanced-planning/specific-days', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/specific-days',
+          extra: {
+            'name': widget.medicationName,
+            'medType': widget.medType,
+            'intakeAdvice': widget.intakeAdvice,
+          },
+        );
         break;
       case AdvancedScheduleType.cyclic:
-        context.push('/add-medication/advanced-planning/cyclic', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/cyclic',
+          extra: {
+            'name': widget.medicationName,
+            'medType': widget.medType,
+            'intakeAdvice': widget.intakeAdvice,
+          },
+        );
         break;
     }
   }

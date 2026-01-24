@@ -18,16 +18,12 @@ class StepProgressIndicator extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Container(
         height: 5,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-        ),
+        decoration: BoxDecoration(color: Colors.grey.shade300),
         child: FractionallySizedBox(
           alignment: Alignment.centerLeft,
           widthFactor: progress,
           child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.green,
-            ),
+            decoration: const BoxDecoration(color: Colors.green),
           ),
         ),
       ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
 class SpecificDaysPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -94,8 +94,9 @@ class _SpecificDaysPlanningScreenState
                             color: colors.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color:
-                                  isSelected ? colors.primary : Colors.transparent,
+                              color: isSelected
+                                  ? colors.primary
+                                  : Colors.transparent,
                               width: 2,
                             ),
                           ),
@@ -138,10 +139,7 @@ class _SpecificDaysPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -154,12 +152,14 @@ class _SpecificDaysPlanningScreenState
 
   void _handleContinue() {
     // Navigate to time selection screen
-    context.push('/add-medication/advanced-planning/specific-days/times',
-        extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'selectedDays': _selectedDays.toList(),
-          'intakeAdvice': widget.intakeAdvice,
-        });
+    context.push(
+      '/add-medication/advanced-planning/specific-days/times',
+      extra: {
+        'name': widget.medicationName,
+        'medType': widget.medType,
+        'selectedDays': _selectedDays.toList(),
+        'intakeAdvice': widget.intakeAdvice,
+      },
+    );
   }
 }

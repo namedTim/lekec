@@ -13,7 +13,7 @@ import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import 'medication_detail_screen.dart';
-import 'package:lekec/main.dart' show homePageKey;
+import '../../main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
 

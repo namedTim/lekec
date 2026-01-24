@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
+import '../../database/tables/medications.dart';
+import '../components/step_progress_indicator.dart';
 
-enum FrequencyOption {
-  onceDaily,
-  twiceDaily,
-  asNeeded,
-  moreOptions,
-}
+enum FrequencyOption { onceDaily, twiceDaily, asNeeded, moreOptions }
 
 class MedicationFrequencySelectionScreen extends StatefulWidget {
   final String medicationName;
@@ -47,9 +42,9 @@ class _MedicationFrequencySelectionScreenState
 
   void _handleNext() {
     if (_selectedFrequency == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Izberite možnost')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Izberite možnost')));
       return;
     }
 
@@ -106,7 +101,8 @@ class _MedicationFrequencySelectionScreenState
               Expanded(
                 child: ListView.separated(
                   itemCount: FrequencyOption.values.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final option = FrequencyOption.values[index];
                     return _FrequencyOptionButton(
@@ -132,19 +128,18 @@ class _MedicationFrequencySelectionScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
         ),
-      ),      bottomNavigationBar: const StepProgressIndicator(
+      ),
+      bottomNavigationBar: const StepProgressIndicator(
         currentStep: 2,
         totalSteps: 3,
-      ),    );
+      ),
+    );
   }
 }
 

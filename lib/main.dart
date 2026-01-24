@@ -6,9 +6,9 @@ import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lekec/ui/screens/ring.dart';
+import 'ui/screens/ring.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/drift_database.dart';
+import 'database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
@@ -28,7 +28,7 @@ import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
-import 'package:lekec/database/tables/medications.dart' hide MedicationStatus;
+import 'database/tables/medications.dart' hide MedicationStatus;
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/medication_card.dart';
 import 'ui/components/confirmation_dialog.dart';
@@ -52,7 +52,7 @@ StreamSubscription<AlarmSet>? _globalUpdateSubscription;
 // Global alarm ring handler - works from any screen
 Future<void> _handleAlarmRinging(AlarmSet alarms) async {
   if (alarms.alarms.isEmpty) return;
-  
+
   // Use the root navigator key to ensure alarm appears over ALL screens
   final navigatorState = rootNavigatorKey.currentState;
   if (navigatorState == null) {
@@ -60,14 +60,14 @@ Future<void> _handleAlarmRinging(AlarmSet alarms) async {
     await Future.delayed(const Duration(milliseconds: 100));
     return _handleAlarmRinging(alarms);
   }
-  
+
   // Check if alarm ring screen is already showing
   final currentRoute = ModalRoute.of(navigatorState.context);
-  if (currentRoute?.settings.name == '/ring' || 
+  if (currentRoute?.settings.name == '/ring' ||
       navigatorState.context.widget is ExampleAlarmRingScreen) {
     return; // Already showing alarm screen
   }
-  
+
   await navigatorState.push(
     MaterialPageRoute<void>(
       builder: (context) =>
@@ -103,7 +103,10 @@ void main() async {
   // Initialize alarm service
   WidgetsFlutterBinding.ensureInitialized();
   await Alarm.init();
-  await Alarm.setWarningNotificationOnKill("Aktivnost opozoril", "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.");
+  await Alarm.setWarningNotificationOnKill(
+    "Aktivnost opozoril",
+    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+  );
 
   // Set up global alarm listeners BEFORE running the app
   // This ensures alarms work regardless of which screen is active
@@ -801,7 +804,8 @@ class _MyHomePageState extends State<MyHomePage>
                                   userId: '1',
                                   status: status,
                                   isOneTimeEntry: isOneTime,
-                                  enableLeftSwipe: canSwipeScheduled || canDeleteOneTime,
+                                  enableLeftSwipe:
+                                      canSwipeScheduled || canDeleteOneTime,
                                   enableRightSwipe: canSwipeScheduled,
                                   isNextMedication: isNextMed,
                                   onStatusChanged: isOneTime

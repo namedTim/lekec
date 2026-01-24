@@ -56,24 +56,30 @@ class MedicationDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Intake Advice Card
                 _DetailCard(
                   icon: Symbols.info,
                   title: 'Priporočilo pred zaužitjem',
                   child: Text(
-                    intakeAdvice?.isEmpty ?? true ? 'Ni podatka' : intakeAdvice!,
+                    intakeAdvice?.isEmpty ?? true
+                        ? 'Ni podatka'
+                        : intakeAdvice!,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontStyle: intakeAdvice?.isEmpty ?? true ? FontStyle.italic : FontStyle.normal,
-                      color: intakeAdvice?.isEmpty ?? true ? colors.onSurfaceVariant.withOpacity(0.6) : null,
+                      fontStyle: intakeAdvice?.isEmpty ?? true
+                          ? FontStyle.italic
+                          : FontStyle.normal,
+                      color: intakeAdvice?.isEmpty ?? true
+                          ? colors.onSurfaceVariant.withOpacity(0.6)
+                          : null,
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Stock/Supply Card
                 _DetailCard(
                   icon: Symbols.inventory_2,
@@ -81,7 +87,10 @@ class MedicationDetailScreen extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: colors.primaryContainer,
                         borderRadius: BorderRadius.circular(8),
@@ -107,9 +116,9 @@ class MedicationDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Dosage Card
                 _DetailCard(
                   icon: Symbols.science,
@@ -121,9 +130,9 @@ class MedicationDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Reminders/Schedule Card
                 _DetailCard(
                   icon: Symbols.schedule,
@@ -178,7 +187,8 @@ class MedicationDetailScreen extends StatelessWidget {
                   context: context,
                   builder: (context) => ConfirmationDialog(
                     title: 'Izbriši zdravilo?',
-                    message: 'Ali ste prepričani, da želite izbrisati zdravilo "$medicationName"?',
+                    message:
+                        'Ali ste prepričani, da želite izbrisati zdravilo "$medicationName"?',
                     confirmText: 'Izbriši',
                     cancelText: 'Prekliči',
                   ),
@@ -228,11 +238,7 @@ class _DetailCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: colors.primary,
-                ),
+                Icon(icon, size: 24, color: colors.primary),
                 const SizedBox(width: 8),
                 Text(
                   title,

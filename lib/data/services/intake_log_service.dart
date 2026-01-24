@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
+import '../../database/drift_database.dart';
 
 class IntakeLogService {
   final AppDatabase db;
@@ -179,7 +179,9 @@ class IntakeLogService {
     )..where((t) => t.id.equals(intakeId))).write(
       MedicationIntakeLogsCompanion(
         wasTaken: drift.Value(wasTaken),
-        takenTime: drift.Value(DateTime.now()), // Set for both taken and not taken
+        takenTime: drift.Value(
+          DateTime.now(),
+        ), // Set for both taken and not taken
       ),
     );
 

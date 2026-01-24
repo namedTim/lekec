@@ -23,30 +23,39 @@ void callbackDispatcher() {
           // Generate new schedule entries
           final generator = IntakeScheduleGenerator(db);
           final count = await generator.generateScheduledIntakes();
-          developer.log('Generated $count schedule entries in background', 
-            name: 'BackgroundTask');
+          developer.log(
+            'Generated $count schedule entries in background',
+            name: 'BackgroundTask',
+          );
           break;
 
         case notificationScheduleTask:
           // Reschedule notifications
           final notificationService = NotificationService();
           await notificationService.scheduleAllUpcomingNotifications(db);
-          developer.log('Rescheduled notifications in background', 
-            name: 'BackgroundTask');
+          developer.log(
+            'Rescheduled notifications in background',
+            name: 'BackgroundTask',
+          );
           break;
       }
 
       return Future.value(true);
     } catch (e, st) {
-      developer.log('Background task failed: $task', 
-        error: e, stackTrace: st, name: 'BackgroundTask');
+      developer.log(
+        'Background task failed: $task',
+        error: e,
+        stackTrace: st,
+        name: 'BackgroundTask',
+      );
       return Future.value(false);
     }
   });
 }
 
 class BackgroundTaskService {
-  static final BackgroundTaskService _instance = BackgroundTaskService._internal();
+  static final BackgroundTaskService _instance =
+      BackgroundTaskService._internal();
   factory BackgroundTaskService() => _instance;
   BackgroundTaskService._internal();
 
@@ -61,7 +70,10 @@ class BackgroundTaskService {
     );
 
     _initialized = true;
-    developer.log('Background task service initialized', name: 'BackgroundTask');
+    developer.log(
+      'Background task service initialized',
+      name: 'BackgroundTask',
+    );
   }
 
   /// Schedule daily background task to generate intake schedules
@@ -83,7 +95,10 @@ class BackgroundTaskService {
       existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );
 
-    developer.log('Scheduled daily schedule generation task', name: 'BackgroundTask');
+    developer.log(
+      'Scheduled daily schedule generation task',
+      name: 'BackgroundTask',
+    );
   }
 
   /// Schedule periodic notification rescheduling
@@ -105,7 +120,10 @@ class BackgroundTaskService {
       existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );
 
-    developer.log('Scheduled periodic notification refresh task', name: 'BackgroundTask');
+    developer.log(
+      'Scheduled periodic notification refresh task',
+      name: 'BackgroundTask',
+    );
   }
 
   /// Cancel all background tasks

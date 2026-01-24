@@ -3,17 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../features/core/providers/database_provider.dart';
+import '../components/step_progress_indicator.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
   const AddMedicationScreen({super.key});
 
   @override
-  ConsumerState<AddMedicationScreen> createState() => _AddMedicationScreenState();
+  ConsumerState<AddMedicationScreen> createState() =>
+      _AddMedicationScreenState();
 }
 
 class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
@@ -33,23 +34,40 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
 
   String _getMedicationTypeLabel(MedicationType type) {
     switch (type) {
-      case MedicationType.pills: return 'Tablete';
-      case MedicationType.ampules: return 'Ampule';
-      case MedicationType.applications: return 'Nanosi';
-      case MedicationType.capsules: return 'Kapsule';
-      case MedicationType.drops: return 'Kapljice';
-      case MedicationType.grams: return 'Grami';
-      case MedicationType.injections: return 'Injekcije';
-      case MedicationType.milligrams: return 'Miligrami';
-      case MedicationType.milliliters: return 'Mililiter';
-      case MedicationType.patches: return 'Obliži';
-      case MedicationType.pieces: return 'Kosi';
-      case MedicationType.portions: return 'Porcije';
-      case MedicationType.puffs: return 'Puhljaji';
-      case MedicationType.sprays: return 'Pršila';
-      case MedicationType.tablespoons: return 'Žlice';
-      case MedicationType.units: return 'Enote';
-      case MedicationType.micrograms: return 'Mikrogrami';
+      case MedicationType.pills:
+        return 'Tablete';
+      case MedicationType.ampules:
+        return 'Ampule';
+      case MedicationType.applications:
+        return 'Nanosi';
+      case MedicationType.capsules:
+        return 'Kapsule';
+      case MedicationType.drops:
+        return 'Kapljice';
+      case MedicationType.grams:
+        return 'Grami';
+      case MedicationType.injections:
+        return 'Injekcije';
+      case MedicationType.milligrams:
+        return 'Miligrami';
+      case MedicationType.milliliters:
+        return 'Mililiter';
+      case MedicationType.patches:
+        return 'Obliži';
+      case MedicationType.pieces:
+        return 'Kosi';
+      case MedicationType.portions:
+        return 'Porcije';
+      case MedicationType.puffs:
+        return 'Puhljaji';
+      case MedicationType.sprays:
+        return 'Pršila';
+      case MedicationType.tablespoons:
+        return 'Žlice';
+      case MedicationType.units:
+        return 'Enote';
+      case MedicationType.micrograms:
+        return 'Mikrogrami';
     }
   }
 
@@ -104,7 +122,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
-                
+
                 // Name Input - Full Width
                 TextFormField(
                   controller: _medicationNameController,
@@ -131,21 +149,26 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   isExpanded: true,
                   menuMaxHeight: 400,
                   // 1. Center the text in the button itself
-                  alignment: Alignment.center, 
+                  alignment: Alignment.center,
                   decoration: InputDecoration(
                     labelText: 'Vrsta zdravila',
                     // Center the label if possible, or leave default
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  
+
                   // 2. Center the selected item text
                   selectedItemBuilder: (BuildContext context) {
-                    return MedicationType.values.map<Widget>((MedicationType type) {
+                    return MedicationType.values.map<Widget>((
+                      MedicationType type,
+                    ) {
                       return Center(
                         child: Text(
                           _getMedicationTypeLabel(type),
@@ -162,7 +185,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       alignment: Alignment.center, // Aligns item in the menu
                       child: SizedBox(
                         // This forces the text content to be max 60% of screen width
-                        width: screenWidth * 0.6, 
+                        width: screenWidth * 0.6,
                         child: Text(
                           _getMedicationTypeLabel(type),
                           textAlign: TextAlign.center,
@@ -170,7 +193,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       ),
                     );
                   }).toList(),
-                  
+
                   onChanged: (value) {
                     if (value != null) {
                       setState(() => _selectedType = value);
@@ -187,7 +210,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   alignment: Alignment.center,
                   decoration: InputDecoration(
                     labelText: 'Priporočilo pred zaužitjem',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -195,28 +221,35 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   selectedItemBuilder: (BuildContext context) {
-                    return ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map<Widget>((String value) {
+                    return [
+                      'Ni posebnosti',
+                      'Pred obrokom',
+                      'Z obrokom',
+                      'Po obroku',
+                      'Po meri',
+                    ].map<Widget>((String value) {
                       return Center(
-                        child: Text(
-                          value,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: Text(value, textAlign: TextAlign.center),
                       );
                     }).toList();
                   },
-                  items: ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map((String value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: screenWidth * 0.6,
-                        child: Text(
-                          value,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  items:
+                      [
+                        'Ni posebnosti',
+                        'Pred obrokom',
+                        'Z obrokom',
+                        'Po obroku',
+                        'Po meri',
+                      ].map((String value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: screenWidth * 0.6,
+                            child: Text(value, textAlign: TextAlign.center),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (value) {
                     if (value != null) {
                       setState(() {
@@ -241,7 +274,8 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       filled: true,
                     ),
                     validator: (value) {
-                      if (_selectedIntakeAdvice == 'Po meri' && (value == null || value.trim().isEmpty)) {
+                      if (_selectedIntakeAdvice == 'Po meri' &&
+                          (value == null || value.trim().isEmpty)) {
                         return 'Vnesite priporočilo';
                       }
                       return null;
@@ -251,7 +285,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                 ],
 
                 const SizedBox(height: 48),
-                
+
                 FilledButton(
                   onPressed: _handleNext,
                   style: FilledButton.styleFrom(

@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/helpers/medication_unit_helper.dart';
-import 'package:lekec/main.dart' show homePageKey;
-import 'package:lekec/data/services/medication_service.dart';
-import 'package:lekec/data/services/intake_log_service.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../features/core/providers/database_provider.dart';
+import '../../helpers/medication_unit_helper.dart';
+import '../../main.dart' show homePageKey;
+import '../../data/services/medication_service.dart';
+import '../../data/services/intake_log_service.dart';
 
 class AddSingleEntryQuantityScreen extends ConsumerStatefulWidget {
   final String medicationName;

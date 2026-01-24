@@ -9,10 +9,10 @@ class MedicationScheduleRules extends Table {
   TextColumn get ruleType => text()();
 
   // For time(s) of day: ["08:00", "20:00"]
-  TextColumn get timesOfDay => text().nullable()();   // store JSON list
+  TextColumn get timesOfDay => text().nullable()(); // store JSON list
 
   // For weekly: [1,3,5]
-  TextColumn get daysOfWeek => text().nullable()();   // JSON list
+  TextColumn get daysOfWeek => text().nullable()(); // JSON list
 
   // For intervals:
   IntColumn get intervalHours => integer().nullable()();
@@ -23,6 +23,4 @@ class MedicationScheduleRules extends Table {
   IntColumn get cycleDaysOff => integer().nullable()();
 
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-
-
 }

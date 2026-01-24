@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
 
 class AddSingleEntryScreen extends ConsumerStatefulWidget {
   const AddSingleEntryScreen({super.key});
@@ -144,16 +144,16 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   selectedItemBuilder: (BuildContext context) {
-                    return MedicationType.values.map<Widget>(
-                      (MedicationType type) {
-                        return Center(
-                          child: Text(
-                            _getMedicationTypeLabel(type),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      },
-                    ).toList();
+                    return MedicationType.values.map<Widget>((
+                      MedicationType type,
+                    ) {
+                      return Center(
+                        child: Text(
+                          _getMedicationTypeLabel(type),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }).toList();
                   },
                   items: MedicationType.values.map((type) {
                     return DropdownMenuItem(
