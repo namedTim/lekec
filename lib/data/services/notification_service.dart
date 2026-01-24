@@ -804,7 +804,7 @@ class NotificationService {
   Future<void> triggerAlarm() async {
     // check permissions
     DateTime now = DateTime.now();
-    DateTime alarmTime = now.add(Duration(seconds: 120));
+    DateTime alarmTime = now.add(Duration(seconds: 40));
 
     final alarmSettings = AlarmSettings(
       id: 42,
