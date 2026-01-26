@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
-import 'package:lekec/screens/ring.dart';
+import 'package:lekec/ui/screens/ring.dart';
 import 'package:lekec/services/alarm_service.dart';
 import 'package:lekec/utils/logging.dart';
 import 'package:flutter/material.dart';
@@ -301,11 +301,16 @@ Future<void> main() async {
   // Initialize database (quick, no heavy operations)
   db = AppDatabase();
 
-  // Set alarm warning notification
-  await Alarm.setWarningNotificationOnKill(
-    "Aktivnost opozoril",
-    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-  );
+  // Load settings and set alarm warning notification
+  final settings = await (db.select(
+    db.appSettings,
+  )..limit(1)).getSingleOrNull();
+  if (settings != null && settings.showKillWarning) {
+    await Alarm.setWarningNotificationOnKill(
+      "Aktivnost opozoril",
+      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+    );
+  }
 
   // Start the app immediately so alarm can show
   runApp(

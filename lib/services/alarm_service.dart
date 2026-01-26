@@ -49,6 +49,7 @@ class AlarmService {
 
   StreamSubscription<AlarmSet>? _ringSubscription;
   StreamSubscription<AlarmSet>? _updateSubscription;
+  int? _currentAlarmId; // Track currently shown alarm to prevent duplicates
 
   /// Initialize alarm listeners - call this once at app startup
   void initialize() {
@@ -63,7 +64,8 @@ class AlarmService {
       // Wait a bit for the navigator to be ready
       await Future.delayed(const Duration(milliseconds: 100));
       final context = _navigatorKey.currentContext;
-      if (context != null) {
+      if (context != null && _currentAlarmId != ringingAlarms.first.id) {
+        _currentAlarmId = ringingAlarms.first.id;
         context.push('/ring', extra: ringingAlarms.first);
       }
     }
@@ -71,10 +73,15 @@ class AlarmService {
 
   /// Handle when an alarm starts ringing
   void _onAlarmRinging(AlarmSet alarmSet) {
-    if (alarmSet.alarms.isEmpty) return;
+    if (alarmSet.alarms.isEmpty) {
+      // No alarms ringing, clear the current alarm
+      _currentAlarmId = null;
+      return;
+    }
 
     final context = _navigatorKey.currentContext;
-    if (context != null) {
+    if (context != null && _currentAlarmId != alarmSet.alarms.first.id) {
+      _currentAlarmId = alarmSet.alarms.first.id;
       context.push('/ring', extra: alarmSet.alarms.first);
     }
   }

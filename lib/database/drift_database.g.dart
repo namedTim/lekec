@@ -2459,8 +2459,70 @@ class $AppSettingsTable extends AppSettings
       'REFERENCES users (id)',
     ),
   );
+  static const VerificationMeta _alarmVolumeMeta = const VerificationMeta(
+    'alarmVolume',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, themeMode, defaultUserId];
+  late final GeneratedColumn<double> alarmVolume = GeneratedColumn<double>(
+    'alarm_volume',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.8),
+  );
+  static const VerificationMeta _alarmSoundMeta = const VerificationMeta(
+    'alarmSound',
+  );
+  @override
+  late final GeneratedColumn<String> alarmSound = GeneratedColumn<String>(
+    'alarm_sound',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('nokia.mp3'),
+  );
+  static const VerificationMeta _alarmVibrationMeta = const VerificationMeta(
+    'alarmVibration',
+  );
+  @override
+  late final GeneratedColumn<bool> alarmVibration = GeneratedColumn<bool>(
+    'alarm_vibration',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("alarm_vibration" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _showKillWarningMeta = const VerificationMeta(
+    'showKillWarning',
+  );
+  @override
+  late final GeneratedColumn<bool> showKillWarning = GeneratedColumn<bool>(
+    'show_kill_warning',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("show_kill_warning" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    themeMode,
+    defaultUserId,
+    alarmVolume,
+    alarmSound,
+    alarmVibration,
+    showKillWarning,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2491,6 +2553,39 @@ class $AppSettingsTable extends AppSettings
         ),
       );
     }
+    if (data.containsKey('alarm_volume')) {
+      context.handle(
+        _alarmVolumeMeta,
+        alarmVolume.isAcceptableOrUnknown(
+          data['alarm_volume']!,
+          _alarmVolumeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('alarm_sound')) {
+      context.handle(
+        _alarmSoundMeta,
+        alarmSound.isAcceptableOrUnknown(data['alarm_sound']!, _alarmSoundMeta),
+      );
+    }
+    if (data.containsKey('alarm_vibration')) {
+      context.handle(
+        _alarmVibrationMeta,
+        alarmVibration.isAcceptableOrUnknown(
+          data['alarm_vibration']!,
+          _alarmVibrationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('show_kill_warning')) {
+      context.handle(
+        _showKillWarningMeta,
+        showKillWarning.isAcceptableOrUnknown(
+          data['show_kill_warning']!,
+          _showKillWarningMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2512,6 +2607,22 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.int,
         data['${effectivePrefix}default_user_id'],
       ),
+      alarmVolume: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}alarm_volume'],
+      )!,
+      alarmSound: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alarm_sound'],
+      )!,
+      alarmVibration: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}alarm_vibration'],
+      )!,
+      showKillWarning: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}show_kill_warning'],
+      )!,
     );
   }
 
@@ -2525,10 +2636,18 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   final int id;
   final String themeMode;
   final int? defaultUserId;
+  final double alarmVolume;
+  final String alarmSound;
+  final bool alarmVibration;
+  final bool showKillWarning;
   const AppSetting({
     required this.id,
     required this.themeMode,
     this.defaultUserId,
+    required this.alarmVolume,
+    required this.alarmSound,
+    required this.alarmVibration,
+    required this.showKillWarning,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2538,6 +2657,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     if (!nullToAbsent || defaultUserId != null) {
       map['default_user_id'] = Variable<int>(defaultUserId);
     }
+    map['alarm_volume'] = Variable<double>(alarmVolume);
+    map['alarm_sound'] = Variable<String>(alarmSound);
+    map['alarm_vibration'] = Variable<bool>(alarmVibration);
+    map['show_kill_warning'] = Variable<bool>(showKillWarning);
     return map;
   }
 
@@ -2548,6 +2671,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       defaultUserId: defaultUserId == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultUserId),
+      alarmVolume: Value(alarmVolume),
+      alarmSound: Value(alarmSound),
+      alarmVibration: Value(alarmVibration),
+      showKillWarning: Value(showKillWarning),
     );
   }
 
@@ -2560,6 +2687,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       id: serializer.fromJson<int>(json['id']),
       themeMode: serializer.fromJson<String>(json['themeMode']),
       defaultUserId: serializer.fromJson<int?>(json['defaultUserId']),
+      alarmVolume: serializer.fromJson<double>(json['alarmVolume']),
+      alarmSound: serializer.fromJson<String>(json['alarmSound']),
+      alarmVibration: serializer.fromJson<bool>(json['alarmVibration']),
+      showKillWarning: serializer.fromJson<bool>(json['showKillWarning']),
     );
   }
   @override
@@ -2569,6 +2700,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'id': serializer.toJson<int>(id),
       'themeMode': serializer.toJson<String>(themeMode),
       'defaultUserId': serializer.toJson<int?>(defaultUserId),
+      'alarmVolume': serializer.toJson<double>(alarmVolume),
+      'alarmSound': serializer.toJson<String>(alarmSound),
+      'alarmVibration': serializer.toJson<bool>(alarmVibration),
+      'showKillWarning': serializer.toJson<bool>(showKillWarning),
     };
   }
 
@@ -2576,12 +2711,20 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     int? id,
     String? themeMode,
     Value<int?> defaultUserId = const Value.absent(),
+    double? alarmVolume,
+    String? alarmSound,
+    bool? alarmVibration,
+    bool? showKillWarning,
   }) => AppSetting(
     id: id ?? this.id,
     themeMode: themeMode ?? this.themeMode,
     defaultUserId: defaultUserId.present
         ? defaultUserId.value
         : this.defaultUserId,
+    alarmVolume: alarmVolume ?? this.alarmVolume,
+    alarmSound: alarmSound ?? this.alarmSound,
+    alarmVibration: alarmVibration ?? this.alarmVibration,
+    showKillWarning: showKillWarning ?? this.showKillWarning,
   );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
@@ -2590,6 +2733,18 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       defaultUserId: data.defaultUserId.present
           ? data.defaultUserId.value
           : this.defaultUserId,
+      alarmVolume: data.alarmVolume.present
+          ? data.alarmVolume.value
+          : this.alarmVolume,
+      alarmSound: data.alarmSound.present
+          ? data.alarmSound.value
+          : this.alarmSound,
+      alarmVibration: data.alarmVibration.present
+          ? data.alarmVibration.value
+          : this.alarmVibration,
+      showKillWarning: data.showKillWarning.present
+          ? data.showKillWarning.value
+          : this.showKillWarning,
     );
   }
 
@@ -2598,45 +2753,81 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     return (StringBuffer('AppSetting(')
           ..write('id: $id, ')
           ..write('themeMode: $themeMode, ')
-          ..write('defaultUserId: $defaultUserId')
+          ..write('defaultUserId: $defaultUserId, ')
+          ..write('alarmVolume: $alarmVolume, ')
+          ..write('alarmSound: $alarmSound, ')
+          ..write('alarmVibration: $alarmVibration, ')
+          ..write('showKillWarning: $showKillWarning')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, themeMode, defaultUserId);
+  int get hashCode => Object.hash(
+    id,
+    themeMode,
+    defaultUserId,
+    alarmVolume,
+    alarmSound,
+    alarmVibration,
+    showKillWarning,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is AppSetting &&
           other.id == this.id &&
           other.themeMode == this.themeMode &&
-          other.defaultUserId == this.defaultUserId);
+          other.defaultUserId == this.defaultUserId &&
+          other.alarmVolume == this.alarmVolume &&
+          other.alarmSound == this.alarmSound &&
+          other.alarmVibration == this.alarmVibration &&
+          other.showKillWarning == this.showKillWarning);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<int> id;
   final Value<String> themeMode;
   final Value<int?> defaultUserId;
+  final Value<double> alarmVolume;
+  final Value<String> alarmSound;
+  final Value<bool> alarmVibration;
+  final Value<bool> showKillWarning;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.defaultUserId = const Value.absent(),
+    this.alarmVolume = const Value.absent(),
+    this.alarmSound = const Value.absent(),
+    this.alarmVibration = const Value.absent(),
+    this.showKillWarning = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.defaultUserId = const Value.absent(),
+    this.alarmVolume = const Value.absent(),
+    this.alarmSound = const Value.absent(),
+    this.alarmVibration = const Value.absent(),
+    this.showKillWarning = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<int>? id,
     Expression<String>? themeMode,
     Expression<int>? defaultUserId,
+    Expression<double>? alarmVolume,
+    Expression<String>? alarmSound,
+    Expression<bool>? alarmVibration,
+    Expression<bool>? showKillWarning,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (themeMode != null) 'theme_mode': themeMode,
       if (defaultUserId != null) 'default_user_id': defaultUserId,
+      if (alarmVolume != null) 'alarm_volume': alarmVolume,
+      if (alarmSound != null) 'alarm_sound': alarmSound,
+      if (alarmVibration != null) 'alarm_vibration': alarmVibration,
+      if (showKillWarning != null) 'show_kill_warning': showKillWarning,
     });
   }
 
@@ -2644,11 +2835,19 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<int>? id,
     Value<String>? themeMode,
     Value<int?>? defaultUserId,
+    Value<double>? alarmVolume,
+    Value<String>? alarmSound,
+    Value<bool>? alarmVibration,
+    Value<bool>? showKillWarning,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
       themeMode: themeMode ?? this.themeMode,
       defaultUserId: defaultUserId ?? this.defaultUserId,
+      alarmVolume: alarmVolume ?? this.alarmVolume,
+      alarmSound: alarmSound ?? this.alarmSound,
+      alarmVibration: alarmVibration ?? this.alarmVibration,
+      showKillWarning: showKillWarning ?? this.showKillWarning,
     );
   }
 
@@ -2664,6 +2863,18 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (defaultUserId.present) {
       map['default_user_id'] = Variable<int>(defaultUserId.value);
     }
+    if (alarmVolume.present) {
+      map['alarm_volume'] = Variable<double>(alarmVolume.value);
+    }
+    if (alarmSound.present) {
+      map['alarm_sound'] = Variable<String>(alarmSound.value);
+    }
+    if (alarmVibration.present) {
+      map['alarm_vibration'] = Variable<bool>(alarmVibration.value);
+    }
+    if (showKillWarning.present) {
+      map['show_kill_warning'] = Variable<bool>(showKillWarning.value);
+    }
     return map;
   }
 
@@ -2672,7 +2883,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     return (StringBuffer('AppSettingsCompanion(')
           ..write('id: $id, ')
           ..write('themeMode: $themeMode, ')
-          ..write('defaultUserId: $defaultUserId')
+          ..write('defaultUserId: $defaultUserId, ')
+          ..write('alarmVolume: $alarmVolume, ')
+          ..write('alarmSound: $alarmSound, ')
+          ..write('alarmVibration: $alarmVibration, ')
+          ..write('showKillWarning: $showKillWarning')
           ..write(')'))
         .toString();
   }
@@ -5350,12 +5565,20 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<int> id,
       Value<String> themeMode,
       Value<int?> defaultUserId,
+      Value<double> alarmVolume,
+      Value<String> alarmSound,
+      Value<bool> alarmVibration,
+      Value<bool> showKillWarning,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
     AppSettingsCompanion Function({
       Value<int> id,
       Value<String> themeMode,
       Value<int?> defaultUserId,
+      Value<double> alarmVolume,
+      Value<String> alarmSound,
+      Value<bool> alarmVibration,
+      Value<bool> showKillWarning,
     });
 
 final class $$AppSettingsTableReferences
@@ -5398,6 +5621,26 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<String> get themeMode => $composableBuilder(
     column: $table.themeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get alarmVolume => $composableBuilder(
+    column: $table.alarmVolume,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get alarmSound => $composableBuilder(
+    column: $table.alarmSound,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get alarmVibration => $composableBuilder(
+    column: $table.alarmVibration,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get showKillWarning => $composableBuilder(
+    column: $table.showKillWarning,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5444,6 +5687,26 @@ class $$AppSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get alarmVolume => $composableBuilder(
+    column: $table.alarmVolume,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get alarmSound => $composableBuilder(
+    column: $table.alarmSound,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get alarmVibration => $composableBuilder(
+    column: $table.alarmVibration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get showKillWarning => $composableBuilder(
+    column: $table.showKillWarning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$UsersTableOrderingComposer get defaultUserId {
     final $$UsersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5482,6 +5745,26 @@ class $$AppSettingsTableAnnotationComposer
 
   GeneratedColumn<String> get themeMode =>
       $composableBuilder(column: $table.themeMode, builder: (column) => column);
+
+  GeneratedColumn<double> get alarmVolume => $composableBuilder(
+    column: $table.alarmVolume,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get alarmSound => $composableBuilder(
+    column: $table.alarmSound,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get alarmVibration => $composableBuilder(
+    column: $table.alarmVibration,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get showKillWarning => $composableBuilder(
+    column: $table.showKillWarning,
+    builder: (column) => column,
+  );
 
   $$UsersTableAnnotationComposer get defaultUserId {
     final $$UsersTableAnnotationComposer composer = $composerBuilder(
@@ -5538,20 +5821,36 @@ class $$AppSettingsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
                 Value<int?> defaultUserId = const Value.absent(),
+                Value<double> alarmVolume = const Value.absent(),
+                Value<String> alarmSound = const Value.absent(),
+                Value<bool> alarmVibration = const Value.absent(),
+                Value<bool> showKillWarning = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 themeMode: themeMode,
                 defaultUserId: defaultUserId,
+                alarmVolume: alarmVolume,
+                alarmSound: alarmSound,
+                alarmVibration: alarmVibration,
+                showKillWarning: showKillWarning,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
                 Value<int?> defaultUserId = const Value.absent(),
+                Value<double> alarmVolume = const Value.absent(),
+                Value<String> alarmSound = const Value.absent(),
+                Value<bool> alarmVibration = const Value.absent(),
+                Value<bool> showKillWarning = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 themeMode: themeMode,
                 defaultUserId: defaultUserId,
+                alarmVolume: alarmVolume,
+                alarmSound: alarmSound,
+                alarmVibration: alarmVibration,
+                showKillWarning: showKillWarning,
               ),
           withReferenceMapper: (p0) => p0
               .map(

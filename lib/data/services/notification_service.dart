@@ -185,6 +185,7 @@ class NotificationService {
     required DateTime scheduledTime,
     String? dosage,
     bool criticalReminder = false,
+    AppDatabase? database,
   }) async {
     if (!_initialized) await initialize();
 
@@ -221,14 +222,25 @@ class NotificationService {
         name: 'NotificationService',
       );
 
+      // Get alarm settings from database
+      final settingsQuery = database != null
+          ? await (database.select(
+              database.appSettings,
+            )..limit(1)).getSingleOrNull()
+          : null;
+
+      final alarmVolume = settingsQuery?.alarmVolume ?? 0.8;
+      final alarmSound = settingsQuery?.alarmSound ?? 'nokia.mp3';
+      final alarmVibration = settingsQuery?.alarmVibration ?? true;
+
       final alarmSettings = AlarmSettings(
         id: id,
         dateTime: scheduledTime,
-        assetAudioPath: 'assets/nokia.mp3',
+        assetAudioPath: 'assets/$alarmSound',
         loopAudio: true,
-        vibrate: true,
+        vibrate: alarmVibration,
         androidFullScreenIntent: true,
-        volumeSettings: const VolumeSettings.fixed(volume: 0.8),
+        volumeSettings: VolumeSettings.fixed(volume: alarmVolume),
         notificationSettings: NotificationSettings(
           title: 'Kritično: Vzemite $medicationName',
           body: dosage != null ? 'Vzemite $dosage' : 'Čas za jemanje zdravila',
@@ -431,6 +443,7 @@ class NotificationService {
         scheduledTime: intake.scheduledTime,
         dosage: dosage,
         criticalReminder: medication.criticalReminder,
+        database: db,
       );
     }
 
@@ -882,7 +895,7 @@ class NotificationService {
   /// Trigger a test alarm in 1 minute
   Future<void> triggerAlarm() async {
     final now = DateTime.now();
-    final alarmTime = now.add(const Duration(minutes: 2));
+    final alarmTime = now.add(const Duration(minutes: 1));
 
     final alarmSettings = AlarmSettings(
       id: DateTime.now().millisecondsSinceEpoch % 10000,
