@@ -291,17 +291,17 @@ class DeveloperSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _DevCard(
-            icon: Symbols.medication,
-            color: Colors.pink,
-            title: "Test Alarm",
-            subtitle: "Schedule notification for next intake in 30 seconds",
+            icon: Symbols.alarm,
+            color: Colors.deepOrange,
+            title: "Test Alarm (1 Minute)",
+            subtitle: "Trigger an alarm that will ring in 1 minute",
             onTap: () async {
               final notificationService = NotificationService();
               await notificationService.triggerAlarm();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Alarm triggered"),
+                    content: Text("Alarm set - will ring in 1 minute"),
                     duration: Duration(seconds: 4),
                   ),
                 );

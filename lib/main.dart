@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
-import 'package:alarm/utils/alarm_set.dart';
+import 'package:lekec/screens/ring.dart';
+import 'package:lekec/services/alarm_service.dart';
+import 'package:lekec/utils/logging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'database/drift_database.dart';
-import 'ui/screens/ring.dart';
 import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
@@ -42,82 +45,6 @@ late final AppDatabase db;
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<DashboardScreenState> homePageKey =
     GlobalKey<DashboardScreenState>();
-
-// Global alarm ring handler - works from any screen
-Future<void> _handleAlarmRinging(AlarmSet alarms) async {
-  if (alarms.alarms.isEmpty) return;
-
-  // Use the root navigator key to ensure alarm appears over ALL screens
-  final navigatorState = rootNavigatorKey.currentState;
-  if (navigatorState == null) {
-    // Navigator not ready yet, retry after a short delay
-    await Future.delayed(const Duration(milliseconds: 100));
-    return _handleAlarmRinging(alarms);
-  }
-
-  // Check if alarm ring screen is already showing
-  final currentRoute = ModalRoute.of(navigatorState.context);
-  if (currentRoute?.settings.name == '/ring' ||
-      navigatorState.context.widget is ExampleAlarmRingScreen) {
-    return; // Already showing alarm screen
-  }
-
-  await navigatorState.push(
-    MaterialPageRoute<void>(
-      builder: (context) =>
-          ExampleAlarmRingScreen(alarmSettings: alarms.alarms.first),
-      fullscreenDialog: true,
-      settings: const RouteSettings(name: '/ring'),
-    ),
-  );
-}
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  db = AppDatabase();
-
-  // Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-
-  // Generate upcoming intake schedules
-  final scheduleGenerator = IntakeScheduleGenerator(db);
-  await scheduleGenerator.generateScheduledIntakes();
-
-  // Schedule notifications for upcoming intakes
-  await notificationService.scheduleAllUpcomingNotifications(db);
-
-  // Initialize and schedule background tasks
-  final backgroundService = BackgroundTaskService();
-  await backgroundService.initialize();
-  await backgroundService.scheduleScheduleGeneration();
-  await backgroundService.scheduleNotificationRefresh();
-
-  // Initialize alarm service
-  WidgetsFlutterBinding.ensureInitialized();
-  await Alarm.init();
-  await Alarm.setWarningNotificationOnKill(
-    "Aktivnost opozoril",
-    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-  );
-
-  // Set up global alarm listeners BEFORE running the app
-  // This ensures alarms work regardless of which screen is active
-  // ignore: unused_local_variable
-  final globalRingSubscription = Alarm.ringing.listen(_handleAlarmRinging);
-  // ignore: unused_local_variable
-  final globalUpdateSubscription = Alarm.scheduled.listen((_) {
-    // Update can be handled at app level if needed
-  });
-
-  runApp(
-    ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
-      child: const MyApp(),
-    ),
-  );
-}
 
 final _router = GoRouter(
   navigatorKey: rootNavigatorKey,
@@ -154,6 +81,14 @@ final _router = GoRouter(
           ],
         ),
       ],
+    ),
+    GoRoute(
+      path: '/ring',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) {
+        final alarmSettings = state.extra as AlarmSettings;
+        return ExampleAlarmRingScreen(alarmSettings: alarmSettings);
+      },
     ),
     GoRoute(
       path: '/dev',
@@ -321,17 +256,17 @@ class ScaffoldWithNavBar extends StatelessWidget {
         onDestinationSelected: (int index) => _onTap(context, index),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
-        destinations: <NavigationDestination>[
+        destinations: const <NavigationDestination>[
           NavigationDestination(
-            icon: const Icon(Symbols.pill),
+            icon: Icon(Symbols.pill),
             label: 'Zdravila',
           ),
           NavigationDestination(
-            icon: const Icon(Symbols.home),
+            icon: Icon(Symbols.home),
             label: 'Tekoči pregled',
           ),
           NavigationDestination(
-            icon: const Icon(Symbols.manage_search),
+            icon: Icon(Symbols.manage_search),
             label: 'Zgodovina',
           ),
         ],
@@ -344,6 +279,76 @@ class ScaffoldWithNavBar extends StatelessWidget {
       index,
       initialLocation: index == navigationShell.currentIndex,
     );
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  setupLogging(showDebugLogs: true);
+
+  // PRIORITY: Initialize alarm service FIRST for fastest response
+  await Alarm.init();
+  
+  // Create alarm service immediately and initialize listeners
+  final alarmService = AlarmService(rootNavigatorKey);
+  alarmService.initialize();
+
+  // Initialize database (quick, no heavy operations)
+  db = AppDatabase();
+
+  // Set alarm warning notification
+  await Alarm.setWarningNotificationOnKill(
+    "Aktivnost opozoril",
+    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+  );
+
+  // Start the app immediately so alarm can show
+  runApp(
+    ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        alarmServiceProvider.overrideWithValue(alarmService),
+      ],
+      child: const MyApp(),
+    ),
+  );
+
+  // Check for ringing alarms ASAP after first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    alarmService.checkInitialRingingAlarms();
+  });
+
+  // Defer heavy initialization to background after app is running
+  _initializeServicesInBackground();
+}
+
+// Run heavy initialization in background after app starts
+Future<void> _initializeServicesInBackground() async {
+  try {
+    // Set screen orientation
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+    // Initialize notification service
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+
+    // Generate upcoming intake schedules
+    final scheduleGenerator = IntakeScheduleGenerator(db);
+    await scheduleGenerator.generateScheduledIntakes();
+
+    // Schedule notifications for upcoming intakes
+    await notificationService.scheduleAllUpcomingNotifications(db);
+
+    // Initialize and schedule background tasks
+    final backgroundService = BackgroundTaskService();
+    await backgroundService.initialize();
+    await backgroundService.scheduleScheduleGeneration();
+    await backgroundService.scheduleNotificationRefresh();
+
+    Logger('main').info('Background services initialized successfully');
+  } catch (e, st) {
+    Logger('main').severe('Error initializing background services', e, st);
   }
 }
 

@@ -800,34 +800,29 @@ class NotificationService {
     );
   }
 
-  /// Trigger a test alarm in 10 seconds
+  /// Trigger a test alarm in 1 minute
   Future<void> triggerAlarm() async {
-    // check permissions
-    DateTime now = DateTime.now();
-    DateTime alarmTime = now.add(Duration(seconds: 40));
+    final now = DateTime.now();
+    final alarmTime = now.add(const Duration(minutes: 1));
 
     final alarmSettings = AlarmSettings(
-      id: 42,
+      id: DateTime.now().millisecondsSinceEpoch % 10000,
       dateTime: alarmTime,
-      assetAudioPath: 'assets/alarms/R2d2.mp3',
+      assetAudioPath: 'assets/marimba.mp3',
       loopAudio: true,
       vibrate: true,
       androidFullScreenIntent: true,
-      volumeSettings: VolumeSettings.fade(
-        volume: 0.0,
-        fadeDuration: Duration(seconds: 5),
-        volumeEnforced: true,
-      ),
+      volumeSettings: const VolumeSettings.fixed(volume: 0.5),
       notificationSettings: const NotificationSettings(
-        title: 'Dev alarm',
-        body: ' This is a test alarm notification',
-        stopButton: ' Stop Alarm',
+        title: 'Test Alarm',
+        body: 'Dev test alarm - rings in 1 minute',
+        stopButton: 'Stop',
         icon: 'notification_icon',
       ),
     );
 
     await Alarm.set(alarmSettings: alarmSettings);
 
-    print('Alarm set for $alarmTime');
+    print('Test alarm set for $alarmTime (1 minute from now)');
   }
 }
