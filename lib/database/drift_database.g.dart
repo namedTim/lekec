@@ -333,6 +333,21 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _criticalReminderMeta = const VerificationMeta(
+    'criticalReminder',
+  );
+  @override
+  late final GeneratedColumn<bool> criticalReminder = GeneratedColumn<bool>(
+    'critical_reminder',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("critical_reminder" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -343,6 +358,7 @@ class $MedicationsTable extends Medications
     medType,
     status,
     intakeAdvice,
+    criticalReminder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -400,6 +416,15 @@ class $MedicationsTable extends Medications
         ),
       );
     }
+    if (data.containsKey('critical_reminder')) {
+      context.handle(
+        _criticalReminderMeta,
+        criticalReminder.isAcceptableOrUnknown(
+          data['critical_reminder']!,
+          _criticalReminderMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -445,6 +470,10 @@ class $MedicationsTable extends Medications
         DriftSqlType.string,
         data['${effectivePrefix}intake_advice'],
       ),
+      criticalReminder: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}critical_reminder'],
+      )!,
     );
   }
 
@@ -468,6 +497,7 @@ class Medication extends DataClass implements Insertable<Medication> {
   final MedicationType medType;
   final MedicationStatus status;
   final String? intakeAdvice;
+  final bool criticalReminder;
   const Medication({
     required this.id,
     required this.name,
@@ -477,6 +507,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     required this.medType,
     required this.status,
     this.intakeAdvice,
+    required this.criticalReminder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -505,6 +536,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     if (!nullToAbsent || intakeAdvice != null) {
       map['intake_advice'] = Variable<String>(intakeAdvice);
     }
+    map['critical_reminder'] = Variable<bool>(criticalReminder);
     return map;
   }
 
@@ -526,6 +558,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       intakeAdvice: intakeAdvice == null && nullToAbsent
           ? const Value.absent()
           : Value(intakeAdvice),
+      criticalReminder: Value(criticalReminder),
     );
   }
 
@@ -547,6 +580,7 @@ class Medication extends DataClass implements Insertable<Medication> {
         serializer.fromJson<int>(json['status']),
       ),
       intakeAdvice: serializer.fromJson<String?>(json['intakeAdvice']),
+      criticalReminder: serializer.fromJson<bool>(json['criticalReminder']),
     );
   }
   @override
@@ -565,6 +599,7 @@ class Medication extends DataClass implements Insertable<Medication> {
         $MedicationsTable.$converterstatus.toJson(status),
       ),
       'intakeAdvice': serializer.toJson<String?>(intakeAdvice),
+      'criticalReminder': serializer.toJson<bool>(criticalReminder),
     };
   }
 
@@ -577,6 +612,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     MedicationType? medType,
     MedicationStatus? status,
     Value<String?> intakeAdvice = const Value.absent(),
+    bool? criticalReminder,
   }) => Medication(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -588,6 +624,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     medType: medType ?? this.medType,
     status: status ?? this.status,
     intakeAdvice: intakeAdvice.present ? intakeAdvice.value : this.intakeAdvice,
+    criticalReminder: criticalReminder ?? this.criticalReminder,
   );
   Medication copyWithCompanion(MedicationsCompanion data) {
     return Medication(
@@ -605,6 +642,9 @@ class Medication extends DataClass implements Insertable<Medication> {
       intakeAdvice: data.intakeAdvice.present
           ? data.intakeAdvice.value
           : this.intakeAdvice,
+      criticalReminder: data.criticalReminder.present
+          ? data.criticalReminder.value
+          : this.criticalReminder,
     );
   }
 
@@ -618,7 +658,8 @@ class Medication extends DataClass implements Insertable<Medication> {
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType, ')
           ..write('status: $status, ')
-          ..write('intakeAdvice: $intakeAdvice')
+          ..write('intakeAdvice: $intakeAdvice, ')
+          ..write('criticalReminder: $criticalReminder')
           ..write(')'))
         .toString();
   }
@@ -633,6 +674,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     medType,
     status,
     intakeAdvice,
+    criticalReminder,
   );
   @override
   bool operator ==(Object other) =>
@@ -645,7 +687,8 @@ class Medication extends DataClass implements Insertable<Medication> {
           other.nationalCode == this.nationalCode &&
           other.medType == this.medType &&
           other.status == this.status &&
-          other.intakeAdvice == this.intakeAdvice);
+          other.intakeAdvice == this.intakeAdvice &&
+          other.criticalReminder == this.criticalReminder);
 }
 
 class MedicationsCompanion extends UpdateCompanion<Medication> {
@@ -657,6 +700,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<MedicationType> medType;
   final Value<MedicationStatus> status;
   final Value<String?> intakeAdvice;
+  final Value<bool> criticalReminder;
   const MedicationsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -666,6 +710,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.medType = const Value.absent(),
     this.status = const Value.absent(),
     this.intakeAdvice = const Value.absent(),
+    this.criticalReminder = const Value.absent(),
   });
   MedicationsCompanion.insert({
     this.id = const Value.absent(),
@@ -676,6 +721,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     required MedicationType medType,
     this.status = const Value.absent(),
     this.intakeAdvice = const Value.absent(),
+    this.criticalReminder = const Value.absent(),
   }) : name = Value(name),
        medType = Value(medType);
   static Insertable<Medication> custom({
@@ -687,6 +733,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Expression<int>? medType,
     Expression<int>? status,
     Expression<String>? intakeAdvice,
+    Expression<bool>? criticalReminder,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -697,6 +744,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       if (medType != null) 'med_type': medType,
       if (status != null) 'status': status,
       if (intakeAdvice != null) 'intake_advice': intakeAdvice,
+      if (criticalReminder != null) 'critical_reminder': criticalReminder,
     });
   }
 
@@ -709,6 +757,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Value<MedicationType>? medType,
     Value<MedicationStatus>? status,
     Value<String?>? intakeAdvice,
+    Value<bool>? criticalReminder,
   }) {
     return MedicationsCompanion(
       id: id ?? this.id,
@@ -719,6 +768,7 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       medType: medType ?? this.medType,
       status: status ?? this.status,
       intakeAdvice: intakeAdvice ?? this.intakeAdvice,
+      criticalReminder: criticalReminder ?? this.criticalReminder,
     );
   }
 
@@ -753,6 +803,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     if (intakeAdvice.present) {
       map['intake_advice'] = Variable<String>(intakeAdvice.value);
     }
+    if (criticalReminder.present) {
+      map['critical_reminder'] = Variable<bool>(criticalReminder.value);
+    }
     return map;
   }
 
@@ -766,7 +819,8 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
           ..write('nationalCode: $nationalCode, ')
           ..write('medType: $medType, ')
           ..write('status: $status, ')
-          ..write('intakeAdvice: $intakeAdvice')
+          ..write('intakeAdvice: $intakeAdvice, ')
+          ..write('criticalReminder: $criticalReminder')
           ..write(')'))
         .toString();
   }
@@ -3121,6 +3175,7 @@ typedef $$MedicationsTableCreateCompanionBuilder =
       required MedicationType medType,
       Value<MedicationStatus> status,
       Value<String?> intakeAdvice,
+      Value<bool> criticalReminder,
     });
 typedef $$MedicationsTableUpdateCompanionBuilder =
     MedicationsCompanion Function({
@@ -3132,6 +3187,7 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
       Value<MedicationType> medType,
       Value<MedicationStatus> status,
       Value<String?> intakeAdvice,
+      Value<bool> criticalReminder,
     });
 
 final class $$MedicationsTableReferences
@@ -3241,6 +3297,11 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> medicationPlansRefs(
     Expression<bool> Function($$MedicationPlansTableFilterComposer f) f,
   ) {
@@ -3340,6 +3401,11 @@ class $$MedicationsTableOrderingComposer
     column: $table.intakeAdvice,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MedicationsTableAnnotationComposer
@@ -3378,6 +3444,11 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumn<String> get intakeAdvice => $composableBuilder(
     column: $table.intakeAdvice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
     builder: (column) => column,
   );
 
@@ -3472,6 +3543,7 @@ class $$MedicationsTableTableManager
                 Value<MedicationType> medType = const Value.absent(),
                 Value<MedicationStatus> status = const Value.absent(),
                 Value<String?> intakeAdvice = const Value.absent(),
+                Value<bool> criticalReminder = const Value.absent(),
               }) => MedicationsCompanion(
                 id: id,
                 name: name,
@@ -3481,6 +3553,7 @@ class $$MedicationsTableTableManager
                 medType: medType,
                 status: status,
                 intakeAdvice: intakeAdvice,
+                criticalReminder: criticalReminder,
               ),
           createCompanionCallback:
               ({
@@ -3492,6 +3565,7 @@ class $$MedicationsTableTableManager
                 required MedicationType medType,
                 Value<MedicationStatus> status = const Value.absent(),
                 Value<String?> intakeAdvice = const Value.absent(),
+                Value<bool> criticalReminder = const Value.absent(),
               }) => MedicationsCompanion.insert(
                 id: id,
                 name: name,
@@ -3501,6 +3575,7 @@ class $$MedicationsTableTableManager
                 medType: medType,
                 status: status,
                 intakeAdvice: intakeAdvice,
+                criticalReminder: criticalReminder,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:drift/drift.dart' as drift;
+import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/confirmation_dialog.dart';
+import '../../main.dart' show db;
+import '../../data/services/notification_service.dart';
 
-class MedicationDetailScreen extends StatelessWidget {
+class MedicationDetailScreen extends StatefulWidget {
   final int medicationId;
   final String medicationName;
   final MedicationType medType;
@@ -13,7 +17,9 @@ class MedicationDetailScreen extends StatelessWidget {
   final String frequency;
   final List<String> times;
   final String? intakeAdvice;
+  final bool criticalReminder;
   final VoidCallback onDelete;
+  final VoidCallback onRefresh;
 
   const MedicationDetailScreen({
     super.key,
@@ -25,14 +31,65 @@ class MedicationDetailScreen extends StatelessWidget {
     required this.frequency,
     required this.times,
     this.intakeAdvice,
+    required this.criticalReminder,
     required this.onDelete,
+    required this.onRefresh,
   });
+
+  @override
+  State<MedicationDetailScreen> createState() => _MedicationDetailScreenState();
+}
+
+class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
+  late bool _criticalReminder;
+
+  @override
+  void initState() {
+    super.initState();
+    _criticalReminder = widget.criticalReminder;
+  }
+
+  Future<void> _toggleCriticalReminder(bool value) async {
+    try {
+      await (db.update(db.medications)
+            ..where((t) => t.id.equals(widget.medicationId)))
+          .write(MedicationsCompanion(criticalReminder: drift.Value(value)));
+
+      setState(() {
+        _criticalReminder = value;
+      });
+
+      // Reschedule notifications to apply the new alarm/notification type
+      final notificationService = NotificationService();
+      await notificationService.scheduleAllUpcomingNotifications(db);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value
+                  ? 'Kritični opomniki so omogočeni'
+                  : 'Kritični opomniki so onemogočeni',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onRefresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final dosageCount = dosageAmount.toInt();
+    final dosageCount = widget.dosageAmount.toInt();
 
     return Scaffold(
       appBar: AppBar(
@@ -50,7 +107,7 @@ class MedicationDetailScreen extends StatelessWidget {
                   icon: Symbols.medication,
                   title: 'Ime zdravila',
                   child: Text(
-                    medicationName,
+                    widget.medicationName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -64,17 +121,58 @@ class MedicationDetailScreen extends StatelessWidget {
                   icon: Symbols.info,
                   title: 'Priporočilo pred zaužitjem',
                   child: Text(
-                    intakeAdvice?.isEmpty ?? true
+                    widget.intakeAdvice?.isEmpty ?? true
                         ? 'Ni podatka'
-                        : intakeAdvice!,
+                        : widget.intakeAdvice!,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontStyle: intakeAdvice?.isEmpty ?? true
+                      fontStyle: widget.intakeAdvice?.isEmpty ?? true
                           ? FontStyle.italic
                           : FontStyle.normal,
-                      color: intakeAdvice?.isEmpty ?? true
+                      color: widget.intakeAdvice?.isEmpty ?? true
                           ? colors.onSurfaceVariant.withOpacity(0.6)
                           : null,
                     ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Critical Reminder Card
+                _DetailCard(
+                  icon: Symbols.alarm,
+                  title: 'Kritični opomniki',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Uporabi alarm',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Telefon bo glasno zvonil in vibriral na ves zaslon',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _criticalReminder,
+                            onChanged: _toggleCriticalReminder,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
 
@@ -105,7 +203,7 @@ class MedicationDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'še $pillsRemaining ${getMedicationUnitShort(medType, pillsRemaining)}',
+                            'še ${widget.pillsRemaining} ${getMedicationUnitShort(widget.medType, widget.pillsRemaining)}',
                             style: theme.textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colors.onPrimaryContainer,
@@ -124,7 +222,7 @@ class MedicationDetailScreen extends StatelessWidget {
                   icon: Symbols.science,
                   title: 'Odmerek',
                   child: Text(
-                    '$dosageCount ${getMedicationUnit(medType, dosageCount)}',
+                    '$dosageCount ${getMedicationUnit(widget.medType, dosageCount)}',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -141,17 +239,17 @@ class MedicationDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        frequency,
+                        widget.frequency,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (times.isNotEmpty) ...[
+                      if (widget.times.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: times.map((time) {
+                          children: widget.times.map((time) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -188,13 +286,13 @@ class MedicationDetailScreen extends StatelessWidget {
                   builder: (context) => ConfirmationDialog(
                     title: 'Izbriši zdravilo?',
                     message:
-                        'Ali ste prepričani, da želite izbrisati zdravilo "$medicationName"?',
+                        'Ali ste prepričani, da želite izbrisati zdravilo "${widget.medicationName}"?',
                     confirmText: 'Izbriši',
                     cancelText: 'Prekliči',
                   ),
                 );
                 if (confirmed == true && context.mounted) {
-                  onDelete();
+                  widget.onDelete();
                   Navigator.of(context).pop();
                 }
               },

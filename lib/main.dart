@@ -85,9 +85,16 @@ final _router = GoRouter(
     GoRoute(
       path: '/ring',
       parentNavigatorKey: rootNavigatorKey,
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final alarmSettings = state.extra as AlarmSettings;
-        return ExampleAlarmRingScreen(alarmSettings: alarmSettings);
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: ExampleAlarmRingScreen(alarmSettings: alarmSettings),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // No animation - instant appearance
+            return child;
+          },
+        );
       },
     ),
     GoRoute(
@@ -257,10 +264,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
         destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Symbols.pill),
-            label: 'Zdravila',
-          ),
+          NavigationDestination(icon: Icon(Symbols.pill), label: 'Zdravila'),
           NavigationDestination(
             icon: Icon(Symbols.home),
             label: 'Tekoči pregled',
@@ -284,12 +288,12 @@ class ScaffoldWithNavBar extends StatelessWidget {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   setupLogging(showDebugLogs: true);
 
   // PRIORITY: Initialize alarm service FIRST for fastest response
   await Alarm.init();
-  
+
   // Create alarm service immediately and initialize listeners
   final alarmService = AlarmService(rootNavigatorKey);
   alarmService.initialize();

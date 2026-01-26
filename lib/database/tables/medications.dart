@@ -32,4 +32,6 @@ class Medications extends Table {
   IntColumn get status =>
       intEnum<MedicationStatus>().withDefault(const Constant(0))();
   TextColumn get intakeAdvice => text().nullable()();
+  BoolColumn get criticalReminder =>
+      boolean().withDefault(const Constant(false))();
 }

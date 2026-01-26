@@ -230,10 +230,12 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                           frequency: med['frequency'] as String,
                           times: med['times'] as List<String>,
                           intakeAdvice: med['intakeAdvice'] as String?,
+                          criticalReminder: med['criticalReminder'] as bool,
                           onDelete: () => _deleteMedication(
                             med['id'] as int,
                             med['name'] as String,
                           ),
+                          onRefresh: _refreshMedications,
                         ),
                       ),
                     );

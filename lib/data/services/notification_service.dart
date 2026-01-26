@@ -6,9 +6,8 @@ import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
-import '../../main.dart' show homePageKey, db, rootNavigatorKey;
+import '../../main.dart' show homePageKey, rootNavigatorKey;
 import 'package:go_router/go_router.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:alarm/alarm.dart';
 
 class NotificationService {
@@ -142,12 +141,50 @@ class NotificationService {
     }
   }
 
+  /// Get medication details for an intake (used by alarm screen)
+  Future<Map<String, dynamic>?> getMedicationDetailsForIntake(
+    int intakeId,
+    AppDatabase db,
+  ) async {
+    final intake = await (db.select(
+      db.medicationIntakeLogs,
+    )..where((log) => log.id.equals(intakeId))).getSingleOrNull();
+
+    if (intake == null) return null;
+
+    final medication = await (db.select(
+      db.medications,
+    )..where((m) => m.id.equals(intake.medicationId))).getSingleOrNull();
+
+    if (medication == null) return null;
+
+    final plan = await (db.select(
+      db.medicationPlans,
+    )..where((p) => p.id.equals(intake.planId))).getSingleOrNull();
+
+    String dosageText = '';
+    if (plan != null) {
+      final dosageCount = plan.dosageAmount.toInt();
+      dosageText =
+          '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+    }
+
+    return {
+      'intakeId': intake.id,
+      'medicationName': medication.name,
+      'dosage': dosageText,
+      'scheduledTime': intake.scheduledTime,
+      'medicationId': medication.id,
+    };
+  }
+
   /// Schedule notification for a medication intake
   Future<void> scheduleIntakeNotification({
     required int id,
     required String medicationName,
     required DateTime scheduledTime,
     String? dosage,
+    bool criticalReminder = false,
   }) async {
     if (!_initialized) await initialize();
 
@@ -177,6 +214,47 @@ class NotificationService {
       return;
     }
 
+    // Use alarm for critical reminders
+    if (criticalReminder) {
+      developer.log(
+        'Scheduling CRITICAL ALARM for $medicationName at $scheduledTime (ID: $id)',
+        name: 'NotificationService',
+      );
+
+      final alarmSettings = AlarmSettings(
+        id: id,
+        dateTime: scheduledTime,
+        assetAudioPath: 'assets/nokia.mp3',
+        loopAudio: true,
+        vibrate: true,
+        androidFullScreenIntent: true,
+        volumeSettings: const VolumeSettings.fixed(volume: 0.8),
+        notificationSettings: NotificationSettings(
+          title: 'Kritično: Vzemite $medicationName',
+          body: dosage != null ? 'Vzemite $dosage' : 'Čas za jemanje zdravila',
+          stopButton: 'Zaustavi',
+          icon: 'notification_icon',
+        ),
+      );
+
+      try {
+        await Alarm.set(alarmSettings: alarmSettings);
+        developer.log(
+          'Successfully scheduled critical alarm for $medicationName at $scheduledTime (ID: $id)',
+          name: 'NotificationService',
+        );
+      } catch (e, st) {
+        developer.log(
+          'Failed to schedule critical alarm for $medicationName',
+          error: e,
+          stackTrace: st,
+          name: 'NotificationService',
+        );
+      }
+      return;
+    }
+
+    // Regular notification for non-critical reminders
     const androidDetails = AndroidNotificationDetails(
       'medication_reminders',
       'Opomniki za zdravila',
@@ -352,6 +430,7 @@ class NotificationService {
         medicationName: medication.name,
         scheduledTime: intake.scheduledTime,
         dosage: dosage,
+        criticalReminder: medication.criticalReminder,
       );
     }
 
@@ -803,7 +882,7 @@ class NotificationService {
   /// Trigger a test alarm in 1 minute
   Future<void> triggerAlarm() async {
     final now = DateTime.now();
-    final alarmTime = now.add(const Duration(minutes: 1));
+    final alarmTime = now.add(const Duration(minutes: 2));
 
     final alarmSettings = AlarmSettings(
       id: DateTime.now().millisecondsSinceEpoch % 10000,
