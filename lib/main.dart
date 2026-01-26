@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alarm/alarm.dart';
 import 'package:alarm/utils/alarm_set.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -77,39 +78,41 @@ void main() async {
 
   db = AppDatabase();
 
-  // Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+  // Skip platform-specific services on web
+  if (!kIsWeb) {
+    // Initialize notification service
+    final notificationService = NotificationService();
+    await notificationService.initialize();
 
-  // Generate upcoming intake schedules
-  final scheduleGenerator = IntakeScheduleGenerator(db);
-  await scheduleGenerator.generateScheduledIntakes();
+    // Generate upcoming intake schedules
+    final scheduleGenerator = IntakeScheduleGenerator(db);
+    await scheduleGenerator.generateScheduledIntakes();
 
-  // Schedule notifications for upcoming intakes
-  await notificationService.scheduleAllUpcomingNotifications(db);
+    // Schedule notifications for upcoming intakes
+    await notificationService.scheduleAllUpcomingNotifications(db);
 
-  // Initialize and schedule background tasks
-  final backgroundService = BackgroundTaskService();
-  await backgroundService.initialize();
-  await backgroundService.scheduleScheduleGeneration();
-  await backgroundService.scheduleNotificationRefresh();
+    // Initialize and schedule background tasks
+    final backgroundService = BackgroundTaskService();
+    await backgroundService.initialize();
+    await backgroundService.scheduleScheduleGeneration();
+    await backgroundService.scheduleNotificationRefresh();
 
-  // Initialize alarm service
-  WidgetsFlutterBinding.ensureInitialized();
-  await Alarm.init();
-  await Alarm.setWarningNotificationOnKill(
-    "Aktivnost opozoril",
-    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-  );
+    // Initialize alarm service
+    await Alarm.init();
+    await Alarm.setWarningNotificationOnKill(
+      "Aktivnost opozoril",
+      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+    );
 
-  // Set up global alarm listeners BEFORE running the app
-  // This ensures alarms work regardless of which screen is active
-  // ignore: unused_local_variable
-  final globalRingSubscription = Alarm.ringing.listen(_handleAlarmRinging);
-  // ignore: unused_local_variable
-  final globalUpdateSubscription = Alarm.scheduled.listen((_) {
-    // Update can be handled at app level if needed
-  });
+    // Set up global alarm listeners BEFORE running the app
+    // This ensures alarms work regardless of which screen is active
+    // ignore: unused_local_variable
+    final globalRingSubscription = Alarm.ringing.listen(_handleAlarmRinging);
+    // ignore: unused_local_variable
+    final globalUpdateSubscription = Alarm.scheduled.listen((_) {
+      // Update can be handled at app level if needed
+    });
+  }
 
   runApp(
     ProviderScope(

@@ -1,10 +1,6 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import 'connection/connection.dart';
 import 'tables/medication_intake_log.dart';
 import 'tables/medication_plans.dart';
 import 'tables/medication_schedule_rule.dart';
@@ -25,7 +21,7 @@ part 'drift_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(createDatabaseConnection('app_database'));
 
   @override
   int get schemaVersion => 3;
@@ -48,13 +44,4 @@ class AppDatabase extends _$AppDatabase {
       },
     );
   }
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'app_database.sqlite'));
-
-    return NativeDatabase.createInBackground(file, logStatements: true);
-  });
 }

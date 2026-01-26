@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -22,6 +23,12 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    
+    // Skip initialization on web
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
 
     // Initialize timezone
     tz.initializeTimeZones();
@@ -149,6 +156,7 @@ class NotificationService {
     required DateTime scheduledTime,
     String? dosage,
   }) async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
@@ -230,24 +238,28 @@ class NotificationService {
 
   /// Cancel a specific notification
   Future<void> cancelNotification(int id) async {
+    if (kIsWeb) return;
     await _notifications.cancel(id);
     developer.log('Cancelled notification $id', name: 'NotificationService');
   }
 
   /// Cancel all notifications
   Future<void> cancelAllNotifications() async {
+    if (kIsWeb) return;
     await _notifications.cancelAll();
     developer.log('Cancelled all notifications', name: 'NotificationService');
   }
 
   /// Get pending notifications count
   Future<int> getPendingNotificationsCount() async {
+    if (kIsWeb) return 0;
     final pending = await _notifications.pendingNotificationRequests();
     return pending.length;
   }
 
   /// Log all pending notifications to debug console
   Future<void> logPendingNotifications() async {
+    if (kIsWeb) return;
     final pending = await _notifications.pendingNotificationRequests();
 
     developer.log(
@@ -292,6 +304,7 @@ class NotificationService {
 
   /// Schedule notifications for all upcoming intakes
   Future<void> scheduleAllUpcomingNotifications(AppDatabase db) async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     // Cancel existing notifications first
@@ -364,6 +377,7 @@ class NotificationService {
 
   /// Show an immediate test notification
   Future<void> showTestNotification() async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     const androidDetails = AndroidNotificationDetails(
@@ -400,6 +414,7 @@ class NotificationService {
 
   /// Schedule a test notification 10 seconds from now
   Future<void> scheduleTestNotification() async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     final now = DateTime.now();
@@ -476,6 +491,7 @@ class NotificationService {
 
   /// Alternative test with basic scheduling (30 seconds)
   Future<void> scheduleBasicTestNotification() async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     final now = DateTime.now();
@@ -596,6 +612,7 @@ class NotificationService {
 
   /// Schedule multiple test notifications at various intervals
   Future<void> scheduleMultipleTestNotifications() async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     final intervals = [1, 2, 5, 7, 10, 20, 30, 60];
@@ -676,6 +693,7 @@ class NotificationService {
   /// Schedule a test notification for the next medication intake in 30 seconds
   /// This is for testing the scroll-to-intake functionality
   Future<void> scheduleTestMedicationNotification(AppDatabase db) async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
 
     final now = DateTime.now();
