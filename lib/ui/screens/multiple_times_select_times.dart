@@ -15,6 +15,7 @@ class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final int timesPerDay;
   final String intakeAdvice;
+  final int userId;
 
   const MultipleTimesSelectTimesScreen({
     super.key,
@@ -22,6 +23,7 @@ class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.timesPerDay,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -351,7 +353,7 @@ class _MultipleTimesSelectTimesScreenState
 
       // Create daily plan with multiple times
       await planService.createMedicationPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
         dosageAmount: _dosageAmount.toDouble(),

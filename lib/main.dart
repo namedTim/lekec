@@ -113,6 +113,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -124,6 +125,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           frequency: extra['frequency'] as FrequencyOption,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -135,6 +137,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -146,6 +149,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -159,6 +163,7 @@ final _router = GoRouter(
           intervalType: extra['intervalType'] as IntervalType,
           intervalValue: extra['intervalValue'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -170,6 +175,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -182,6 +188,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           timesPerDay: extra['timesPerDay'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -193,6 +200,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -205,6 +213,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           selectedDays: List<int>.from(extra['selectedDays'] as List),
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -216,6 +225,7 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
@@ -229,12 +239,18 @@ final _router = GoRouter(
           takingDays: extra['takingDays'] as int,
           pauseDays: extra['pauseDays'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
         );
       },
     ),
     GoRoute(
       path: '/add-single-entry',
-      builder: (context, state) => const AddSingleEntryScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AddSingleEntryScreen(
+          userId: extra?['userId'] as int? ?? 1,
+        );
+      },
     ),
     GoRoute(
       path: '/add-single-entry/quantity',
@@ -243,6 +259,7 @@ final _router = GoRouter(
         return AddSingleEntryQuantityScreen(
           medicationName: extra['name'] as String,
           medType: extra['medType'] as MedicationType,
+          userId: extra['userId'] as int,
         );
       },
     ),

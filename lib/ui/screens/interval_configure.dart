@@ -17,6 +17,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final IntervalType intervalType;
   final int intervalValue;
   final String intakeAdvice;
+  final int userId;
 
   const IntervalConfigureScreen({
     super.key,
@@ -25,6 +26,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
     required this.intervalType,
     required this.intervalValue,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -320,7 +322,7 @@ class _IntervalConfigureScreenState
       final startTime =
           '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}';
       await planService.createIntervalPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
         dosageAmount: _dosageAmount.toDouble(),

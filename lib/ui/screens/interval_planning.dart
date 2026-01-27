@@ -10,12 +10,14 @@ class IntervalPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
 
   const IntervalPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -204,6 +206,7 @@ class _IntervalPlanningScreenState
         'intervalType': _selectedType,
         'intervalValue': _intervalValue,
         'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
       },
     );
   }

@@ -8,12 +8,14 @@ class MultipleTimesPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
 
   const MultipleTimesPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -126,6 +128,7 @@ class _MultipleTimesPlanningScreenState
         'medType': widget.medType,
         'timesPerDay': _timesPerDay,
         'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
       },
     );
   }

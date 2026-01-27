@@ -21,12 +21,14 @@ class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final FrequencyOption frequency;
+  final int userId;
 
   const SimpleMedicationPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.frequency,
+    required this.userId,
   });
 
   @override
@@ -171,7 +173,7 @@ class _SimpleMedicationPlanningScreenState
 
       // 3. Create medication plan with schedule rules
       final planId = await planService.createMedicationPlan(
-        userId: 1, // TODO: Get from current user
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: _startDate ?? DateTime.now(),
         dosageAmount: _quantity.toDouble(),

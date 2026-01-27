@@ -7,6 +7,7 @@ import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../components/step_progress_indicator.dart';
+import '../components/confirmation_dialog.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
@@ -24,12 +25,136 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   MedicationType _selectedType = MedicationType.pills;
   String _selectedIntakeAdvice = 'Ni posebnosti';
   bool _showCustomAdviceField = false;
+  List<User> _users = [];
+  int? _selectedUserId;
+  bool _isLoadingUsers = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
 
   @override
   void dispose() {
     _medicationNameController.dispose();
     _customIntakeAdviceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    final db = ref.read(databaseProvider);
+    
+    // Get all users
+    final users = await db.select(db.users).get();
+    
+    // If no users exist, create default "jaz" user
+    if (users.isEmpty) {
+      final id = await db.into(db.users).insert(
+        UsersCompanion.insert(name: 'jaz'),
+      );
+      final jazUser = await (db.select(db.users)..where((u) => u.id.equals(id))).getSingle();
+      users.add(jazUser);
+    }
+    
+    // Find "jaz" user or use first user as default
+    final jazUser = users.firstWhere(
+      (u) => u.name.toLowerCase() == 'jaz',
+      orElse: () => users.first,
+    );
+    
+    setState(() {
+      _users = users;
+      _selectedUserId = jazUser.id;
+      _isLoadingUsers = false;
+    });
+  }
+
+  Future<void> _showAddUserDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Dodaj novega uporabnika'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Ime uporabnika',
+            hintText: 'Vnesite ime',
+          ),
+          autofocus: true,
+          onSubmitted: (_) {
+            if (controller.text.trim().isNotEmpty) {
+              Navigator.pop(context, true);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Prekliči'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Dodaj'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && controller.text.trim().isNotEmpty) {
+      final userName = controller.text.trim();
+      final db = ref.read(databaseProvider);
+      final id = await db.into(db.users).insert(
+        UsersCompanion.insert(name: userName),
+      );
+      final newUser = await (db.select(db.users)..where((u) => u.id.equals(id))).getSingle();
+      
+      setState(() {
+        _users.add(newUser);
+        _selectedUserId = newUser.id;
+      });
+    }
+  }
+
+  Future<void> _showDeleteUserDialog(User user) async {
+    // Don't allow deleting the "jaz" user
+    if (user.name.toLowerCase() == 'jaz') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Privzeti uporabnik se ne more izbrisati')),
+      );
+      return;
+    }
+
+    final result = await showConfirmationDialog(
+      context,
+      title: 'Izbriši uporabnika',
+      message: 'Ali ste prepričani, da želite izbrisati uporabnika "${user.name}"?',
+      confirmText: 'Izbriši',
+      cancelText: 'Prekliči',
+    );
+
+    if (result) {
+      final db = ref.read(databaseProvider);
+      await (db.delete(db.users)..where((u) => u.id.equals(user.id))).go();
+      
+      setState(() {
+        _users.removeWhere((u) => u.id == user.id);
+        
+        // If the deleted user was selected, select "jaz" or first available user
+        if (_selectedUserId == user.id) {
+          final jazUser = _users.firstWhere(
+            (u) => u.name.toLowerCase() == 'jaz',
+            orElse: () => _users.first,
+          );
+          _selectedUserId = jazUser.id;
+        }
+      });
+    }
   }
 
   String _getMedicationTypeLabel(MedicationType type) {
@@ -73,6 +198,13 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
 
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedUserId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Izberite uporabnika')),
+        );
+        return;
+      }
+
       // Determine final intake advice
       final intakeAdvice = _selectedIntakeAdvice == 'Po meri'
           ? _customIntakeAdviceController.text.trim()
@@ -85,6 +217,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
             'name': _medicationNameController.text,
             'medType': _selectedType,
             'intakeAdvice': intakeAdvice,
+            'userId': _selectedUserId,
           },
         );
       }
@@ -281,6 +414,44 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       return null;
                     },
                     maxLines: 2,
+                  ),
+                ],
+
+                const SizedBox(height: 40),
+
+                // User Selection
+                if (_isLoadingUsers)
+                  const Center(child: CircularProgressIndicator())
+                else ...[
+                  Text(
+                    'Kdo bo vzel zdravilo?',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ..._users.map((user) => GestureDetector(
+                        onLongPress: () => _showDeleteUserDialog(user),
+                        child: ChoiceChip(
+                          label: Text(user.name),
+                          selected: _selectedUserId == user.id,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedUserId = user.id);
+                            }
+                          },
+                        ),
+                      )),
+                      ActionChip(
+                        avatar: const Icon(Symbols.add, size: 18),
+                        label: const Text('Dodaj'),
+                        onPressed: _showAddUserDialog,
+                      ),
+                    ],
                   ),
                 ],
 

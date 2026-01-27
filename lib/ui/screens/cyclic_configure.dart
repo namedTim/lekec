@@ -16,6 +16,7 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
   final int takingDays;
   final int pauseDays;
   final String intakeAdvice;
+  final int userId;
 
   const CyclicConfigureScreen({
     super.key,
@@ -24,6 +25,7 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
     required this.takingDays,
     required this.pauseDays,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -357,7 +359,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
 
       // Create cyclic plan
       await planService.createCyclicPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
         dosageAmount: _dosageAmount.toDouble(),

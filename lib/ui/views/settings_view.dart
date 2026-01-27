@@ -72,9 +72,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
     await _loadSettings();
 
-    // If this is an alarm setting, reschedule all existing critical alarms
+    // Show feedback
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nastavitve shranjene'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+
+    // If this is an alarm setting, reschedule all existing critical alarms in background
     if (isAlarmSetting) {
-      await _rescheduleAllAlarms(db);
+      _rescheduleAllAlarms(db);
     }
   }
 
@@ -128,15 +139,6 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
         await Alarm.set(alarmSettings: alarmSettings);
       }
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Alarmi posodobljeni'),
-          duration: Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -421,19 +423,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         AppSettingsCompanion(showKillWarning: drift.Value(v)),
                   );
 
-                  // Reload all alarms to pick up the new setting
-                  // Each alarm has enableNotificationOnKill that needs to be updated
+                  // Reload all alarms in background
                   final alarmService = ref.read(alarmServiceProvider);
-                  await alarmService.reloadAllAlarms();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Alarmi posodobljeni'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
+                  alarmService.reloadAllAlarms();
                 },
               ),
             ],

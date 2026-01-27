@@ -8,12 +8,14 @@ class SpecificDaysPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
 
   const SpecificDaysPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -159,6 +161,7 @@ class _SpecificDaysPlanningScreenState
         'medType': widget.medType,
         'selectedDays': _selectedDays.toList(),
         'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
       },
     );
   }

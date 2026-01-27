@@ -5,7 +5,12 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
 
 class AddSingleEntryScreen extends ConsumerStatefulWidget {
-  const AddSingleEntryScreen({super.key});
+  final int userId;
+
+  const AddSingleEntryScreen({
+    super.key,
+    this.userId = 1,
+  });
 
   @override
   ConsumerState<AddSingleEntryScreen> createState() =>
@@ -69,6 +74,7 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
         extra: {
           'name': _medicationNameController.text.trim(),
           'medType': _selectedType,
+          'userId': widget.userId,
         },
       );
     }

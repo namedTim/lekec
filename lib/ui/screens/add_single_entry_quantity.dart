@@ -15,11 +15,13 @@ import '../../data/services/intake_log_service.dart';
 class AddSingleEntryQuantityScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
+  final int userId;
 
   const AddSingleEntryQuantityScreen({
     super.key,
     required this.medicationName,
     required this.medType,
+    required this.userId,
   });
 
   @override
@@ -86,7 +88,7 @@ class _AddSingleEntryQuantityScreenState
       // Create a one-time intake log entry
       await intakeLogService.createOneTimeEntry(
         medicationId: medicationId,
-        userId: 1, // TODO: Get from current user
+        userId: widget.userId,
         dosageAmount: _quantity.toDouble(),
       );
 

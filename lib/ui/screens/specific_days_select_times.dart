@@ -15,6 +15,7 @@ class SpecificDaysSelectTimesScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final List<int> selectedDays;
   final String intakeAdvice;
+  final int userId;
 
   const SpecificDaysSelectTimesScreen({
     super.key,
@@ -22,6 +23,7 @@ class SpecificDaysSelectTimesScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.selectedDays,
     required this.intakeAdvice,
+    required this.userId,
   });
 
   @override
@@ -348,7 +350,7 @@ class _SpecificDaysSelectTimesScreenState
 
       // Create specific days plan
       await planService.createSpecificDaysPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
         dosageAmount: _dosageAmount.toDouble(),
