@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alarm/alarm.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
@@ -20,6 +21,7 @@ class ExampleAlarmRingScreen extends StatefulWidget {
 
 class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     with SingleTickerProviderStateMixin {
+  static const platform = MethodChannel('com.lekec/lockscreen');
   Map<String, dynamic>? _medicationDetails;
   bool _isLoading = true;
   late AnimationController _pulseController;
@@ -28,6 +30,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   @override
   void initState() {
     super.initState();
+    _showOverLockscreen(true);
     _loadMedicationDetails();
 
     _pulseController = AnimationController(
@@ -38,6 +41,14 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+  }
+
+  Future<void> _showOverLockscreen(bool show) async {
+    try {
+      await platform.invokeMethod('showOverLockscreen', {'show': show});
+    } catch (e) {
+      // Ignore errors on non-Android platforms
+    }
   }
 
   Future<void> _loadMedicationDetails() async {
@@ -57,6 +68,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
 
   @override
   void dispose() {
+    _showOverLockscreen(false);
     _pulseController.dispose();
     super.dispose();
   }
