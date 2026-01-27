@@ -75,6 +75,17 @@ class AppTheme {
           borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
       ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimaryLight,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -139,6 +150,24 @@ class AppTheme {
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.black,
+      ),
+
+      cardTheme: const CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimaryDark,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

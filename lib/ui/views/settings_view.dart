@@ -7,6 +7,7 @@ import 'package:alarm/alarm.dart';
 import '../../features/core/providers/theme_provider.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
+import '../../services/alarm_service.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
@@ -145,6 +146,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       dateTime: DateTime.now().add(const Duration(seconds: 2)),
       assetAudioPath: 'assets/${_settings?.alarmSound ?? 'nokia.mp3'}',
       loopAudio: true,
+      warningNotificationOnKill: false,
       vibrate: _settings?.alarmVibration ?? true,
       androidFullScreenIntent: true,
       volumeSettings: VolumeSettings.fixed(
@@ -366,11 +368,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 padding: const EdgeInsets.all(16.0),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: FilledButton.icon(
                     onPressed: _testAlarm,
                     icon: const Icon(Symbols.play_arrow),
                     label: const Text('Testiraj alarm'),
-                    style: OutlinedButton.styleFrom(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: theme.brightness == Brightness.dark 
+                          ? Colors.black 
+                          : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -415,14 +421,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         AppSettingsCompanion(showKillWarning: drift.Value(v)),
                   );
 
-                  // Update the alarm warning notification immediately
-                  if (value) {
-                    await Alarm.setWarningNotificationOnKill(
-                      "Aktivnost opozoril",
-                      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+                  // Reload all alarms to pick up the new setting
+                  // Each alarm has enableNotificationOnKill that needs to be updated
+                  final alarmService = ref.read(alarmServiceProvider);
+                  await alarmService.reloadAllAlarms();
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Alarmi posodobljeni'),
+                        duration: Duration(seconds: 2),
+                      ),
                     );
-                  } else {
-                    await Alarm.setWarningNotificationOnKill("", "");
                   }
                 },
               ),

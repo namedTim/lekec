@@ -109,6 +109,21 @@ class AlarmService {
     await Alarm.stopAll();
   }
 
+  /// Reload all alarms (recreates them with current settings)
+  /// This is needed when global alarm settings change
+  Future<void> reloadAllAlarms() async {
+    final alarms = await Alarm.getAlarms();
+    
+    // Recreate each alarm to pick up new settings
+    for (final alarm in alarms) {
+      // Stop the alarm first
+      await Alarm.stop(alarm.id);
+      
+      // Recreate it with the same settings (alarm package will use new global settings)
+      await Alarm.set(alarmSettings: alarm);
+    }
+  }
+
   /// Clean up subscriptions
   void dispose() {
     _ringSubscription?.cancel();

@@ -301,16 +301,11 @@ Future<void> main() async {
   // Initialize database (quick, no heavy operations)
   db = AppDatabase();
 
-  // Load settings and set alarm warning notification
-  final settings = await (db.select(
-    db.appSettings,
-  )..limit(1)).getSingleOrNull();
-  if (settings != null && settings.showKillWarning) {
-    await Alarm.setWarningNotificationOnKill(
-      "Aktivnost opozoril",
-      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-    );
-  }
+  // Set alarm warning notification
+  await Alarm.setWarningNotificationOnKill(
+    "Aktivnost opozoril",
+    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+  );
 
   // Start the app immediately so alarm can show
   runApp(

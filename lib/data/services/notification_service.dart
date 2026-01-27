@@ -232,6 +232,7 @@ class NotificationService {
       final alarmVolume = settingsQuery?.alarmVolume ?? 0.8;
       final alarmSound = settingsQuery?.alarmSound ?? 'nokia.mp3';
       final alarmVibration = settingsQuery?.alarmVibration ?? true;
+      final notificationOnKill = settingsQuery?.showKillWarning ?? true;
 
       final alarmSettings = AlarmSettings(
         id: id,
@@ -240,9 +241,10 @@ class NotificationService {
         loopAudio: true,
         vibrate: alarmVibration,
         androidFullScreenIntent: true,
+        warningNotificationOnKill: notificationOnKill,
         volumeSettings: VolumeSettings.fixed(volume: alarmVolume),
         notificationSettings: NotificationSettings(
-          title: 'Kritično: Vzemite $medicationName',
+          title: 'Kritičen opomnik: Vzemite $medicationName',
           body: dosage != null ? 'Vzemite $dosage' : 'Čas za jemanje zdravila',
           stopButton: 'Zaustavi',
           icon: 'notification_icon',
@@ -271,8 +273,8 @@ class NotificationService {
       'medication_reminders',
       'Opomniki za zdravila',
       channelDescription: 'Opomniki za jemanje zdravil',
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       icon: '@mipmap/ic_launcher',
       playSound: true,
       enableVibration: true,

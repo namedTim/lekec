@@ -62,6 +62,17 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   }
 
   Future<void> _stopAlarm() async {
+    // Stop the alarm
+    await Alarm.stop(widget.alarmSettings.id);
+
+    // If this is a demo/test alarm (no medication details), just close the screen
+    if (_medicationDetails == null) {
+      if (mounted) {
+        context.pop();
+      }
+      return;
+    }
+
     // Mark intake as taken in database
     await (db.update(db.medicationIntakeLogs)
           ..where((t) => t.id.equals(widget.alarmSettings.id)))
@@ -71,9 +82,6 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
         takenTime: drift.Value(DateTime.now()),
       ),
     );
-
-    // Stop the alarm
-    await Alarm.stop(widget.alarmSettings.id);
 
     // Navigate to home page and scroll to intake
     if (mounted) {
@@ -90,6 +98,19 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
 
   Future<void> _snoozeAlarm() async {
     final newTime = DateTime.now().add(const Duration(minutes: 10));
+
+    // If this is a demo/test alarm (no medication details), just snooze and close
+    if (_medicationDetails == null) {
+      await Alarm.set(
+        alarmSettings: widget.alarmSettings.copyWith(
+          dateTime: newTime,
+        ),
+      );
+      if (mounted) {
+        context.pop();
+      }
+      return;
+    }
 
     // Update the scheduled time in the database
     await (db.update(db.medicationIntakeLogs)
@@ -117,12 +138,27 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   }
 
   Future<void> _dismissAlarm() async {
-    // Just stop the alarm without navigating
+    // Just stop the alarm
     await Alarm.stop(widget.alarmSettings.id);
 
     // Close the alarm screen
     if (mounted) {
-      context.go('/');
+      // If this is a demo/test alarm (no medication details), just pop
+      if (_medicationDetails == null) {
+        context.pop();
+      } else {
+        context.go('/');
+      }
+    }
+  }
+
+  Future<void> _checkDemoAlarm() async{
+    if (_medicationDetails?['dosage'] == ''){
+      // just pop alarm screen and stop alarm
+      await Alarm.stop(widget.alarmSettings.id);
+      if (mounted) {
+        context.pop();
+      }
     }
   }
 
