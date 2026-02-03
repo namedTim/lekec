@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart' as drift;
 import 'dart:convert';
+import 'package:alarm/alarm.dart';
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
+import 'notification_service.dart';
 
 class MedicationService {
   final AppDatabase db;
@@ -39,9 +41,25 @@ class MedicationService {
   }
 
   /// Soft delete a medication by ID (mark as deleted)
-  /// Also deletes future intake logs
+  /// Also deletes future intake logs and cancels all alarms/notifications
   Future<void> deleteMedication(int medicationId) async {
     final now = DateTime.now();
+
+    // Get all future intake logs for this medication before deleting
+    final futureIntakes = await (db.select(db.medicationIntakeLogs)
+          ..where((log) => log.medicationId.equals(medicationId))
+          ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+        .get();
+
+    // Cancel all alarms and notifications for these intakes
+    final notificationService = NotificationService();
+    for (final intake in futureIntakes) {
+      // Cancel alarm (for critical reminders)
+      await Alarm.stop(intake.id);
+      
+      // Cancel notification (for regular reminders)
+      await notificationService.cancelNotification(intake.id);
+    }
 
     // Mark medication as deleted
     await (db.update(

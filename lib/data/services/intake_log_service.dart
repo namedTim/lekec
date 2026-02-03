@@ -191,7 +191,8 @@ class IntakeLogService {
         !intake.wasTaken &&
         medication != null &&
         medication.dosagesRemaining != null) {
-      final newRemaining = medication.dosagesRemaining! - plan.dosageAmount;
+      // Prevent negative values - clamp at 0
+      final newRemaining = (medication.dosagesRemaining! - plan.dosageAmount).clamp(0.0, double.infinity);
       await (db.update(
         db.medications,
       )..where((t) => t.id.equals(medication.id))).write(
