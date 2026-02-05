@@ -11,6 +11,7 @@ import 'tables/medication_schedule_rule.dart';
 import 'tables/medications.dart';
 import 'tables/users.dart';
 import 'tables/app_settings.dart';
+import 'tables/onboarding_settings.dart';
 
 part 'drift_database.g.dart';
 
@@ -22,13 +23,14 @@ part 'drift_database.g.dart';
     MedicationScheduleRules,
     MedicationIntakeLogs,
     AppSettings,
+    OnboardingSettings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -55,6 +57,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(appSettings, appSettings.alarmSound);
           await m.addColumn(appSettings, appSettings.alarmVibration);
           await m.addColumn(appSettings, appSettings.showKillWarning);
+        }
+        if (from < 6) {
+          // Add onboarding settings table
+          await m.createTable(onboardingSettings);
         }
       },
     );

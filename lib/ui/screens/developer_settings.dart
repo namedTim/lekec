@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../features/dev/providers/dev_actions_provider.dart';
 import '../../features/core/providers/database_provider.dart';
+import '../../features/core/providers/onboarding_provider.dart';
 import '../../database/drift_database.dart';
 import '../../data/services/notification_service.dart';
+import 'package:drift/drift.dart' as drift;
 
 class DeveloperSettingsScreen extends ConsumerWidget {
   const DeveloperSettingsScreen({super.key});
@@ -85,6 +87,36 @@ class DeveloperSettingsScreen extends ConsumerWidget {
                       content: Text('Error: $e'),
                       backgroundColor: Colors.red,
                       duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _DevCard(
+            icon: Symbols.restart_alt,
+            color: Colors.cyan,
+            title: "Reset Onboarding",
+            subtitle: "Clear onboarding completion to show welcome screens",
+            onTap: () async {
+              try {
+                await db.delete(db.onboardingSettings).go();
+                ref.invalidate(onboardingStatusProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Onboarding reset! Restart app to see welcome screens"),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
                     ),
                   );
                 }

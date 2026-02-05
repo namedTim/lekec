@@ -2893,6 +2893,384 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $OnboardingSettingsTable extends OnboardingSettings
+    with TableInfo<$OnboardingSettingsTable, OnboardingSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OnboardingSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _isCompletedMeta = const VerificationMeta(
+    'isCompleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isCompleted = GeneratedColumn<bool>(
+    'is_completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<UserType?, int> userType =
+      GeneratedColumn<int>(
+        'user_type',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<UserType?>($OnboardingSettingsTable.$converteruserTypen);
+  static const VerificationMeta _familyNameMeta = const VerificationMeta(
+    'familyName',
+  );
+  @override
+  late final GeneratedColumn<String> familyName = GeneratedColumn<String>(
+    'family_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    isCompleted,
+    userType,
+    familyName,
+    completedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'onboarding_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OnboardingSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('is_completed')) {
+      context.handle(
+        _isCompletedMeta,
+        isCompleted.isAcceptableOrUnknown(
+          data['is_completed']!,
+          _isCompletedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('family_name')) {
+      context.handle(
+        _familyNameMeta,
+        familyName.isAcceptableOrUnknown(data['family_name']!, _familyNameMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  OnboardingSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OnboardingSetting(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      isCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_completed'],
+      )!,
+      userType: $OnboardingSettingsTable.$converteruserTypen.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}user_type'],
+        ),
+      ),
+      familyName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}family_name'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
+    );
+  }
+
+  @override
+  $OnboardingSettingsTable createAlias(String alias) {
+    return $OnboardingSettingsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<UserType, int, int> $converteruserType =
+      const EnumIndexConverter<UserType>(UserType.values);
+  static JsonTypeConverter2<UserType?, int?, int?> $converteruserTypen =
+      JsonTypeConverter2.asNullable($converteruserType);
+}
+
+class OnboardingSetting extends DataClass
+    implements Insertable<OnboardingSetting> {
+  final int id;
+  final bool isCompleted;
+  final UserType? userType;
+  final String? familyName;
+  final DateTime? completedAt;
+  const OnboardingSetting({
+    required this.id,
+    required this.isCompleted,
+    this.userType,
+    this.familyName,
+    this.completedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['is_completed'] = Variable<bool>(isCompleted);
+    if (!nullToAbsent || userType != null) {
+      map['user_type'] = Variable<int>(
+        $OnboardingSettingsTable.$converteruserTypen.toSql(userType),
+      );
+    }
+    if (!nullToAbsent || familyName != null) {
+      map['family_name'] = Variable<String>(familyName);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    return map;
+  }
+
+  OnboardingSettingsCompanion toCompanion(bool nullToAbsent) {
+    return OnboardingSettingsCompanion(
+      id: Value(id),
+      isCompleted: Value(isCompleted),
+      userType: userType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userType),
+      familyName: familyName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(familyName),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+    );
+  }
+
+  factory OnboardingSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OnboardingSetting(
+      id: serializer.fromJson<int>(json['id']),
+      isCompleted: serializer.fromJson<bool>(json['isCompleted']),
+      userType: $OnboardingSettingsTable.$converteruserTypen.fromJson(
+        serializer.fromJson<int?>(json['userType']),
+      ),
+      familyName: serializer.fromJson<String?>(json['familyName']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'isCompleted': serializer.toJson<bool>(isCompleted),
+      'userType': serializer.toJson<int?>(
+        $OnboardingSettingsTable.$converteruserTypen.toJson(userType),
+      ),
+      'familyName': serializer.toJson<String?>(familyName),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+    };
+  }
+
+  OnboardingSetting copyWith({
+    int? id,
+    bool? isCompleted,
+    Value<UserType?> userType = const Value.absent(),
+    Value<String?> familyName = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
+  }) => OnboardingSetting(
+    id: id ?? this.id,
+    isCompleted: isCompleted ?? this.isCompleted,
+    userType: userType.present ? userType.value : this.userType,
+    familyName: familyName.present ? familyName.value : this.familyName,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+  );
+  OnboardingSetting copyWithCompanion(OnboardingSettingsCompanion data) {
+    return OnboardingSetting(
+      id: data.id.present ? data.id.value : this.id,
+      isCompleted: data.isCompleted.present
+          ? data.isCompleted.value
+          : this.isCompleted,
+      userType: data.userType.present ? data.userType.value : this.userType,
+      familyName: data.familyName.present
+          ? data.familyName.value
+          : this.familyName,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnboardingSetting(')
+          ..write('id: $id, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('userType: $userType, ')
+          ..write('familyName: $familyName, ')
+          ..write('completedAt: $completedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, isCompleted, userType, familyName, completedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OnboardingSetting &&
+          other.id == this.id &&
+          other.isCompleted == this.isCompleted &&
+          other.userType == this.userType &&
+          other.familyName == this.familyName &&
+          other.completedAt == this.completedAt);
+}
+
+class OnboardingSettingsCompanion extends UpdateCompanion<OnboardingSetting> {
+  final Value<int> id;
+  final Value<bool> isCompleted;
+  final Value<UserType?> userType;
+  final Value<String?> familyName;
+  final Value<DateTime?> completedAt;
+  const OnboardingSettingsCompanion({
+    this.id = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.userType = const Value.absent(),
+    this.familyName = const Value.absent(),
+    this.completedAt = const Value.absent(),
+  });
+  OnboardingSettingsCompanion.insert({
+    this.id = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.userType = const Value.absent(),
+    this.familyName = const Value.absent(),
+    this.completedAt = const Value.absent(),
+  });
+  static Insertable<OnboardingSetting> custom({
+    Expression<int>? id,
+    Expression<bool>? isCompleted,
+    Expression<int>? userType,
+    Expression<String>? familyName,
+    Expression<DateTime>? completedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (isCompleted != null) 'is_completed': isCompleted,
+      if (userType != null) 'user_type': userType,
+      if (familyName != null) 'family_name': familyName,
+      if (completedAt != null) 'completed_at': completedAt,
+    });
+  }
+
+  OnboardingSettingsCompanion copyWith({
+    Value<int>? id,
+    Value<bool>? isCompleted,
+    Value<UserType?>? userType,
+    Value<String?>? familyName,
+    Value<DateTime?>? completedAt,
+  }) {
+    return OnboardingSettingsCompanion(
+      id: id ?? this.id,
+      isCompleted: isCompleted ?? this.isCompleted,
+      userType: userType ?? this.userType,
+      familyName: familyName ?? this.familyName,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (isCompleted.present) {
+      map['is_completed'] = Variable<bool>(isCompleted.value);
+    }
+    if (userType.present) {
+      map['user_type'] = Variable<int>(
+        $OnboardingSettingsTable.$converteruserTypen.toSql(userType.value),
+      );
+    }
+    if (familyName.present) {
+      map['family_name'] = Variable<String>(familyName.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnboardingSettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('userType: $userType, ')
+          ..write('familyName: $familyName, ')
+          ..write('completedAt: $completedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2906,6 +3284,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MedicationIntakeLogsTable medicationIntakeLogs =
       $MedicationIntakeLogsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $OnboardingSettingsTable onboardingSettings =
+      $OnboardingSettingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2917,6 +3297,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     medicationScheduleRules,
     medicationIntakeLogs,
     appSettings,
+    onboardingSettings,
   ];
 }
 
@@ -5919,6 +6300,220 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function({bool defaultUserId})
     >;
+typedef $$OnboardingSettingsTableCreateCompanionBuilder =
+    OnboardingSettingsCompanion Function({
+      Value<int> id,
+      Value<bool> isCompleted,
+      Value<UserType?> userType,
+      Value<String?> familyName,
+      Value<DateTime?> completedAt,
+    });
+typedef $$OnboardingSettingsTableUpdateCompanionBuilder =
+    OnboardingSettingsCompanion Function({
+      Value<int> id,
+      Value<bool> isCompleted,
+      Value<UserType?> userType,
+      Value<String?> familyName,
+      Value<DateTime?> completedAt,
+    });
+
+class $$OnboardingSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $OnboardingSettingsTable> {
+  $$OnboardingSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<UserType?, UserType, int> get userType =>
+      $composableBuilder(
+        column: $table.userType,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get familyName => $composableBuilder(
+    column: $table.familyName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$OnboardingSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $OnboardingSettingsTable> {
+  $$OnboardingSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get userType => $composableBuilder(
+    column: $table.userType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get familyName => $composableBuilder(
+    column: $table.familyName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$OnboardingSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OnboardingSettingsTable> {
+  $$OnboardingSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<UserType?, int> get userType =>
+      $composableBuilder(column: $table.userType, builder: (column) => column);
+
+  GeneratedColumn<String> get familyName => $composableBuilder(
+    column: $table.familyName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$OnboardingSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OnboardingSettingsTable,
+          OnboardingSetting,
+          $$OnboardingSettingsTableFilterComposer,
+          $$OnboardingSettingsTableOrderingComposer,
+          $$OnboardingSettingsTableAnnotationComposer,
+          $$OnboardingSettingsTableCreateCompanionBuilder,
+          $$OnboardingSettingsTableUpdateCompanionBuilder,
+          (
+            OnboardingSetting,
+            BaseReferences<
+              _$AppDatabase,
+              $OnboardingSettingsTable,
+              OnboardingSetting
+            >,
+          ),
+          OnboardingSetting,
+          PrefetchHooks Function()
+        > {
+  $$OnboardingSettingsTableTableManager(
+    _$AppDatabase db,
+    $OnboardingSettingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OnboardingSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OnboardingSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OnboardingSettingsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> isCompleted = const Value.absent(),
+                Value<UserType?> userType = const Value.absent(),
+                Value<String?> familyName = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+              }) => OnboardingSettingsCompanion(
+                id: id,
+                isCompleted: isCompleted,
+                userType: userType,
+                familyName: familyName,
+                completedAt: completedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> isCompleted = const Value.absent(),
+                Value<UserType?> userType = const Value.absent(),
+                Value<String?> familyName = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+              }) => OnboardingSettingsCompanion.insert(
+                id: id,
+                isCompleted: isCompleted,
+                userType: userType,
+                familyName: familyName,
+                completedAt: completedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OnboardingSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OnboardingSettingsTable,
+      OnboardingSetting,
+      $$OnboardingSettingsTableFilterComposer,
+      $$OnboardingSettingsTableOrderingComposer,
+      $$OnboardingSettingsTableAnnotationComposer,
+      $$OnboardingSettingsTableCreateCompanionBuilder,
+      $$OnboardingSettingsTableUpdateCompanionBuilder,
+      (
+        OnboardingSetting,
+        BaseReferences<
+          _$AppDatabase,
+          $OnboardingSettingsTable,
+          OnboardingSetting
+        >,
+      ),
+      OnboardingSetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5938,4 +6533,6 @@ class $AppDatabaseManager {
       $$MedicationIntakeLogsTableTableManager(_db, _db.medicationIntakeLogs);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$OnboardingSettingsTableTableManager get onboardingSettings =>
+      $$OnboardingSettingsTableTableManager(_db, _db.onboardingSettings);
 }

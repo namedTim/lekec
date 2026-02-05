@@ -33,11 +33,13 @@ import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
+import 'features/core/providers/onboarding_provider.dart';
 import 'database/tables/medications.dart';
 import 'ui/theme/app_theme.dart';
 import 'data/services/intake_schedule_generator.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/background_task_service.dart';
+import 'ui/screens/onboarding/onboarding_flow.dart';
 
 export 'ui/widgets/medication_card.dart' show MedicationStatus;
 
@@ -379,13 +381,61 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final onboardingStatus = ref.watch(onboardingStatusProvider);
 
-    return MaterialApp.router(
-      title: 'Lekec',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode.value ?? ThemeMode.system,
-      routerConfig: _router,
+    return onboardingStatus.when(
+      data: (isCompleted) {
+        if (!isCompleted) {
+          // Show onboarding flow
+          return MaterialApp(
+            title: 'Lekec',
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeMode.value ?? ThemeMode.system,
+            home: OnboardingFlow(
+              onComplete: () {
+                // Refresh the onboarding status to show the main app
+                ref.invalidate(onboardingStatusProvider);
+                // Use a slight delay to ensure the provider updates before navigation
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (rootNavigatorKey.currentContext != null) {
+                    rootNavigatorKey.currentContext!.go('/meds');
+                  }
+                });
+              },
+            ),
+          );
+        }
+
+        // Show main app
+        return MaterialApp.router(
+          title: 'Lekec',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeMode.value ?? ThemeMode.system,
+          routerConfig: _router,
+        );
+      },
+      loading: () => MaterialApp(
+        title: 'Lekec',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode.value ?? ThemeMode.system,
+        home: const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      error: (error, stack) => MaterialApp(
+        title: 'Lekec',
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Center(
+            child: Text('Napaka: $error'),
+          ),
+        ),
+      ),
     );
   }
 }
