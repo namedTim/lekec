@@ -45,8 +45,8 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   Future<void> _loadUsers() async {
     final db = ref.read(databaseProvider);
     
-    // Get all users
-    final users = await db.select(db.users).get();
+    // Get all active users
+    final users = await (db.select(db.users)..where((t) => t.isActive.equals(true))).get();
     
     // If no users exist, create default "jaz" user
     if (users.isEmpty) {

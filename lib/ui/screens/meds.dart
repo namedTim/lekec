@@ -13,6 +13,9 @@ import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import 'medication_detail_screen.dart';
+import 'user_medications_screen.dart';
+import '../widgets/user_card.dart';
+import '../widgets/add_user_dialog.dart';
 import '../../main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
@@ -75,6 +78,46 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Napaka pri brisanju: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAddUserDialog() async {
+    final userName = await showDialog<String>(
+      context: context,
+      builder: (context) => const AddUserDialog(),
+    );
+
+    if (userName != null && userName.isNotEmpty) {
+      try {
+        final db = ref.read(databaseProvider);
+        await db.into(db.users).insert(
+          UsersCompanion.insert(
+            name: userName,
+            createdAt: drift.Value(DateTime.now()),
+          ),
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Uporabnik $userName dodan'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          setState(() {}); // Refresh users list
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Napaka: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -305,7 +348,84 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           },
         );
       case MedsTab.users:
-        return const Center(child: Text('Seznam uporabnikov'));
+        final db = ref.watch(databaseProvider);
+        return FutureBuilder<List<User>>(
+          future: (db.select(db.users)..where((t) => t.isActive.equals(true))).get(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Napaka: ${snapshot.error}'));
+            }
+            
+            final users = snapshot.data ?? [];
+            
+            if (users.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Symbols.group,
+                      size: 64,
+                      color: colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Ni dodanih uporabnikov.',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _showAddUserDialog,
+                      icon: const Icon(Symbols.person_add),
+                      label: const Text('Dodaj uporabnika'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            return ListView.builder(
+              padding: const EdgeInsets.only(top: 8, left: 8, right: 8, bottom: 88),
+              itemCount: users.length + 1,
+              itemBuilder: (context, index) {
+                if (index == users.length) {
+                  // Add user button at bottom
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: FilledButton.icon(
+                      onPressed: _showAddUserDialog,
+                      icon: const Icon(Symbols.person_add),
+                      label: const Text('Dodaj uporabnika'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
+                  );
+                }
+                
+                final user = users[index];
+                return UserCard(
+                  userName: user.name,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => UserMedicationsScreen(
+                          userId: user.id,
+                          userName: user.name,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
       case MedsTab.settings:
         return const SettingsView();
     }

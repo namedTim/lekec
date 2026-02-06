@@ -71,7 +71,7 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadUserData() async {
-    final users = await db.select(db.users).get();
+    final users = await (db.select(db.users)..where((t) => t.isActive.equals(true))).get();
     if (mounted) {
       setState(() {
         _totalUserCount = users.length;
