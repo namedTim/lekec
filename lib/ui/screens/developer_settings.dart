@@ -6,7 +6,6 @@ import '../../features/core/providers/database_provider.dart';
 import '../../features/core/providers/onboarding_provider.dart';
 import '../../database/drift_database.dart';
 import '../../data/services/notification_service.dart';
-import 'package:drift/drift.dart' as drift;
 
 class DeveloperSettingsScreen extends ConsumerWidget {
   const DeveloperSettingsScreen({super.key});

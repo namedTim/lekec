@@ -8,6 +8,7 @@ import '../../database/drift_database.dart';
 import '../../main.dart' show db;
 import '../../helpers/medication_unit_helper.dart';
 import '../../ui/widgets/medication_card.dart';
+import '../../ui/widgets/medication_detail_dialog.dart';
 import '../../ui/components/confirmation_dialog.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../ui/widgets/time_island.dart';
@@ -31,6 +32,8 @@ class DashboardScreenState extends State<DashboardScreen>
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
   late IntakeLogService _intakeService;
+  int _totalUserCount = 0;
+  Map<int, String> _userNames = {};
 
   // Time Island state
   Map<String, dynamic>? _nextMedication;
@@ -51,6 +54,7 @@ class DashboardScreenState extends State<DashboardScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+    _loadUserData();
     loadTodaysIntakes();
     _updateTimeIsland();
     _startIslandUpdateTimer();
@@ -64,6 +68,16 @@ class DashboardScreenState extends State<DashboardScreen>
     setState(() {
       alarms = updatedAlarms;
     });
+  }
+
+  Future<void> _loadUserData() async {
+    final users = await db.select(db.users).get();
+    if (mounted) {
+      setState(() {
+        _totalUserCount = users.length;
+        _userNames = {for (var user in users) user.id: user.name};
+      });
+    }
   }
 
   @override
@@ -228,6 +242,27 @@ class DashboardScreenState extends State<DashboardScreen>
         );
       }
     }
+  }
+
+  void _showMedicationDetail({
+    required String medName,
+    required String dosage,
+    required DateTime scheduledTime,
+    required double dosageAmount,
+    required int? pillsRemaining,
+    required String userName,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => MedicationDetailDialog(
+        medName: medName,
+        dosage: dosage,
+        scheduledTime: scheduledTime,
+        dosageAmount: dosageAmount,
+        pillsRemaining: pillsRemaining,
+        userName: userName,
+      ),
+    );
   }
 
   Future<void> _updateIntakeStatus(
@@ -427,6 +462,13 @@ class DashboardScreenState extends State<DashboardScreen>
                                 // For one-time entries, dosage is stored in the intake log
                                 final dosageAmount = plan?.dosageAmount ?? 1.0;
                                 final dosageCount = dosageAmount.toInt();
+                                
+                                // Get user name
+                                final userName = _userNames[intake.userId] ?? 'Unknown';
+                                
+                                // Calculate remaining pills after this dosage
+                                final currentRemaining = medication.dosagesRemaining ?? 0;
+                                final remainingAfterDose = (currentRemaining - dosageAmount).toInt();
 
                                 // Enable swipes only if time has passed (isPast)
                                 // For future medications, disable swiping
@@ -438,19 +480,29 @@ class DashboardScreenState extends State<DashboardScreen>
                                   medName: medication.name,
                                   dosage:
                                       '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                  medicineRemaining:
-                                      '', // TODO: Calculate remaining
-                                  pillCount:
-                                      0, // TODO: Calculate from inventory
-                                  showName: false,
-                                  username: 'jaz', // TODO: Get from user
-                                  userId: '1',
+                                  medicineRemaining: remainingAfterDose > 0
+                                      ? 'še ${remainingAfterDose} ${getMedicationUnitShort(medication.medType, remainingAfterDose)}'
+                                      : '',
+                                  pillCount: remainingAfterDose,
+                                  showName: _totalUserCount > 1,
+                                  username: userName,
+                                  userId: intake.userId.toString(),
                                   status: status,
                                   isOneTimeEntry: isOneTime,
                                   enableLeftSwipe:
                                       canSwipeScheduled || canDeleteOneTime,
                                   enableRightSwipe: canSwipeScheduled,
                                   isNextMedication: isNextMed,
+                                  onTap: () {
+                                    _showMedicationDetail(
+                                      medName: medication.name,
+                                      dosage: '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                      scheduledTime: intake.scheduledTime,
+                                      dosageAmount: dosageAmount,
+                                      pillsRemaining: currentRemaining > 0 ? remainingAfterDose : null,
+                                      userName: userName,
+                                    );
+                                  },
                                   onStatusChanged: isOneTime
                                       ? null
                                       : (newStatus) async {

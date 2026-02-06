@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../database/drift_database.dart';
 import '../../../database/tables/onboarding_settings.dart';
 import '../../../features/core/providers/database_provider.dart';

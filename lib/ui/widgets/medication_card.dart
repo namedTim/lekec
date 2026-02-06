@@ -24,6 +24,7 @@ class MedicationCard extends StatefulWidget {
     this.enableLeftSwipe = true,
     this.enableRightSwipe = true,
     this.isNextMedication = false,
+    this.onTap,
   });
 
   final String medName;
@@ -40,6 +41,7 @@ class MedicationCard extends StatefulWidget {
   final bool enableLeftSwipe;
   final bool enableRightSwipe;
   final bool isNextMedication;
+  final VoidCallback? onTap;
 
   @override
   State<MedicationCard> createState() => _MedicationCardState();
@@ -109,102 +111,121 @@ class _MedicationCardState extends State<MedicationCard> {
         }
         return false; // Don't actually dismiss the card
       },
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: widget.isNextMedication
-              ? Border.all(
-                  color: const Color(0xFF22C55E), // Green color
-                  width: 3,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 🧾 Main content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.isNextMedication
+                ? Border.all(
+                    color: const Color(0xFF22C55E), // Green color
+                    width: 3,
+                  )
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Medicine name
-                  Text(
-                    widget.medName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Dosage
-                  Text(
-                    widget.dosage,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Remaining pills / info chip
-                  if (widget.medicineRemaining.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getPillCountColor(widget.pillCount),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        widget.medicineRemaining,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                  // 🧾 Main content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Medicine name and dosage in same row
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                widget.medName,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              widget.dosage,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+
+                        const SizedBox(height: 8),
+
+                        // Remaining pills / info chip
+                        if (widget.medicineRemaining.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getPillCountColor(widget.pillCount),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              widget.medicineRemaining,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        // Add bottom padding when username is visible
+                        if (widget.showName) const SizedBox(height: 16),
+                      ],
                     ),
+                  ),
+
+                  // Add padding when username is visible
+                  if (widget.showName) const SizedBox(width: 16),
+
+                  // Status indicator icon
+                  _buildStatusIcon(colors),
+                ],
+              ),
+              // Username in bottom right corner
+              if (widget.showName)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Symbols.person,
+                    size: 14,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.username,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
             ),
-
-            // Status indicator icon
-            _buildStatusIcon(colors),
-
-            // 👤 User badge
-            if (widget.showName)
-              Container(
-                margin: const EdgeInsets.only(left: 12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  widget.username,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
           ],
         ),
+      ),
       ),
     );
   }
