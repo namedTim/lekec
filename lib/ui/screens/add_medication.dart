@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../components/step_progress_indicator.dart';
 import '../components/confirmation_dialog.dart';
+import '../components/medication_camera_dialog.dart';
+import '../../services/gemini_medication_service.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,9 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   List<User> _users = [];
   int? _selectedUserId;
   bool _isLoadingUsers = true;
+  
+  // Store extracted data for passing to next screens
+  MedicationExtractionResult? _extractedData;
 
   @override
   void initState() {
@@ -196,6 +200,78 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     }
   }
 
+  Future<void> _openCameraDialog() async {
+    final result = await showDialog<MedicationExtractionResult>(
+      context: context,
+      builder: (context) => const MedicationCameraDialog(),
+    );
+
+    if (result != null && mounted) {
+      // Store extracted data for passing to subsequent screens
+      _extractedData = result;
+      
+      // Auto-fill form with extracted data
+      if (result.medicationName != null && result.medicationName!.isNotEmpty) {
+        _medicationNameController.text = result.medicationName!;
+      }
+
+      if (result.medicationType != null) {
+        setState(() {
+          _selectedType = result.medicationType!;
+        });
+      }
+
+      // Auto-fill intake advice if available
+      final extractedAdvice = result.getIntakeAdvice();
+      if (extractedAdvice != null) {
+        final adviceOptions = ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'];
+        if (adviceOptions.contains(extractedAdvice)) {
+          setState(() {
+            _selectedIntakeAdvice = extractedAdvice;
+            _showCustomAdviceField = false;
+          });
+        } else {
+          // Custom advice from label
+          setState(() {
+            _selectedIntakeAdvice = 'Po meri';
+            _showCustomAdviceField = true;
+            _customIntakeAdviceController.text = extractedAdvice;
+          });
+        }
+      }
+
+      // Build detailed success message
+      final List<String> extractedFields = [];
+      if (result.medicationName != null) extractedFields.add('ime');
+      if (result.medicationType != null) extractedFields.add('vrsta');
+      if (result.quantityInBox != null) extractedFields.add('količina v škatli');
+      if (result.dosageFrequency != null) extractedFields.add('pogostost jemanja');
+      if (result.patientName != null) extractedFields.add('pacient');
+      if (extractedAdvice != null) extractedFields.add('nasveti');
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            extractedFields.isNotEmpty
+                ? 'Zajeto: ${extractedFields.join(", ")}. Preverite in popravite po potrebi.'
+                : 'Slika zajeta, vendar informacije niso bile najdene. Izpolnite ročno.',
+          ),
+          backgroundColor: extractedFields.isNotEmpty ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      // Log extracted data for debugging
+      if (result.notes != null && result.notes!.isNotEmpty) {
+        developer.log('Medication extraction notes: ${result.notes}');
+      }
+      if (result.dosageFrequency?.rawText != null) {
+        developer.log('Dosage frequency text: ${result.dosageFrequency!.rawText}');
+      }
+    }
+  }
+
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedUserId == null) {
@@ -218,6 +294,8 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
             'medType': _selectedType,
             'intakeAdvice': intakeAdvice,
             'userId': _selectedUserId,
+            // Pass extracted data for auto-filling subsequent screens
+            'extractedData': _extractedData,
           },
         );
       }
@@ -256,7 +334,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Name Input - Full Width
+                // Name Input - Full Width with Camera Icon
                 TextFormField(
                   controller: _medicationNameController,
                   decoration: InputDecoration(
@@ -266,6 +344,11 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Symbols.photo_camera),
+                      tooltip: 'Zajemi s kamero',
+                      onPressed: _openCameraDialog,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {

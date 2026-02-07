@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 import '../components/step_progress_indicator.dart';
 
 enum FrequencyOption { onceDaily, twiceDaily, asNeeded, moreOptions }
@@ -11,6 +12,7 @@ class MedicationFrequencySelectionScreen extends StatefulWidget {
   final MedicationType medType;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const MedicationFrequencySelectionScreen({
     super.key,
@@ -18,6 +20,7 @@ class MedicationFrequencySelectionScreen extends StatefulWidget {
     required this.medType,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -28,6 +31,18 @@ class MedicationFrequencySelectionScreen extends StatefulWidget {
 class _MedicationFrequencySelectionScreenState
     extends State<MedicationFrequencySelectionScreen> {
   FrequencyOption? _selectedFrequency;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-select frequency if extracted from label
+    if (widget.extractedData?.dosageFrequency != null) {
+      final suggestedFrequency = widget.extractedData!.dosageFrequency!.toFrequencyOption();
+      if (suggestedFrequency != null) {
+        _selectedFrequency = suggestedFrequency;
+      }
+    }
+  }
 
   String _getFrequencyLabel(FrequencyOption option) {
     switch (option) {
@@ -40,6 +55,12 @@ class _MedicationFrequencySelectionScreenState
       case FrequencyOption.moreOptions:
         return 'Potrebujem več opcij';
     }
+  }
+
+  /// Check if this option was suggested by AI
+  bool _isSuggestedByAI(FrequencyOption option) {
+    if (widget.extractedData?.dosageFrequency == null) return false;
+    return widget.extractedData!.dosageFrequency!.toFrequencyOption() == option;
   }
 
   void _handleNext() {
@@ -59,6 +80,7 @@ class _MedicationFrequencySelectionScreenState
           'medType': widget.medType,
           'intakeAdvice': widget.intakeAdvice,
           'userId': widget.userId,
+          'extractedData': widget.extractedData,
         },
       );
     } else {
@@ -70,6 +92,7 @@ class _MedicationFrequencySelectionScreenState
           'frequency': _selectedFrequency,
           'intakeAdvice': widget.intakeAdvice,
           'userId': widget.userId,
+          'extractedData': widget.extractedData,
         },
       );
     }
@@ -101,6 +124,38 @@ class _MedicationFrequencySelectionScreenState
                 ),
                 textAlign: TextAlign.center,
               ),
+              // Show AI suggestion hint if available
+              if (widget.extractedData?.dosageFrequency?.rawText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Symbols.auto_awesome,
+                        size: 16,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Z nalepke: "${widget.extractedData!.dosageFrequency!.rawText}"',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 48),
               Expanded(
                 child: ListView.separated(
@@ -112,6 +167,7 @@ class _MedicationFrequencySelectionScreenState
                     return _FrequencyOptionButton(
                       label: _getFrequencyLabel(option),
                       isSelected: _selectedFrequency == option,
+                      isSuggestedByAI: _isSuggestedByAI(option),
                       onTap: () {
                         setState(() {
                           _selectedFrequency = option;
@@ -150,11 +206,13 @@ class _MedicationFrequencySelectionScreenState
 class _FrequencyOptionButton extends StatelessWidget {
   final String label;
   final bool isSelected;
+  final bool isSuggestedByAI;
   final VoidCallback onTap;
 
   const _FrequencyOptionButton({
     required this.label,
     required this.isSelected,
+    this.isSuggestedByAI = false,
     required this.onTap,
   });
 
@@ -193,6 +251,28 @@ class _FrequencyOptionButton extends StatelessWidget {
                 ),
               ),
             ),
+            if (isSuggestedByAI)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Symbols.auto_awesome, size: 14, color: colors.onPrimaryContainer),
+                    const SizedBox(width: 4),
+                    Text(
+                      'AI',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

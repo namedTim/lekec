@@ -35,6 +35,7 @@ import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'features/core/providers/onboarding_provider.dart';
 import 'database/tables/medications.dart';
+import 'services/gemini_medication_service.dart';
 import 'ui/theme/app_theme.dart';
 import 'data/services/intake_schedule_generator.dart';
 import 'data/services/notification_service.dart';
@@ -116,6 +117,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -128,6 +130,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           frequency: extra['frequency'] as FrequencyOption,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -140,6 +143,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -178,6 +182,7 @@ final _router = GoRouter(
           medType: extra['medType'] as MedicationType,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -191,6 +196,7 @@ final _router = GoRouter(
           timesPerDay: extra['timesPerDay'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),

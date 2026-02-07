@@ -5,6 +5,7 @@ import '../../database/drift_database.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 import '../components/quantity_selector.dart';
 import '../components/step_progress_indicator.dart';
 import '../../features/core/providers/database_provider.dart';
@@ -13,7 +14,6 @@ import '../../data/services/notification_service.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/plan_service.dart';
 import 'dart:developer' as developer;
-import 'dart:convert';
 import 'medication_frequency_selection.dart' show FrequencyOption;
 import '../../main.dart' show homePageKey;
 
@@ -22,6 +22,7 @@ class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final FrequencyOption frequency;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const SimpleMedicationPlanningScreen({
     super.key,
@@ -29,6 +30,7 @@ class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.frequency,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -43,6 +45,49 @@ class _SimpleMedicationPlanningScreenState
   int _quantity = 1;
   int _initialQuantity = 0;
   bool _isSaving = false;
+  bool _isTimeAiSuggested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-fill from extracted data if available
+    if (widget.extractedData != null) {
+      // Set quantity per dose
+      if (widget.extractedData!.dosageFrequency?.amountPerDose != null) {
+        _quantity = widget.extractedData!.dosageFrequency!.amountPerDose!;
+      }
+      // Set initial quantity from box
+      if (widget.extractedData!.quantityInBox != null) {
+        _initialQuantity = widget.extractedData!.quantityInBox!;
+      }
+      // Set first intake time from AI suggestions
+      final suggestedTimes =
+          widget.extractedData!.dosageFrequency?.suggestedTimes;
+      if (suggestedTimes != null && suggestedTimes.isNotEmpty) {
+        final time = _parseTimeString(suggestedTimes[0]);
+        if (time != null) {
+          _firstIntakeTime = time;
+          _isTimeAiSuggested = true;
+        }
+      }
+    }
+  }
+
+  TimeOfDay? _parseTimeString(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = int.parse(parts[1]);
+        if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    return null;
+  }
 
   String _getFrequencyLabel() {
     switch (widget.frequency) {
@@ -75,7 +120,10 @@ class _SimpleMedicationPlanningScreenState
       initialTime: _firstIntakeTime ?? TimeOfDay.now(),
     );
     if (time != null) {
-      setState(() => _firstIntakeTime = time);
+      setState(() {
+        _firstIntakeTime = time;
+        _isTimeAiSuggested = false; // User changed it manually
+      });
     }
   }
 
@@ -289,6 +337,7 @@ class _SimpleMedicationPlanningScreenState
                       ? _firstIntakeTime!.format(context)
                       : 'Izberite čas',
                   onTap: _selectFirstIntakeTime,
+                  isAiSuggested: _isTimeAiSuggested,
                 ),
                 const SizedBox(height: 16),
 
@@ -362,12 +411,14 @@ class _PlanningCard extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback onTap;
+  final bool isAiSuggested;
 
   const _PlanningCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.onTap,
+    this.isAiSuggested = false,
   });
 
   @override
@@ -383,20 +434,51 @@ class _PlanningCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
+          border: isAiSuggested
+              ? Border.all(color: colors.onSurface, width: 2)
+              : null,
         ),
         child: Row(
           children: [
-            Icon(icon, color: colors.primary),
+            Icon(
+              isAiSuggested ? Symbols.auto_awesome : icon,
+              color: isAiSuggested ? colors.onSurface : colors.primary,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (isAiSuggested) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.onSurface,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.surface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(

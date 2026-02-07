@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 
 class MultipleTimesPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const MultipleTimesPlanningScreen({
     super.key,
@@ -16,6 +18,7 @@ class MultipleTimesPlanningScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -26,6 +29,24 @@ class MultipleTimesPlanningScreen extends ConsumerStatefulWidget {
 class _MultipleTimesPlanningScreenState
     extends ConsumerState<MultipleTimesPlanningScreen> {
   int _timesPerDay = 2;
+  bool _isAiSuggested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFromExtractedData();
+  }
+
+  void _initFromExtractedData() {
+    final extracted = widget.extractedData;
+    if (extracted?.dosageFrequency?.timesPerDay != null) {
+      final times = extracted!.dosageFrequency!.timesPerDay!;
+      if (times >= 1 && times <= 10) {
+        _timesPerDay = times;
+        _isAiSuggested = true;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,12 +82,47 @@ class _MultipleTimesPlanningScreenState
               ),
               const SizedBox(height: 32),
 
-              // Intakes label
-              Text(
-                'Intakes',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // Intakes label with AI badge
+              Row(
+                children: [
+                  Text(
+                    'Intakes',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_isAiSuggested) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.onSurface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Symbols.auto_awesome,
+                            size: 14,
+                            color: colors.surface,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'AI',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.surface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -76,6 +132,9 @@ class _MultipleTimesPlanningScreenState
                 decoration: BoxDecoration(
                   color: colors.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
+                  border: _isAiSuggested
+                      ? Border.all(color: colors.onSurface, width: 2)
+                      : null,
                 ),
                 child: DropdownButton<int>(
                   value: _timesPerDay,
@@ -90,7 +149,10 @@ class _MultipleTimesPlanningScreenState
                   }),
                   onChanged: (value) {
                     if (value != null) {
-                      setState(() => _timesPerDay = value);
+                      setState(() {
+                        _timesPerDay = value;
+                        _isAiSuggested = false; // User changed it manually
+                      });
                     }
                   },
                 ),
@@ -129,6 +191,7 @@ class _MultipleTimesPlanningScreenState
         'timesPerDay': _timesPerDay,
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,
+        'extractedData': widget.extractedData,
       },
     );
   }

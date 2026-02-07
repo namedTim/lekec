@@ -67,3 +67,6 @@ app.*.map.json
 
 # Local Database
 *.sqlite
+
+# API Keys - NEVER commit this file
+lib/config/api_keys.dart

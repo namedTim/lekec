@@ -59,5 +59,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Potrebujemo dostop do kamere za skeniranje oznak zdravil</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Potrebujemo dostop do galerije za izbiro slik zdravil</string>
 </dict>
 </plist>

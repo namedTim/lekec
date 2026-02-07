@@ -1,0 +1,12 @@
+// Template for API Keys configuration
+// 
+// INSTRUCTIONS:
+// 1. Copy this file and rename it to 'api_keys.dart' in the same directory
+// 2. Replace the placeholder value with your actual Gemini API key
+// 3. Get your API key from: https://makersuite.google.com/app/apikey
+// 4. NEVER commit api_keys.dart to version control (it's in .gitignore)
+
+class ApiKeys {
+  // Gemini API Key - Get yours at: https://makersuite.google.com/app/apikey
+  static const String geminiApiKey = 'YOUR_GEMINI_API_KEY_HERE';
+}
