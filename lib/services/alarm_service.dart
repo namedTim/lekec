@@ -51,22 +51,44 @@ class AlarmService {
   StreamSubscription<AlarmSet>? _updateSubscription;
   int? _currentAlarmId; // Track currently shown alarm to prevent duplicates
 
+  /// Maximum time (in minutes) after scheduled time that an alarm should still ring
+  /// After this, the alarm is considered "too late" and will be silently stopped
+  static const int _maxLateMinutes = 45;
+
   /// Initialize alarm listeners - call this once at app startup
   void initialize() {
     _ringSubscription = Alarm.ringing.listen(_onAlarmRinging);
     _updateSubscription = Alarm.scheduled.listen(_onAlarmsUpdated);
   }
 
+  /// Check if an alarm is too old to ring (past the grace period)
+  bool _isAlarmTooOld(AlarmSettings alarm) {
+    final now = DateTime.now();
+    final scheduledTime = alarm.dateTime;
+    final difference = now.difference(scheduledTime);
+    return difference.inMinutes > _maxLateMinutes;
+  }
+
   /// Check for ringing alarms on cold start and navigate if needed
   Future<void> checkInitialRingingAlarms() async {
     final ringingAlarms = Alarm.ringing.value.alarms;
-    if (ringingAlarms.isNotEmpty) {
-      // Wait a bit for the navigator to be ready
+    if (ringingAlarms.isEmpty) return;
+
+    // Check each ringing alarm
+    for (final alarm in ringingAlarms) {
+      if (_isAlarmTooOld(alarm)) {
+        // Alarm is too old, stop it silently
+        await Alarm.stop(alarm.id);
+        continue;
+      }
+
+      // Alarm is within grace period, show it
       await Future.delayed(const Duration(milliseconds: 100));
       final context = _navigatorKey.currentContext;
-      if (context != null && _currentAlarmId != ringingAlarms.first.id) {
-        _currentAlarmId = ringingAlarms.first.id;
-        context.push('/ring', extra: ringingAlarms.first);
+      if (context != null && _currentAlarmId != alarm.id) {
+        _currentAlarmId = alarm.id;
+        context.push('/ring', extra: alarm);
+        break; // Only show one alarm at a time
       }
     }
   }
@@ -79,10 +101,19 @@ class AlarmService {
       return;
     }
 
+    final alarm = alarmSet.alarms.first;
+
+    // Check if alarm is too old to ring
+    if (_isAlarmTooOld(alarm)) {
+      // Stop the alarm silently - it's too late
+      Alarm.stop(alarm.id);
+      return;
+    }
+
     final context = _navigatorKey.currentContext;
-    if (context != null && _currentAlarmId != alarmSet.alarms.first.id) {
-      _currentAlarmId = alarmSet.alarms.first.id;
-      context.push('/ring', extra: alarmSet.alarms.first);
+    if (context != null && _currentAlarmId != alarm.id) {
+      _currentAlarmId = alarm.id;
+      context.push('/ring', extra: alarm);
     }
   }
 
@@ -113,12 +144,12 @@ class AlarmService {
   /// This is needed when global alarm settings change
   Future<void> reloadAllAlarms() async {
     final alarms = await Alarm.getAlarms();
-    
+
     // Recreate each alarm to pick up new settings
     for (final alarm in alarms) {
       // Stop the alarm first
       await Alarm.stop(alarm.id);
-      
+
       // Recreate it with the same settings (alarm package will use new global settings)
       await Alarm.set(alarmSettings: alarm);
     }

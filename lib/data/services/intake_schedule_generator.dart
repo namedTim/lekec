@@ -143,21 +143,32 @@ class IntakeScheduleGenerator {
         );
     }
 
-    // Insert all scheduled times into the database
+    // Insert all scheduled times into the database, avoiding duplicates
+    int insertedCount = 0;
     for (final scheduledTime in scheduledTimes) {
-      await db
-          .into(db.medicationIntakeLogs)
-          .insert(
-            MedicationIntakeLogsCompanion.insert(
-              planId: plan.id,
-              medicationId: plan.medicationId,
-              userId: plan.userId,
-              scheduledTime: scheduledTime,
-            ),
-          );
+      // Check if entry already exists for this plan and scheduled time
+      final existing =
+          await (db.select(db.medicationIntakeLogs)
+                ..where((log) => log.planId.equals(plan.id))
+                ..where((log) => log.scheduledTime.equals(scheduledTime)))
+              .getSingleOrNull();
+
+      if (existing == null) {
+        await db
+            .into(db.medicationIntakeLogs)
+            .insert(
+              MedicationIntakeLogsCompanion.insert(
+                planId: plan.id,
+                medicationId: plan.medicationId,
+                userId: plan.userId,
+                scheduledTime: scheduledTime,
+              ),
+            );
+        insertedCount++;
+      }
     }
 
-    return scheduledTimes.length;
+    return insertedCount;
   }
 
   /// Generate schedule for "daily" rule with specific times
@@ -421,5 +432,47 @@ class IntakeScheduleGenerator {
     final horizon = now.add(Duration(days: generationHorizonDays));
 
     await _generateForPlan(plan, now, horizon);
+  }
+
+  /// Remove duplicate intake log entries (keeps the first occurrence)
+  /// Returns the number of duplicates removed
+  Future<int> removeDuplicateEntries() async {
+    developer.log(
+      'Removing duplicate intake log entries',
+      name: 'IntakeScheduler',
+    );
+
+    // Get all intake logs ordered by id (oldest first)
+    final allLogs = await (db.select(
+      db.medicationIntakeLogs,
+    )..orderBy([(t) => drift.OrderingTerm.asc(t.id)])).get();
+
+    // Track seen (planId, scheduledTime) combinations
+    final seen = <String>{};
+    final duplicateIds = <int>[];
+
+    for (final log in allLogs) {
+      final key = '${log.planId}_${log.scheduledTime.millisecondsSinceEpoch}';
+      if (seen.contains(key)) {
+        // This is a duplicate
+        duplicateIds.add(log.id);
+      } else {
+        seen.add(key);
+      }
+    }
+
+    // Delete duplicates
+    for (final id in duplicateIds) {
+      await (db.delete(
+        db.medicationIntakeLogs,
+      )..where((log) => log.id.equals(id))).go();
+    }
+
+    developer.log(
+      'Removed ${duplicateIds.length} duplicate entries',
+      name: 'IntakeScheduler',
+    );
+
+    return duplicateIds.length;
   }
 }

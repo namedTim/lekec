@@ -255,9 +255,7 @@ final _router = GoRouter(
       path: '/add-single-entry',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
-        return AddSingleEntryScreen(
-          userId: extra?['userId'] as int? ?? 1,
-        );
+        return AddSingleEntryScreen(userId: extra?['userId'] as int? ?? 1);
       },
     ),
     GoRoute(
@@ -364,6 +362,10 @@ Future<void> _initializeServicesInBackground() async {
 
     // Generate upcoming intake schedules
     final scheduleGenerator = IntakeScheduleGenerator(db);
+
+    // Clean up any duplicate entries first
+    await scheduleGenerator.removeDuplicateEntries();
+
     await scheduleGenerator.generateScheduledIntakes();
 
     // Schedule notifications for upcoming intakes
@@ -427,20 +429,12 @@ class MyApp extends ConsumerWidget {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: themeMode.value ?? ThemeMode.system,
-        home: const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
       error: (error, stack) => MaterialApp(
         title: 'Lekec',
         theme: AppTheme.light,
-        home: Scaffold(
-          body: Center(
-            child: Text('Napaka: $error'),
-          ),
-        ),
+        home: Scaffold(body: Center(child: Text('Napaka: $error'))),
       ),
     );
   }
