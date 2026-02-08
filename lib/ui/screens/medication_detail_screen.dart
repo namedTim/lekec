@@ -5,8 +5,10 @@ import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/confirmation_dialog.dart';
-import '../../main.dart' show db;
+import '../../main.dart' show db, homePageKey;
 import '../../data/services/notification_service.dart';
+import '../../data/services/intake_log_service.dart';
+import '../components/log_intake_sheet.dart';
 
 class MedicationDetailScreen extends StatefulWidget {
   final int medicationId;
@@ -20,6 +22,9 @@ class MedicationDetailScreen extends StatefulWidget {
   final bool criticalReminder;
   final VoidCallback onDelete;
   final VoidCallback onRefresh;
+  final bool isAsNeeded;
+  final int? planId;
+  final int? userId;
 
   const MedicationDetailScreen({
     super.key,
@@ -34,6 +39,9 @@ class MedicationDetailScreen extends StatefulWidget {
     required this.criticalReminder,
     required this.onDelete,
     required this.onRefresh,
+    this.isAsNeeded = false,
+    this.planId,
+    this.userId,
   });
 
   @override
@@ -42,11 +50,82 @@ class MedicationDetailScreen extends StatefulWidget {
 
 class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   late bool _criticalReminder;
+  late int _pillsRemaining;
 
   @override
   void initState() {
     super.initState();
     _criticalReminder = widget.criticalReminder;
+    _pillsRemaining = widget.pillsRemaining;
+  }
+
+  Future<void> _showLogIntakeSheet() async {
+    final result = await showLogIntakeSheet(
+      context: context,
+      medicationName: widget.medicationName,
+      medType: widget.medType,
+      defaultQuantity: widget.dosageAmount.toInt(),
+    );
+
+    if (result != null && mounted) {
+      final time = result['time'] as TimeOfDay;
+      final qty = result['quantity'] as int;
+      final now = DateTime.now();
+      final takenTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        time.hour,
+        time.minute,
+      );
+
+      try {
+        final intakeService = IntakeLogService(db);
+        await intakeService.logAsNeededIntake(
+          planId: widget.planId!,
+          medicationId: widget.medicationId,
+          userId: widget.userId!,
+          dosageAmount: qty.toDouble(),
+          takenTime: takenTime,
+        );
+
+        setState(() {
+          _pillsRemaining = (_pillsRemaining - qty).clamp(0, 99999);
+        });
+
+        widget.onRefresh();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+
+        if (mounted) {
+          final colors = Theme.of(context).colorScheme;
+          final timeStr =
+              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✓ $qty ${getMedicationUnitShort(widget.medType, qty)} ob $timeStr',
+                style: TextStyle(color: colors.onSurface),
+              ),
+              duration: const Duration(seconds: 2),
+              backgroundColor: colors.surfaceContainerHighest,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Napaka: $e'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _toggleCriticalReminder(bool value) async {
@@ -95,6 +174,29 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
       appBar: AppBar(
         title: const Text('Podrobnosti zdravila'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => ConfirmationDialog(
+                  title: 'Izbriši zdravilo?',
+                  message:
+                      'Ali ste prepričani, da želite izbrisati zdravilo "${widget.medicationName}"?',
+                  confirmText: 'Izbriši',
+                  cancelText: 'Prekliči',
+                ),
+              );
+              if (confirmed == true && context.mounted) {
+                widget.onDelete();
+                Navigator.of(context).pop();
+              }
+            },
+            icon: Icon(Symbols.delete, color: colors.error),
+            tooltip: 'Izbriši zdravilo',
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         children: [
@@ -203,7 +305,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'še ${widget.pillsRemaining} ${getMedicationUnitShort(widget.medType, widget.pillsRemaining)}',
+                            'še $_pillsRemaining ${getMedicationUnitShort(widget.medType, _pillsRemaining)}',
                             style: theme.textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colors.onPrimaryContainer,
@@ -276,35 +378,21 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
               ],
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            child: FilledButton.icon(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => ConfirmationDialog(
-                    title: 'Izbriši zdravilo?',
-                    message:
-                        'Ali ste prepričani, da želite izbrisati zdravilo "${widget.medicationName}"?',
-                    confirmText: 'Izbriši',
-                    cancelText: 'Prekliči',
-                  ),
-                );
-                if (confirmed == true && context.mounted) {
-                  widget.onDelete();
-                  Navigator.of(context).pop();
-                }
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.error,
-                foregroundColor: colors.onError,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+          if (widget.isAsNeeded &&
+              widget.planId != null &&
+              widget.userId != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: FilledButton.icon(
+                onPressed: _showLogIntakeSheet,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Symbols.add_circle),
+                label: const Text('Zabeleži vnos'),
               ),
-              icon: const Icon(Symbols.delete),
-              label: const Text('Izbriši zdravilo'),
             ),
-          ),
         ],
       ),
     );

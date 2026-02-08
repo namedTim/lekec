@@ -130,7 +130,7 @@ class IntakeLogService {
         db.medicationScheduleRules,
       )..where((t) => t.planId.equals(plan.id))).getSingleOrNull();
 
-      final isOneTime = rule?.ruleType == 'oneTime';
+      final isOneTime = rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
 
       final timeKey =
           '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
@@ -192,7 +192,8 @@ class IntakeLogService {
         medication != null &&
         medication.dosagesRemaining != null) {
       // Prevent negative values - clamp at 0
-      final newRemaining = (medication.dosagesRemaining! - plan.dosageAmount).clamp(0.0, double.infinity);
+      final newRemaining = (medication.dosagesRemaining! - plan.dosageAmount)
+          .clamp(0.0, double.infinity);
       await (db.update(
         db.medications,
       )..where((t) => t.id.equals(medication.id))).write(
@@ -259,5 +260,46 @@ class IntakeLogService {
             takenTime: drift.Value(DateTime.now()),
           ),
         );
+  }
+
+  /// Log an as-needed ("po potrebi") intake with custom time and quantity
+  Future<void> logAsNeededIntake({
+    required int planId,
+    required int medicationId,
+    required int userId,
+    required double dosageAmount,
+    required DateTime takenTime,
+  }) async {
+    // Create the intake log entry
+    await db
+        .into(db.medicationIntakeLogs)
+        .insert(
+          MedicationIntakeLogsCompanion(
+            planId: drift.Value(planId),
+            medicationId: drift.Value(medicationId),
+            userId: drift.Value(userId),
+            scheduledTime: drift.Value(takenTime),
+            wasTaken: const drift.Value(true),
+            takenTime: drift.Value(takenTime),
+            dosageAmount: drift.Value(dosageAmount),
+          ),
+        );
+
+    // Update medication remaining count
+    final medication = await (db.select(
+      db.medications,
+    )..where((t) => t.id.equals(medicationId))).getSingleOrNull();
+
+    if (medication != null && medication.dosagesRemaining != null) {
+      final newRemaining = (medication.dosagesRemaining! - dosageAmount).clamp(
+        0.0,
+        double.infinity,
+      );
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
+        MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+      );
+    }
   }
 }

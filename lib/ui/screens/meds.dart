@@ -13,11 +13,13 @@ import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
+import '../../data/services/intake_log_service.dart';
 import 'medication_detail_screen.dart';
 import 'user_medications_screen.dart';
 import '../widgets/user_card.dart';
 import '../widgets/add_user_dialog.dart';
 import '../widgets/empty_state_card.dart';
+import '../components/log_intake_sheet.dart';
 import '../../main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
@@ -283,6 +285,12 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                                 intakeAdvice: med['intakeAdvice'] as String?,
                                 criticalReminder:
                                     med['criticalReminder'] as bool,
+                                isAsNeeded:
+                                    (med['frequency'] as String) ==
+                                    'Po potrebi',
+                                planId: (med['plan'] as MedicationPlan?)?.id,
+                                userId:
+                                    (med['plan'] as MedicationPlan?)?.userId,
                                 onDelete: () => _deleteMedication(
                                   med['id'] as int,
                                   med['name'] as String,
@@ -351,6 +359,96 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                             med['id'] as int,
                             med['name'] as String,
                           ),
+                          isAsNeeded:
+                              (med['frequency'] as String) == 'Po potrebi',
+                          onLogIntake:
+                              (med['frequency'] as String) == 'Po potrebi' &&
+                                  (med['plan'] as MedicationPlan?) != null
+                              ? () async {
+                                  final plan = med['plan'] as MedicationPlan;
+                                  final result = await showLogIntakeSheet(
+                                    context: context,
+                                    medicationName: med['name'] as String,
+                                    medType: med['medType'] as MedicationType,
+                                    defaultQuantity: dosageCount,
+                                  );
+                                  if (result != null && mounted) {
+                                    final time = result['time'] as TimeOfDay;
+                                    final qty = result['quantity'] as int;
+                                    final now = DateTime.now();
+                                    final takenTime = DateTime(
+                                      now.year,
+                                      now.month,
+                                      now.day,
+                                      time.hour,
+                                      time.minute,
+                                    );
+                                    try {
+                                      final database = ref.read(
+                                        databaseProvider,
+                                      );
+                                      final intakeService = IntakeLogService(
+                                        database,
+                                      );
+                                      await intakeService.logAsNeededIntake(
+                                        planId: plan.id,
+                                        medicationId: med['id'] as int,
+                                        userId: plan.userId,
+                                        dosageAmount: qty.toDouble(),
+                                        takenTime: takenTime,
+                                      );
+                                      if (mounted) {
+                                        final colors = Theme.of(
+                                          context,
+                                        ).colorScheme;
+                                        final timeStr =
+                                            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).clearSnackBars();
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '✓ $qty ${getMedicationUnitShort(med['medType'] as MedicationType, qty)} ob $timeStr',
+                                              style: TextStyle(
+                                                color: colors.onSurface,
+                                              ),
+                                            ),
+                                            duration: const Duration(
+                                              seconds: 2,
+                                            ),
+                                            backgroundColor:
+                                                colors.surfaceContainerHighest,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        _refreshMedications();
+                                        homePageKey.currentState
+                                            ?.loadTodaysIntakes(
+                                              autoScroll: false,
+                                            );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).clearSnackBars();
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Napaka: $e'),
+                                            backgroundColor: Colors.red,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                }
+                              : null,
                         ),
                       );
                     },

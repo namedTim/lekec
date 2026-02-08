@@ -15,16 +15,20 @@ class MedicationDetailsCard extends StatelessWidget {
     required this.medType,
     this.onAddMedication,
     this.onDelete,
+    this.isAsNeeded = false,
+    this.onLogIntake,
   });
 
   final String medName;
   final String dosage;
   final int pillsRemaining;
-  final String frequency; // e.g., "2x dnevno", "1x dnevno"
-  final List<String> times; // e.g., ["8:00", "20:00"]
+  final String frequency;
+  final List<String> times;
   final MedicationType medType;
   final Function(int)? onAddMedication;
   final VoidCallback? onDelete;
+  final bool isAsNeeded;
+  final VoidCallback? onLogIntake;
 
   Color _getPillCountColor(int count) {
     if (count >= 20) {
@@ -180,19 +184,48 @@ class MedicationDetailsCard extends StatelessWidget {
               ),
             ),
 
-            // Add button
-            Container(
-              margin: const EdgeInsets.only(left: 12),
-              decoration: BoxDecoration(
-                color: colors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                onPressed: () => _handleAddMedication(context),
-                icon: const Icon(Symbols.add),
-                color: colors.onPrimary,
-                tooltip: 'Dodaj zdravilo',
-              ),
+            // Action buttons
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isAsNeeded && onLogIntake != null)
+                  Container(
+                    margin: const EdgeInsets.only(left: 12, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: onLogIntake,
+                      icon: const Icon(Symbols.add_circle),
+                      color: colors.onPrimary,
+                      tooltip: 'Zabeleži vnos',
+                      iconSize: 22,
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                    ),
+                  ),
+                Container(
+                  margin: const EdgeInsets.only(left: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: () => _handleAddMedication(context),
+                    icon: const Icon(Symbols.add),
+                    color: colors.onSurfaceVariant,
+                    tooltip: 'Upravljaj zalogo',
+                    iconSize: 22,
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -2086,6 +2086,17 @@ class $MedicationIntakeLogsTable extends MedicationIntakeLogs
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _dosageAmountMeta = const VerificationMeta(
+    'dosageAmount',
+  );
+  @override
+  late final GeneratedColumn<double> dosageAmount = GeneratedColumn<double>(
+    'dosage_amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2095,6 +2106,7 @@ class $MedicationIntakeLogsTable extends MedicationIntakeLogs
     scheduledTime,
     takenTime,
     wasTaken,
+    dosageAmount,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2161,6 +2173,15 @@ class $MedicationIntakeLogsTable extends MedicationIntakeLogs
         wasTaken.isAcceptableOrUnknown(data['was_taken']!, _wasTakenMeta),
       );
     }
+    if (data.containsKey('dosage_amount')) {
+      context.handle(
+        _dosageAmountMeta,
+        dosageAmount.isAcceptableOrUnknown(
+          data['dosage_amount']!,
+          _dosageAmountMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2198,6 +2219,10 @@ class $MedicationIntakeLogsTable extends MedicationIntakeLogs
         DriftSqlType.bool,
         data['${effectivePrefix}was_taken'],
       )!,
+      dosageAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}dosage_amount'],
+      ),
     );
   }
 
@@ -2216,6 +2241,9 @@ class MedicationIntakeLog extends DataClass
   final DateTime scheduledTime;
   final DateTime? takenTime;
   final bool wasTaken;
+
+  /// The dosage amount taken (used for as-needed entries where dosage may vary)
+  final double? dosageAmount;
   const MedicationIntakeLog({
     required this.id,
     required this.planId,
@@ -2224,6 +2252,7 @@ class MedicationIntakeLog extends DataClass
     required this.scheduledTime,
     this.takenTime,
     required this.wasTaken,
+    this.dosageAmount,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2237,6 +2266,9 @@ class MedicationIntakeLog extends DataClass
       map['taken_time'] = Variable<DateTime>(takenTime);
     }
     map['was_taken'] = Variable<bool>(wasTaken);
+    if (!nullToAbsent || dosageAmount != null) {
+      map['dosage_amount'] = Variable<double>(dosageAmount);
+    }
     return map;
   }
 
@@ -2251,6 +2283,9 @@ class MedicationIntakeLog extends DataClass
           ? const Value.absent()
           : Value(takenTime),
       wasTaken: Value(wasTaken),
+      dosageAmount: dosageAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dosageAmount),
     );
   }
 
@@ -2267,6 +2302,7 @@ class MedicationIntakeLog extends DataClass
       scheduledTime: serializer.fromJson<DateTime>(json['scheduledTime']),
       takenTime: serializer.fromJson<DateTime?>(json['takenTime']),
       wasTaken: serializer.fromJson<bool>(json['wasTaken']),
+      dosageAmount: serializer.fromJson<double?>(json['dosageAmount']),
     );
   }
   @override
@@ -2280,6 +2316,7 @@ class MedicationIntakeLog extends DataClass
       'scheduledTime': serializer.toJson<DateTime>(scheduledTime),
       'takenTime': serializer.toJson<DateTime?>(takenTime),
       'wasTaken': serializer.toJson<bool>(wasTaken),
+      'dosageAmount': serializer.toJson<double?>(dosageAmount),
     };
   }
 
@@ -2291,6 +2328,7 @@ class MedicationIntakeLog extends DataClass
     DateTime? scheduledTime,
     Value<DateTime?> takenTime = const Value.absent(),
     bool? wasTaken,
+    Value<double?> dosageAmount = const Value.absent(),
   }) => MedicationIntakeLog(
     id: id ?? this.id,
     planId: planId ?? this.planId,
@@ -2299,6 +2337,7 @@ class MedicationIntakeLog extends DataClass
     scheduledTime: scheduledTime ?? this.scheduledTime,
     takenTime: takenTime.present ? takenTime.value : this.takenTime,
     wasTaken: wasTaken ?? this.wasTaken,
+    dosageAmount: dosageAmount.present ? dosageAmount.value : this.dosageAmount,
   );
   MedicationIntakeLog copyWithCompanion(MedicationIntakeLogsCompanion data) {
     return MedicationIntakeLog(
@@ -2313,6 +2352,9 @@ class MedicationIntakeLog extends DataClass
           : this.scheduledTime,
       takenTime: data.takenTime.present ? data.takenTime.value : this.takenTime,
       wasTaken: data.wasTaken.present ? data.wasTaken.value : this.wasTaken,
+      dosageAmount: data.dosageAmount.present
+          ? data.dosageAmount.value
+          : this.dosageAmount,
     );
   }
 
@@ -2325,7 +2367,8 @@ class MedicationIntakeLog extends DataClass
           ..write('userId: $userId, ')
           ..write('scheduledTime: $scheduledTime, ')
           ..write('takenTime: $takenTime, ')
-          ..write('wasTaken: $wasTaken')
+          ..write('wasTaken: $wasTaken, ')
+          ..write('dosageAmount: $dosageAmount')
           ..write(')'))
         .toString();
   }
@@ -2339,6 +2382,7 @@ class MedicationIntakeLog extends DataClass
     scheduledTime,
     takenTime,
     wasTaken,
+    dosageAmount,
   );
   @override
   bool operator ==(Object other) =>
@@ -2350,7 +2394,8 @@ class MedicationIntakeLog extends DataClass
           other.userId == this.userId &&
           other.scheduledTime == this.scheduledTime &&
           other.takenTime == this.takenTime &&
-          other.wasTaken == this.wasTaken);
+          other.wasTaken == this.wasTaken &&
+          other.dosageAmount == this.dosageAmount);
 }
 
 class MedicationIntakeLogsCompanion
@@ -2362,6 +2407,7 @@ class MedicationIntakeLogsCompanion
   final Value<DateTime> scheduledTime;
   final Value<DateTime?> takenTime;
   final Value<bool> wasTaken;
+  final Value<double?> dosageAmount;
   const MedicationIntakeLogsCompanion({
     this.id = const Value.absent(),
     this.planId = const Value.absent(),
@@ -2370,6 +2416,7 @@ class MedicationIntakeLogsCompanion
     this.scheduledTime = const Value.absent(),
     this.takenTime = const Value.absent(),
     this.wasTaken = const Value.absent(),
+    this.dosageAmount = const Value.absent(),
   });
   MedicationIntakeLogsCompanion.insert({
     this.id = const Value.absent(),
@@ -2379,6 +2426,7 @@ class MedicationIntakeLogsCompanion
     required DateTime scheduledTime,
     this.takenTime = const Value.absent(),
     this.wasTaken = const Value.absent(),
+    this.dosageAmount = const Value.absent(),
   }) : planId = Value(planId),
        medicationId = Value(medicationId),
        userId = Value(userId),
@@ -2391,6 +2439,7 @@ class MedicationIntakeLogsCompanion
     Expression<DateTime>? scheduledTime,
     Expression<DateTime>? takenTime,
     Expression<bool>? wasTaken,
+    Expression<double>? dosageAmount,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2400,6 +2449,7 @@ class MedicationIntakeLogsCompanion
       if (scheduledTime != null) 'scheduled_time': scheduledTime,
       if (takenTime != null) 'taken_time': takenTime,
       if (wasTaken != null) 'was_taken': wasTaken,
+      if (dosageAmount != null) 'dosage_amount': dosageAmount,
     });
   }
 
@@ -2411,6 +2461,7 @@ class MedicationIntakeLogsCompanion
     Value<DateTime>? scheduledTime,
     Value<DateTime?>? takenTime,
     Value<bool>? wasTaken,
+    Value<double?>? dosageAmount,
   }) {
     return MedicationIntakeLogsCompanion(
       id: id ?? this.id,
@@ -2420,6 +2471,7 @@ class MedicationIntakeLogsCompanion
       scheduledTime: scheduledTime ?? this.scheduledTime,
       takenTime: takenTime ?? this.takenTime,
       wasTaken: wasTaken ?? this.wasTaken,
+      dosageAmount: dosageAmount ?? this.dosageAmount,
     );
   }
 
@@ -2447,6 +2499,9 @@ class MedicationIntakeLogsCompanion
     if (wasTaken.present) {
       map['was_taken'] = Variable<bool>(wasTaken.value);
     }
+    if (dosageAmount.present) {
+      map['dosage_amount'] = Variable<double>(dosageAmount.value);
+    }
     return map;
   }
 
@@ -2459,7 +2514,8 @@ class MedicationIntakeLogsCompanion
           ..write('userId: $userId, ')
           ..write('scheduledTime: $scheduledTime, ')
           ..write('takenTime: $takenTime, ')
-          ..write('wasTaken: $wasTaken')
+          ..write('wasTaken: $wasTaken, ')
+          ..write('dosageAmount: $dosageAmount')
           ..write(')'))
         .toString();
   }
@@ -5466,6 +5522,7 @@ typedef $$MedicationIntakeLogsTableCreateCompanionBuilder =
       required DateTime scheduledTime,
       Value<DateTime?> takenTime,
       Value<bool> wasTaken,
+      Value<double?> dosageAmount,
     });
 typedef $$MedicationIntakeLogsTableUpdateCompanionBuilder =
     MedicationIntakeLogsCompanion Function({
@@ -5476,6 +5533,7 @@ typedef $$MedicationIntakeLogsTableUpdateCompanionBuilder =
       Value<DateTime> scheduledTime,
       Value<DateTime?> takenTime,
       Value<bool> wasTaken,
+      Value<double?> dosageAmount,
     });
 
 final class $$MedicationIntakeLogsTableReferences
@@ -5583,6 +5641,11 @@ class $$MedicationIntakeLogsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get dosageAmount => $composableBuilder(
+    column: $table.dosageAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$MedicationPlansTableFilterComposer get planId {
     final $$MedicationPlansTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -5682,6 +5745,11 @@ class $$MedicationIntakeLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get dosageAmount => $composableBuilder(
+    column: $table.dosageAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$MedicationPlansTableOrderingComposer get planId {
     final $$MedicationPlansTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5774,6 +5842,11 @@ class $$MedicationIntakeLogsTableAnnotationComposer
 
   GeneratedColumn<bool> get wasTaken =>
       $composableBuilder(column: $table.wasTaken, builder: (column) => column);
+
+  GeneratedColumn<double> get dosageAmount => $composableBuilder(
+    column: $table.dosageAmount,
+    builder: (column) => column,
+  );
 
   $$MedicationPlansTableAnnotationComposer get planId {
     final $$MedicationPlansTableAnnotationComposer composer = $composerBuilder(
@@ -5888,6 +5961,7 @@ class $$MedicationIntakeLogsTableTableManager
                 Value<DateTime> scheduledTime = const Value.absent(),
                 Value<DateTime?> takenTime = const Value.absent(),
                 Value<bool> wasTaken = const Value.absent(),
+                Value<double?> dosageAmount = const Value.absent(),
               }) => MedicationIntakeLogsCompanion(
                 id: id,
                 planId: planId,
@@ -5896,6 +5970,7 @@ class $$MedicationIntakeLogsTableTableManager
                 scheduledTime: scheduledTime,
                 takenTime: takenTime,
                 wasTaken: wasTaken,
+                dosageAmount: dosageAmount,
               ),
           createCompanionCallback:
               ({
@@ -5906,6 +5981,7 @@ class $$MedicationIntakeLogsTableTableManager
                 required DateTime scheduledTime,
                 Value<DateTime?> takenTime = const Value.absent(),
                 Value<bool> wasTaken = const Value.absent(),
+                Value<double?> dosageAmount = const Value.absent(),
               }) => MedicationIntakeLogsCompanion.insert(
                 id: id,
                 planId: planId,
@@ -5914,6 +5990,7 @@ class $$MedicationIntakeLogsTableTableManager
                 scheduledTime: scheduledTime,
                 takenTime: takenTime,
                 wasTaken: wasTaken,
+                dosageAmount: dosageAmount,
               ),
           withReferenceMapper: (p0) => p0
               .map(

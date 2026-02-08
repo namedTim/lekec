@@ -14,4 +14,7 @@ class MedicationIntakeLogs extends Table {
       .nullable()(); // Set when user takes ANY action (taken or not taken)
 
   BoolColumn get wasTaken => boolean().withDefault(const Constant(false))();
+  
+  /// The dosage amount taken (used for as-needed entries where dosage may vary)
+  RealColumn get dosageAmount => real().nullable()();
 }

@@ -344,6 +344,32 @@ class DashboardScreenState extends State<DashboardScreen>
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
+    // Pre-compute running remaining count per intake
+    // Walk all intakes in time order, decrement per medication
+    final Map<int, int> _runningRemaining = {};
+    {
+      final Map<int, double> medRunning = {}; // medicationId → running count
+      for (final timeKey in _groupedIntakes.keys) {
+        for (final intakeData in _groupedIntakes[timeKey]!) {
+          final medication = intakeData['medication'] as Medication;
+          final plan = intakeData['plan'] as MedicationPlan?;
+          final intake = intakeData['intake'] as MedicationIntakeLog;
+          // Use intake's dosageAmount if set (for as-needed entries), otherwise plan's
+          final dosageAmount = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
+
+          // Initialize with medication's current remaining if first encounter
+          if (!medRunning.containsKey(medication.id)) {
+            medRunning[medication.id] = (medication.dosagesRemaining ?? 0)
+                .toDouble();
+          }
+
+          // Decrement and store for this intake
+          medRunning[medication.id] = medRunning[medication.id]! - dosageAmount;
+          _runningRemaining[intake.id] = medRunning[medication.id]!.toInt();
+        }
+      }
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -461,19 +487,18 @@ class DashboardScreenState extends State<DashboardScreen>
                                     status == MedicationStatus.upcoming &&
                                     isInBorderWindow;
 
-                                // For one-time entries, dosage is stored in the intake log
-                                final dosageAmount = plan?.dosageAmount ?? 1.0;
+                                // For as-needed entries, dosage is stored in the intake log
+                                // Otherwise, use plan dosage
+                                final dosageAmount = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
                                 final dosageCount = dosageAmount.toInt();
 
                                 // Get user name
                                 final userName =
                                     _userNames[intake.userId] ?? 'Unknown';
 
-                                // Calculate remaining pills after this dosage
-                                final currentRemaining =
-                                    medication.dosagesRemaining ?? 0;
+                                // Get pre-computed running remaining for this intake
                                 final remainingAfterDose =
-                                    (currentRemaining - dosageAmount).toInt();
+                                    _runningRemaining[intake.id] ?? 0;
 
                                 // Enable swipes only if time has passed (isPast)
                                 // For future medications, disable swiping
@@ -505,7 +530,7 @@ class DashboardScreenState extends State<DashboardScreen>
                                           '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
                                       scheduledTime: intake.scheduledTime,
                                       dosageAmount: dosageAmount,
-                                      pillsRemaining: currentRemaining > 0
+                                      pillsRemaining: remainingAfterDose > 0
                                           ? remainingAfterDose
                                           : null,
                                       userName: userName,
