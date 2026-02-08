@@ -273,9 +273,10 @@ final _router = GoRouter(
       path: '/add-single-entry/quantity',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return AddSingleEntryQuantityScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           userId: extra['userId'] as int,
         );
       },

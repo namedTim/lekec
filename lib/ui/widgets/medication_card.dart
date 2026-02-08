@@ -135,68 +135,68 @@ class _MedicationCardState extends State<MedicationCard> {
           ),
           child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  right: 56,
-                ), // Space for status icon
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Medicine name and dosage in same row
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Left content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            widget.medName,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                        // Medicine name and dosage in same row
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                widget.medName,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              widget.dosage,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Remaining pills / info chip
+                        if (widget.medicineRemaining.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getPillCountColor(widget.pillCount),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              widget.medicineRemaining,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          widget.dosage,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
+                        ],
+                        // Add bottom padding when username is visible
+                        if (widget.showName) const SizedBox(height: 16),
                       ],
                     ),
+                  ),
 
-                    const SizedBox(height: 8),
-
-                    // Remaining pills / info chip
-                    if (widget.medicineRemaining.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getPillCountColor(widget.pillCount),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          widget.medicineRemaining,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    // Add bottom padding when username is visible
-                    if (widget.showName) const SizedBox(height: 16),
-                  ],
-                ),
+                  // Status indicator icon
+                  _buildStatusIcon(colors),
+                ],
               ),
 
-              // Status indicator icon positioned at the right
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: 0,
-                child: _buildStatusIcon(colors),
-              ),
               // Username in bottom right corner
               if (widget.showName)
                 Positioned(
