@@ -136,10 +136,12 @@ final _router = GoRouter(
       path: '/add-medication/simple-planning',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
+        final frequencyIndex = extra['frequencyIndex'] as int;
         return SimpleMedicationPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
-          frequency: extra['frequency'] as FrequencyOption,
+          medType: MedicationType.values[medTypeIndex],
+          frequency: FrequencyOption.values[frequencyIndex],
           userId: extra['userId'] as int,
           extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
@@ -149,9 +151,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return AdvancedMedicationPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
           extractedData: extra['extractedData'] as MedicationExtractionResult?,
@@ -162,9 +165,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/interval',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return IntervalPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
         );
@@ -174,10 +178,12 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/interval/configure',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
+        final intervalTypeIndex = extra['intervalTypeIndex'] as int;
         return IntervalConfigureScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
-          intervalType: extra['intervalType'] as IntervalType,
+          medType: MedicationType.values[medTypeIndex],
+          intervalType: IntervalType.values[intervalTypeIndex],
           intervalValue: extra['intervalValue'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
@@ -188,9 +194,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/multiple-times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MultipleTimesPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
           extractedData: extra['extractedData'] as MedicationExtractionResult?,
@@ -201,9 +208,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/multiple-times/times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MultipleTimesSelectTimesScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           timesPerDay: extra['timesPerDay'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
@@ -215,9 +223,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/specific-days',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return SpecificDaysPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
         );
@@ -227,9 +236,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/specific-days/times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return SpecificDaysSelectTimesScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           selectedDays: List<int>.from(extra['selectedDays'] as List),
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
@@ -240,9 +250,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/cyclic',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return CyclicPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
         );
@@ -252,9 +263,10 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/cyclic/configure',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return CyclicConfigureScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           takingDays: extra['takingDays'] as int,
           pauseDays: extra['pauseDays'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,

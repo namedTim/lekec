@@ -77,7 +77,7 @@ class _MedicationFrequencySelectionScreenState
         '/add-medication/advanced-planning',
         extra: {
           'name': widget.medicationName,
-          'medType': widget.medType,
+          'medTypeIndex': widget.medType.index,
           'intakeAdvice': widget.intakeAdvice,
           'userId': widget.userId,
           'extractedData': widget.extractedData,
@@ -88,8 +88,8 @@ class _MedicationFrequencySelectionScreenState
         '/add-medication/simple-planning',
         extra: {
           'name': widget.medicationName,
-          'medType': widget.medType,
-          'frequency': _selectedFrequency,
+          'medTypeIndex': widget.medType.index,
+          'frequencyIndex': _selectedFrequency!.index,
           'intakeAdvice': widget.intakeAdvice,
           'userId': widget.userId,
           'extractedData': widget.extractedData,

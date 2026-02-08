@@ -281,7 +281,7 @@ class _AdvancedMedicationPlanningScreenState
           '/add-medication/advanced-planning/interval',
           extra: {
             'name': widget.medicationName,
-            'medType': widget.medType,
+            'medTypeIndex': widget.medType.index,
             'intakeAdvice': widget.intakeAdvice,
             'userId': widget.userId,
             'extractedData': widget.extractedData,
@@ -293,7 +293,7 @@ class _AdvancedMedicationPlanningScreenState
           '/add-medication/advanced-planning/multiple-times',
           extra: {
             'name': widget.medicationName,
-            'medType': widget.medType,
+            'medTypeIndex': widget.medType.index,
             'intakeAdvice': widget.intakeAdvice,
             'userId': widget.userId,
             'extractedData': widget.extractedData,
@@ -305,7 +305,7 @@ class _AdvancedMedicationPlanningScreenState
           '/add-medication/advanced-planning/specific-days',
           extra: {
             'name': widget.medicationName,
-            'medType': widget.medType,
+            'medTypeIndex': widget.medType.index,
             'intakeAdvice': widget.intakeAdvice,
             'userId': widget.userId,
             'extractedData': widget.extractedData,
@@ -317,7 +317,7 @@ class _AdvancedMedicationPlanningScreenState
           '/add-medication/advanced-planning/cyclic',
           extra: {
             'name': widget.medicationName,
-            'medType': widget.medType,
+            'medTypeIndex': widget.medType.index,
             'intakeAdvice': widget.intakeAdvice,
             'userId': widget.userId,
             'extractedData': widget.extractedData,

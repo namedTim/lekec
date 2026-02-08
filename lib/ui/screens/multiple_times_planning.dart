@@ -187,7 +187,7 @@ class _MultipleTimesPlanningScreenState
       '/add-medication/advanced-planning/multiple-times/times',
       extra: {
         'name': widget.medicationName,
-        'medType': widget.medType,
+        'medTypeIndex': widget.medType.index,
         'timesPerDay': _timesPerDay,
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,

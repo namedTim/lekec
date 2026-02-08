@@ -158,7 +158,7 @@ class _SpecificDaysPlanningScreenState
       '/add-medication/advanced-planning/specific-days/times',
       extra: {
         'name': widget.medicationName,
-        'medType': widget.medType,
+        'medTypeIndex': widget.medType.index,
         'selectedDays': _selectedDays.toList(),
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,

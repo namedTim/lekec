@@ -11,26 +11,39 @@ class MedicationCameraDialog extends StatefulWidget {
   State<MedicationCameraDialog> createState() => _MedicationCameraDialogState();
 }
 
-class _MedicationCameraDialogState extends State<MedicationCameraDialog> {
+enum _CapturePhase { camera, captured, processing, done, error }
+
+class _MedicationCameraDialogState extends State<MedicationCameraDialog>
+    with SingleTickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isInitialized = false;
-  bool _isProcessing = false;
+  _CapturePhase _phase = _CapturePhase.camera;
   String? _errorMessage;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
     _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
     try {
       _cameras = await availableCameras();
-      
+
       if (_cameras == null || _cameras!.isEmpty) {
         setState(() {
-          _errorMessage = 'No cameras available';
+          _phase = _CapturePhase.error;
+          _errorMessage = 'Kamera ni na voljo';
         });
         return;
       }
@@ -42,15 +55,14 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog> {
       );
 
       await _cameraController!.initialize();
-      
+
       if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
+        setState(() => _isInitialized = true);
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to initialize camera: $e';
+        _phase = _CapturePhase.error;
+        _errorMessage = 'Napaka kamere';
       });
     }
   }
@@ -60,41 +72,55 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog> {
       return;
     }
 
-    setState(() {
-      _isProcessing = true;
-    });
-
     try {
+      // Phase 1: Capture
       final XFile image = await _cameraController!.takePicture();
-      final File imageFile = File(image.path);
 
-      // Call Gemini API to extract medication info
+      setState(() => _phase = _CapturePhase.captured);
+
+      // Brief flash to confirm capture
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      // Phase 2: Processing
+      setState(() {
+        _phase = _CapturePhase.processing;
+      });
+      _pulseController.repeat(reverse: true);
+
+      final File imageFile = File(image.path);
       final geminiService = GeminiMedicationService();
       final result = await geminiService.extractMedicationInfo(imageFile);
+
+      _pulseController.stop();
+
+      // Phase 3: Done
+      setState(() => _phase = _CapturePhase.done);
+      await Future.delayed(const Duration(milliseconds: 500));
 
       if (mounted) {
         Navigator.of(context).pop(result);
       }
     } catch (e) {
+      _pulseController.stop();
       setState(() {
-        _isProcessing = false;
-        _errorMessage = 'Error capturing image: $e';
+        _phase = _CapturePhase.error;
+        _errorMessage = 'Ni uspelo. Poskusite znova.';
       });
-      
+
       await Future.delayed(const Duration(seconds: 2));
-      
+
       if (mounted) {
         setState(() {
+          _phase = _CapturePhase.camera;
           _errorMessage = null;
         });
       }
     }
   }
 
-
-
   @override
   void dispose() {
+    _pulseController.dispose();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -105,100 +131,221 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog> {
     final colors = theme.colorScheme;
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(20),
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height * 0.55,
+        color: Colors.black,
         child: Column(
           children: [
             // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Fotografiraj zdravilo',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Colors.black,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.auto_awesome,
+                        color: colors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'AI zajem',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Symbols.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Camera Preview
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: colors.outline,
-                    width: 2,
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Symbols.close, color: Colors.white70),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                    ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildCameraPreview(),
-                ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            // Camera / Status area
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Camera preview or captured image
+                  _buildPreviewArea(colors),
 
-            // Error message
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Symbols.error, color: colors.error, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(color: colors.onErrorContainer),
+                  // Overlay for captured/processing/done states
+                  if (_phase == _CapturePhase.captured)
+                    Container(
+                      color: Colors.white.withOpacity(0.9),
+                      child: Center(
+                        child: Icon(
+                          Symbols.check_circle,
+                          size: 72,
+                          color: Colors.green.shade400,
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-            if (_errorMessage != null) const SizedBox(height: 16),
-
-            // Capture button
-            FilledButton.icon(
-              onPressed: _isProcessing || !_isInitialized 
-                  ? null 
-                  : _captureAndProcess,
-              icon: _isProcessing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                  if (_phase == _CapturePhase.processing)
+                    Container(
+                      color: Colors.black.withOpacity(0.75),
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _pulseAnimation,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _pulseAnimation.value,
+                              child: child,
+                            );
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: colors.primary.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Symbols.auto_awesome,
+                                  size: 48,
+                                  color: colors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Analiziram...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: 160,
+                                child: LinearProgressIndicator(
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: colors.primary,
+                                  backgroundColor: Colors.white24,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    )
-                  : const Icon(Symbols.photo_camera),
-              label: Text(_isProcessing ? 'Obdelava...' : 'Zajemi'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                    ),
+
+                  if (_phase == _CapturePhase.done)
+                    Container(
+                      color: Colors.black.withOpacity(0.75),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Symbols.check_circle,
+                                size: 56,
+                                color: Colors.green,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Zaključeno!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  if (_phase == _CapturePhase.error && _errorMessage != null)
+                    Container(
+                      color: Colors.black.withOpacity(0.75),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Symbols.error, size: 56, color: colors.error),
+                            const SizedBox(height: 16),
+                            Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
+
+            // Bottom area
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              color: Colors.black,
+              child: _phase == _CapturePhase.camera
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Usmerite kamero na škatlo ali nalepko',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: _captureAndProcess,
+                          child: Container(
+                            width: 68,
+                            height: 68,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.5),
+                                width: 4,
+                              ),
+                            ),
+                            child: const Icon(
+                              Symbols.photo_camera,
+                              size: 30,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const SizedBox(height: 68),
             ),
           ],
         ),
@@ -206,66 +353,28 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog> {
     );
   }
 
-  Widget _buildCameraPreview() {
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Symbols.error,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget _buildPreviewArea(ColorScheme colors) {
     if (!_isInitialized || _cameraController == null) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child: CircularProgressIndicator(color: Colors.white),
       );
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        CameraPreview(_cameraController!),
-        
-        // Overlay with hint
-        Positioned(
-          bottom: 20,
-          left: 20,
-          right: 20,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'Usmerite kamero na oznako zdravila',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-              ),
-            ),
+    final cameraAspect = _cameraController!.value.aspectRatio; // height/width
+    return ClipRect(
+      child: OverflowBox(
+        alignment: Alignment.center,
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: 1,
+            height: cameraAspect,
+            child: CameraPreview(_cameraController!),
           ),
         ),
-      ],
+      ),
     );
   }
 }

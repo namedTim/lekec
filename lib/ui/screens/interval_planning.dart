@@ -202,8 +202,8 @@ class _IntervalPlanningScreenState
       '/add-medication/advanced-planning/interval/configure',
       extra: {
         'name': widget.medicationName,
-        'medType': widget.medType,
-        'intervalType': _selectedType,
+        'medTypeIndex': widget.medType.index,
+        'intervalTypeIndex': _selectedType.index,
         'intervalValue': _intervalValue,
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,

@@ -8,6 +8,7 @@ import '../../features/core/providers/database_provider.dart';
 import '../components/step_progress_indicator.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/medication_camera_dialog.dart';
+import '../components/label_scanner_screen.dart';
 import '../../services/gemini_medication_service.dart';
 import 'dart:developer' as developer;
 
@@ -248,6 +249,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   Future<void> _openCameraDialog() async {
     final result = await showDialog<MedicationExtractionResult>(
       context: context,
+      barrierColor: Colors.black87,
       builder: (context) => const MedicationCameraDialog(),
     );
 
@@ -291,29 +293,31 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         }
       }
 
-      // Build detailed success message
-      final List<String> extractedFields = [];
-      if (result.medicationName != null) extractedFields.add('ime');
-      if (result.medicationType != null) extractedFields.add('vrsta');
-      if (result.quantityInBox != null)
-        extractedFields.add('količina v škatli');
-      if (result.dosageFrequency != null)
-        extractedFields.add('pogostost jemanja');
-      if (result.patientName != null) extractedFields.add('pacient');
-      if (extractedAdvice != null) extractedFields.add('nasveti');
+      // Show simple success/fail message
+      final hasData =
+          result.medicationName != null ||
+          result.medicationType != null ||
+          result.dosageFrequency != null;
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            extractedFields.isNotEmpty
-                ? 'Zajeto: ${extractedFields.join(", ")}. Preverite in popravite po potrebi.'
-                : 'Slika zajeta, vendar informacije niso bile najdene. Izpolnite ročno.',
+          content: Row(
+            children: [
+              Icon(
+                hasData ? Symbols.check_circle : Symbols.info,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(hasData ? 'Podatki izpolnjeni ✓' : 'Ni zaznanih podatkov'),
+            ],
           ),
-          backgroundColor: extractedFields.isNotEmpty
-              ? Colors.green
-              : Colors.orange,
-          duration: const Duration(seconds: 4),
+          backgroundColor: hasData ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
 
@@ -326,6 +330,34 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
           'Dosage frequency text: ${result.dosageFrequency!.rawText}',
         );
       }
+    }
+  }
+
+  Future<void> _openLabelScanner() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const LabelScannerScreen()),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      _medicationNameController.text = result;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Symbols.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text('Ime izpolnjeno ✓'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     }
   }
 
@@ -414,20 +446,31 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Container(
                       height: 56,
                       width: 56,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
-                        icon: Icon(
-                          Symbols.photo_camera,
-                          color: theme.colorScheme.primary,
-                        ),
-                        tooltip: 'Zajemi s kamero',
+                        icon: const Icon(Icons.document_scanner_outlined),
+                        tooltip: 'Skeniraj ime (OCR)',
+                        onPressed: _openLabelScanner,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.auto_awesome_outlined),
+                        tooltip: 'AI zajem (vse podrobnosti)',
                         onPressed: _openCameraDialog,
                       ),
                     ),

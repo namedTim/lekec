@@ -192,7 +192,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
       '/add-medication/advanced-planning/cyclic/configure',
       extra: {
         'name': widget.medicationName,
-        'medType': widget.medType,
+        'medTypeIndex': widget.medType.index,
         'takingDays': takingDays,
         'pauseDays': pauseDays,
         'intakeAdvice': widget.intakeAdvice,

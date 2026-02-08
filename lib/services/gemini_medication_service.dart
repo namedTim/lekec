@@ -68,6 +68,19 @@ class DosageFrequency {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'timesPerDay': timesPerDay,
+    'amountPerDose': amountPerDose,
+    'intervalHours': intervalHours,
+    'isAsNeeded': isAsNeeded,
+    'isCyclic': isCyclic,
+    'cyclicDaysOn': cyclicDaysOn,
+    'cyclicDaysOff': cyclicDaysOff,
+    'specificDays': specificDays,
+    'rawText': rawText,
+    'suggestedTimes': suggestedTimes,
+  };
+
   /// Converts to the app's FrequencyOption enum
   FrequencyOption? toFrequencyOption() {
     if (isAsNeeded) return FrequencyOption.asNeeded;
@@ -145,6 +158,18 @@ class MedicationExtractionResult {
       intakeAdvice: json['intakeAdvice'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'medicationName': medicationName,
+    'medicationType': medicationType?.name,
+    'pillSize': pillSize,
+    'quantityInBox': quantityInBox,
+    'dosageFrequency': dosageFrequency?.toJson(),
+    'pharmacyName': pharmacyName,
+    'patientName': patientName,
+    'notes': notes,
+    'intakeAdvice': intakeAdvice,
+  };
 
   static int? _parseInt(dynamic value) {
     if (value == null) return null;
