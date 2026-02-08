@@ -8,6 +8,7 @@ import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
 import '../components/speed_dial_fab.dart';
 import '../components/confirmation_dialog.dart';
+import '../components/medication_presets_panel.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
@@ -16,6 +17,7 @@ import 'medication_detail_screen.dart';
 import 'user_medications_screen.dart';
 import '../widgets/user_card.dart';
 import '../widgets/add_user_dialog.dart';
+import '../widgets/empty_state_card.dart';
 import '../../main.dart' show homePageKey;
 
 enum MedsTab { medications, users, settings }
@@ -95,12 +97,14 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
     if (userName != null && userName.isNotEmpty) {
       try {
         final db = ref.read(databaseProvider);
-        await db.into(db.users).insert(
-          UsersCompanion.insert(
-            name: userName,
-            createdAt: drift.Value(DateTime.now()),
-          ),
-        );
+        await db
+            .into(db.users)
+            .insert(
+              UsersCompanion.insert(
+                name: userName,
+                createdAt: drift.Value(DateTime.now()),
+              ),
+            );
 
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
@@ -116,10 +120,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Napaka: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -237,120 +238,144 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
             final medications = snapshot.data ?? [];
+            final isEmpty = medications.isEmpty;
 
-            if (medications.isEmpty) {
-              return Center(
-                child: Text(
-                  'Ni dodanih zdravil.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.only(
-                left: 8,
-                right: 8,
-                top: 8,
-                bottom: 88,
-              ),
-              itemCount: medications.length,
-              itemBuilder: (context, index) {
-                final med = medications[index];
-                final dosageAmount = med['dosage'] as double;
-                final dosageCount = dosageAmount.toInt();
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => MedicationDetailScreen(
-                          medicationId: med['id'] as int,
-                          medicationName: med['name'] as String,
-                          medType: med['medType'] as MedicationType,
+            return Stack(
+              children: [
+                // Main content
+                if (isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: EmptyStateCard(
+                        icon: Symbols.medication,
+                        title: 'Ni dodanih zdravil',
+                        subtitle: 'Izberite zdravilo spodaj ali dodajte novo',
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    padding: const EdgeInsets.only(
+                      left: 8,
+                      right: 8,
+                      top: 8,
+                      bottom: 180, // Extra padding for the presets panel
+                    ),
+                    itemCount: medications.length,
+                    itemBuilder: (context, index) {
+                      final med = medications[index];
+                      final dosageAmount = med['dosage'] as double;
+                      final dosageCount = dosageAmount.toInt();
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => MedicationDetailScreen(
+                                medicationId: med['id'] as int,
+                                medicationName: med['name'] as String,
+                                medType: med['medType'] as MedicationType,
+                                pillsRemaining: med['remaining'] as int,
+                                dosageAmount: dosageAmount,
+                                frequency: med['frequency'] as String,
+                                times: med['times'] as List<String>,
+                                intakeAdvice: med['intakeAdvice'] as String?,
+                                criticalReminder:
+                                    med['criticalReminder'] as bool,
+                                onDelete: () => _deleteMedication(
+                                  med['id'] as int,
+                                  med['name'] as String,
+                                ),
+                                onRefresh: _refreshMedications,
+                              ),
+                            ),
+                          );
+                        },
+                        child: MedicationDetailsCard(
+                          medName: med['name'] as String,
+                          dosage:
+                              '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
                           pillsRemaining: med['remaining'] as int,
-                          dosageAmount: dosageAmount,
                           frequency: med['frequency'] as String,
                           times: med['times'] as List<String>,
-                          intakeAdvice: med['intakeAdvice'] as String?,
-                          criticalReminder: med['criticalReminder'] as bool,
+                          medType: med['medType'] as MedicationType,
+                          onAddMedication: (quantity) async {
+                            try {
+                              final db = ref.read(databaseProvider);
+                              final currentRemaining = med['remaining'] as int;
+                              final newRemaining = (currentRemaining + quantity)
+                                  .clamp(0, 9999);
+
+                              await (db.update(db.medications)..where(
+                                    (t) => t.id.equals(med['id'] as int),
+                                  ))
+                                  .write(
+                                    MedicationsCompanion(
+                                      dosagesRemaining: drift.Value(
+                                        newRemaining.toDouble(),
+                                      ),
+                                    ),
+                                  );
+
+                              if (mounted) {
+                                final absQuantity = quantity.abs();
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      quantity >= 0
+                                          ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
+                                          : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
+                                    ),
+                                    backgroundColor: quantity >= 0
+                                        ? Colors.green
+                                        : Colors.orange,
+                                  ),
+                                );
+                                _refreshMedications();
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Napaka: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
                           onDelete: () => _deleteMedication(
                             med['id'] as int,
                             med['name'] as String,
                           ),
-                          onRefresh: _refreshMedications,
                         ),
-                      ),
-                    );
-                  },
-                  child: MedicationDetailsCard(
-                    medName: med['name'] as String,
-                    dosage:
-                        '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
-                    pillsRemaining: med['remaining'] as int,
-                    frequency: med['frequency'] as String,
-                    times: med['times'] as List<String>,
-                    medType: med['medType'] as MedicationType,
-                    onAddMedication: (quantity) async {
-                      try {
-                        final db = ref.read(databaseProvider);
-                        final currentRemaining = med['remaining'] as int;
-                        final newRemaining = (currentRemaining + quantity)
-                            .clamp(0, 9999);
-
-                        await (db.update(
-                          db.medications,
-                        )..where((t) => t.id.equals(med['id'] as int))).write(
-                          MedicationsCompanion(
-                            dosagesRemaining: drift.Value(
-                              newRemaining.toDouble(),
-                            ),
-                          ),
-                        );
-
-                        if (mounted) {
-                          final absQuantity = quantity.abs();
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                quantity >= 0
-                                    ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
-                                    : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
-                              ),
-                              backgroundColor: quantity >= 0
-                                  ? Colors.green
-                                  : Colors.orange,
-                            ),
-                          );
-                          _refreshMedications();
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Napaka: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
+                      );
                     },
-                    onDelete: () => _deleteMedication(
-                      med['id'] as int,
-                      med['name'] as String,
-                    ),
                   ),
-                );
-              },
+
+                // Presets panel at the bottom
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: MedicationPresetsPanel(
+                    initiallyExpanded: isEmpty,
+                    onPresetSelected: _refreshMedications,
+                  ),
+                ),
+              ],
             );
           },
         );
       case MedsTab.users:
         final db = ref.watch(databaseProvider);
         return FutureBuilder<List<User>>(
-          future: (db.select(db.users)..where((t) => t.isActive.equals(true))).get(),
+          future: (db.select(
+            db.users,
+          )..where((t) => t.isActive.equals(true))).get(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -358,39 +383,32 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
-            
+
             final users = snapshot.data ?? [];
-            
+
             if (users.isEmpty) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Symbols.group,
-                      size: 64,
-                      color: colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Ni dodanih uporabnikov.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: _showAddUserDialog,
-                      icon: const Icon(Symbols.person_add),
-                      label: const Text('Dodaj uporabnika'),
-                    ),
-                  ],
+                child: EmptyStateCard(
+                  icon: Symbols.group,
+                  title: 'Ni dodanih uporabnikov',
+                  subtitle:
+                      'Dodajte uporabnike za upravljanje njihovih zdravil',
+                  action: FilledButton.icon(
+                    onPressed: _showAddUserDialog,
+                    icon: const Icon(Symbols.person_add),
+                    label: const Text('Dodaj uporabnika'),
+                  ),
                 ),
               );
             }
-            
+
             return ListView.builder(
-              padding: const EdgeInsets.only(top: 8, left: 8, right: 8, bottom: 88),
+              padding: const EdgeInsets.only(
+                top: 8,
+                left: 8,
+                right: 8,
+                bottom: 88,
+              ),
               itemCount: users.length + 1,
               itemBuilder: (context, index) {
                 if (index == users.length) {
@@ -407,7 +425,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                     ),
                   );
                 }
-                
+
                 final user = users[index];
                 return UserCard(
                   userName: user.name,

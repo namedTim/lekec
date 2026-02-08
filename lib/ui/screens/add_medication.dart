@@ -12,7 +12,16 @@ import '../../services/gemini_medication_service.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
-  const AddMedicationScreen({super.key});
+  final String? presetName;
+  final MedicationType? presetType;
+  final String? presetIntakeAdvice;
+
+  const AddMedicationScreen({
+    super.key,
+    this.presetName,
+    this.presetType,
+    this.presetIntakeAdvice,
+  });
 
   @override
   ConsumerState<AddMedicationScreen> createState() =>
@@ -29,7 +38,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   List<User> _users = [];
   int? _selectedUserId;
   bool _isLoadingUsers = true;
-  
+
   // Store extracted data for passing to next screens
   MedicationExtractionResult? _extractedData;
 
@@ -37,6 +46,33 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   void initState() {
     super.initState();
     _loadUsers();
+    _applyPresetData();
+  }
+
+  void _applyPresetData() {
+    if (widget.presetName != null) {
+      _medicationNameController.text = widget.presetName!;
+    }
+    if (widget.presetType != null) {
+      _selectedType = widget.presetType!;
+    }
+    if (widget.presetIntakeAdvice != null) {
+      final advice = widget.presetIntakeAdvice!;
+
+      // Map preset advice to dropdown values
+      if (advice == 'Ni posebnosti') {
+        _selectedIntakeAdvice = 'Ni posebnosti';
+      } else if (advice.contains('pred obrokom')) {
+        _selectedIntakeAdvice = 'Pred obrokom';
+      } else if (advice.contains('po obroku') || advice.contains('z obrokom')) {
+        _selectedIntakeAdvice = 'Po obroku';
+      } else {
+        // For any other advice, use custom field
+        _selectedIntakeAdvice = 'Po meri';
+        _showCustomAdviceField = true;
+        _customIntakeAdviceController.text = advice;
+      }
+    }
   }
 
   @override
@@ -48,25 +84,29 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
 
   Future<void> _loadUsers() async {
     final db = ref.read(databaseProvider);
-    
+
     // Get all active users
-    final users = await (db.select(db.users)..where((t) => t.isActive.equals(true))).get();
-    
+    final users = await (db.select(
+      db.users,
+    )..where((t) => t.isActive.equals(true))).get();
+
     // If no users exist, create default "jaz" user
     if (users.isEmpty) {
-      final id = await db.into(db.users).insert(
-        UsersCompanion.insert(name: 'jaz'),
-      );
-      final jazUser = await (db.select(db.users)..where((u) => u.id.equals(id))).getSingle();
+      final id = await db
+          .into(db.users)
+          .insert(UsersCompanion.insert(name: 'jaz'));
+      final jazUser = await (db.select(
+        db.users,
+      )..where((u) => u.id.equals(id))).getSingle();
       users.add(jazUser);
     }
-    
+
     // Find "jaz" user or use first user as default
     final jazUser = users.firstWhere(
       (u) => u.name.toLowerCase() == 'jaz',
       orElse: () => users.first,
     );
-    
+
     setState(() {
       _users = users;
       _selectedUserId = jazUser.id;
@@ -113,11 +153,13 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     if (result == true && controller.text.trim().isNotEmpty) {
       final userName = controller.text.trim();
       final db = ref.read(databaseProvider);
-      final id = await db.into(db.users).insert(
-        UsersCompanion.insert(name: userName),
-      );
-      final newUser = await (db.select(db.users)..where((u) => u.id.equals(id))).getSingle();
-      
+      final id = await db
+          .into(db.users)
+          .insert(UsersCompanion.insert(name: userName));
+      final newUser = await (db.select(
+        db.users,
+      )..where((u) => u.id.equals(id))).getSingle();
+
       setState(() {
         _users.add(newUser);
         _selectedUserId = newUser.id;
@@ -129,7 +171,9 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     // Don't allow deleting the "jaz" user
     if (user.name.toLowerCase() == 'jaz') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Privzeti uporabnik se ne more izbrisati')),
+        const SnackBar(
+          content: Text('Privzeti uporabnik se ne more izbrisati'),
+        ),
       );
       return;
     }
@@ -137,7 +181,8 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     final result = await showConfirmationDialog(
       context,
       title: 'Izbriši uporabnika',
-      message: 'Ali ste prepričani, da želite izbrisati uporabnika "${user.name}"?',
+      message:
+          'Ali ste prepričani, da želite izbrisati uporabnika "${user.name}"?',
       confirmText: 'Izbriši',
       cancelText: 'Prekliči',
     );
@@ -145,10 +190,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     if (result) {
       final db = ref.read(databaseProvider);
       await (db.delete(db.users)..where((u) => u.id.equals(user.id))).go();
-      
+
       setState(() {
         _users.removeWhere((u) => u.id == user.id);
-        
+
         // If the deleted user was selected, select "jaz" or first available user
         if (_selectedUserId == user.id) {
           final jazUser = _users.firstWhere(
@@ -209,7 +254,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     if (result != null && mounted) {
       // Store extracted data for passing to subsequent screens
       _extractedData = result;
-      
+
       // Auto-fill form with extracted data
       if (result.medicationName != null && result.medicationName!.isNotEmpty) {
         _medicationNameController.text = result.medicationName!;
@@ -224,7 +269,13 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
       // Auto-fill intake advice if available
       final extractedAdvice = result.getIntakeAdvice();
       if (extractedAdvice != null) {
-        final adviceOptions = ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'];
+        final adviceOptions = [
+          'Ni posebnosti',
+          'Pred obrokom',
+          'Z obrokom',
+          'Po obroku',
+          'Po meri',
+        ];
         if (adviceOptions.contains(extractedAdvice)) {
           setState(() {
             _selectedIntakeAdvice = extractedAdvice;
@@ -244,8 +295,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
       final List<String> extractedFields = [];
       if (result.medicationName != null) extractedFields.add('ime');
       if (result.medicationType != null) extractedFields.add('vrsta');
-      if (result.quantityInBox != null) extractedFields.add('količina v škatli');
-      if (result.dosageFrequency != null) extractedFields.add('pogostost jemanja');
+      if (result.quantityInBox != null)
+        extractedFields.add('količina v škatli');
+      if (result.dosageFrequency != null)
+        extractedFields.add('pogostost jemanja');
       if (result.patientName != null) extractedFields.add('pacient');
       if (extractedAdvice != null) extractedFields.add('nasveti');
 
@@ -257,7 +310,9 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                 ? 'Zajeto: ${extractedFields.join(", ")}. Preverite in popravite po potrebi.'
                 : 'Slika zajeta, vendar informacije niso bile najdene. Izpolnite ročno.',
           ),
-          backgroundColor: extractedFields.isNotEmpty ? Colors.green : Colors.orange,
+          backgroundColor: extractedFields.isNotEmpty
+              ? Colors.green
+              : Colors.orange,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -267,7 +322,9 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         developer.log('Medication extraction notes: ${result.notes}');
       }
       if (result.dosageFrequency?.rawText != null) {
-        developer.log('Dosage frequency text: ${result.dosageFrequency!.rawText}');
+        developer.log(
+          'Dosage frequency text: ${result.dosageFrequency!.rawText}',
+        );
       }
     }
   }
@@ -275,9 +332,9 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedUserId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Izberite uporabnika')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Izberite uporabnika')));
         return;
       }
 
@@ -291,7 +348,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
           '/add-medication/frequency',
           extra: {
             'name': _medicationNameController.text,
-            'medType': _selectedType,
+            'medTypeIndex': _selectedType.index,
             'intakeAdvice': intakeAdvice,
             'userId': _selectedUserId,
             // Pass extracted data for auto-filling subsequent screens
@@ -517,18 +574,20 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      ..._users.map((user) => GestureDetector(
-                        onLongPress: () => _showDeleteUserDialog(user),
-                        child: ChoiceChip(
-                          label: Text(user.name),
-                          selected: _selectedUserId == user.id,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _selectedUserId = user.id);
-                            }
-                          },
+                      ..._users.map(
+                        (user) => GestureDetector(
+                          onLongPress: () => _showDeleteUserDialog(user),
+                          child: ChoiceChip(
+                            label: Text(user.name),
+                            selected: _selectedUserId == user.id,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() => _selectedUserId = user.id);
+                              }
+                            },
+                          ),
                         ),
-                      )),
+                      ),
                       ActionChip(
                         avatar: const Icon(Symbols.add, size: 18),
                         label: const Text('Dodaj'),

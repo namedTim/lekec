@@ -76,6 +76,8 @@ LazyDatabase _openConnection() {
     final dir = await getApplicationDocumentsDirectory();
     final file = File(p.join(dir.path, 'app_database.sqlite'));
 
-    return NativeDatabase.createInBackground(file, logStatements: true);
+    // Use regular NativeDatabase instead of createInBackground
+    // to avoid isolate-related issues
+    return NativeDatabase(file, logStatements: false);
   });
 }

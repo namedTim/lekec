@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/history_time_slot.dart';
+import '../widgets/empty_state_card.dart';
 import '../../data/services/history_service.dart';
 
 enum HistoryFilter { all, taken, missed }
@@ -196,17 +198,16 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
               ),
             ),
 
-            // History list
             Expanded(
               child: _allEntries.isEmpty && _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _allEntries.isEmpty
                   ? Center(
-                      child: Text(
-                        'Ni zgodovine',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                      child: EmptyStateCard(
+                        icon: Symbols.history,
+                        title: 'Ni zgodovine',
+                        subtitle:
+                            'Zgodovina jemanja zdravil se bo prikazala tukaj',
                       ),
                     )
                   : ListView.builder(

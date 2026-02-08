@@ -13,6 +13,7 @@ import '../../ui/components/confirmation_dialog.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/components/time_slot.dart';
+import '../../ui/widgets/empty_state_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -71,7 +72,9 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadUserData() async {
-    final users = await (db.select(db.users)..where((t) => t.isActive.equals(true))).get();
+    final users = await (db.select(
+      db.users,
+    )..where((t) => t.isActive.equals(true))).get();
     if (mounted) {
       setState(() {
         _totalUserCount = users.length;
@@ -372,11 +375,10 @@ class DashboardScreenState extends State<DashboardScreen>
               Expanded(
                 child: _groupedIntakes.isEmpty
                     ? Center(
-                        child: Text(
-                          'Ni načrtovanih zdravil za danes',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
+                        child: EmptyStateCard(
+                          icon: Symbols.event_available,
+                          title: 'Ni načrtovanih zdravil za danes',
+                          subtitle: 'Dodajte zdravila za opomnike',
                         ),
                       )
                     : ListView.builder(
@@ -462,13 +464,16 @@ class DashboardScreenState extends State<DashboardScreen>
                                 // For one-time entries, dosage is stored in the intake log
                                 final dosageAmount = plan?.dosageAmount ?? 1.0;
                                 final dosageCount = dosageAmount.toInt();
-                                
+
                                 // Get user name
-                                final userName = _userNames[intake.userId] ?? 'Unknown';
-                                
+                                final userName =
+                                    _userNames[intake.userId] ?? 'Unknown';
+
                                 // Calculate remaining pills after this dosage
-                                final currentRemaining = medication.dosagesRemaining ?? 0;
-                                final remainingAfterDose = (currentRemaining - dosageAmount).toInt();
+                                final currentRemaining =
+                                    medication.dosagesRemaining ?? 0;
+                                final remainingAfterDose =
+                                    (currentRemaining - dosageAmount).toInt();
 
                                 // Enable swipes only if time has passed (isPast)
                                 // For future medications, disable swiping
@@ -496,10 +501,13 @@ class DashboardScreenState extends State<DashboardScreen>
                                   onTap: () {
                                     _showMedicationDetail(
                                       medName: medication.name,
-                                      dosage: '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                      dosage:
+                                          '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
                                       scheduledTime: intake.scheduledTime,
                                       dosageAmount: dosageAmount,
-                                      pillsRemaining: currentRemaining > 0 ? remainingAfterDose : null,
+                                      pillsRemaining: currentRemaining > 0
+                                          ? remainingAfterDose
+                                          : null,
                                       userName: userName,
                                     );
                                   },

@@ -106,15 +106,26 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/add-medication',
-      builder: (context, state) => const AddMedicationScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final presetTypeIndex = extra?['presetTypeIndex'] as int?;
+        return AddMedicationScreen(
+          presetName: extra?['presetName'] as String?,
+          presetType: presetTypeIndex != null
+              ? MedicationType.values[presetTypeIndex]
+              : null,
+          presetIntakeAdvice: extra?['presetIntakeAdvice'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/add-medication/frequency',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MedicationFrequencySelectionScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
           extractedData: extra['extractedData'] as MedicationExtractionResult?,

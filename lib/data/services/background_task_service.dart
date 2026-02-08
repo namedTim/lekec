@@ -12,11 +12,12 @@ const String notificationScheduleTask = 'notificationScheduleTask';
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
+    AppDatabase? db;
     try {
       developer.log('Background task started: $task', name: 'BackgroundTask');
 
       // Initialize database
-      final db = AppDatabase();
+      db = AppDatabase();
 
       switch (task) {
         case scheduleGenerationTask:
@@ -49,6 +50,9 @@ void callbackDispatcher() {
         name: 'BackgroundTask',
       );
       return Future.value(false);
+    } finally {
+      // Always close the database when done
+      await db?.close();
     }
   });
 }
