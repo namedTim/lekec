@@ -391,28 +391,47 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Name Input - Full Width with Camera Icon
-                TextFormField(
-                  controller: _medicationNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Ime zdravila',
-                    hintText: 'Vnesite ime zdravila',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // Name Input with Camera Button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _medicationNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Ime zdravila',
+                          hintText: 'Vnesite ime zdravila',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vnesite ime zdravila';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                    filled: true,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Symbols.photo_camera),
-                      tooltip: 'Zajemi s kamero',
-                      onPressed: _openCameraDialog,
+                    const SizedBox(width: 12),
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          Symbols.photo_camera,
+                          color: theme.colorScheme.primary,
+                        ),
+                        tooltip: 'Zajemi s kamero',
+                        onPressed: _openCameraDialog,
+                      ),
                     ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vnesite ime zdravila';
-                    }
-                    return null;
-                  },
+                  ],
                 ),
                 const SizedBox(height: 24),
 
