@@ -3,6 +3,8 @@ import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:developer' as developer;
+import 'dart:io';
+import 'package:image/image.dart' as img;
 
 class LabelScannerScreen extends StatefulWidget {
   const LabelScannerScreen({super.key});
@@ -70,7 +72,11 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
 
     try {
       final image = await _cameraController!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
+      
+      // Crop the image to the highlighted rectangle area
+      final croppedImageFile = await _cropImageToRectangle(image.path);
+      
+      final inputImage = InputImage.fromFilePath(croppedImageFile.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
 
       final fullText = recognizedText.text.trim();
@@ -104,6 +110,54 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
         setState(() => _isProcessing = false);
       }
     }
+  }
+
+  /// Crop the captured image to match the rectangle shown on screen
+  Future<File> _cropImageToRectangle(String imagePath) async {
+    final originalImage = img.decodeImage(File(imagePath).readAsBytesSync());
+    if (originalImage == null) {
+      throw Exception('Failed to decode image');
+    }
+
+    // Calculate the crop rectangle
+    // The rectangle is 85% of screen width and 80px height, centered
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height - kToolbarHeight - MediaQuery.of(context).padding.top;
+    
+    final rectWidth = screenWidth * 0.85;
+    const rectHeight = 80.0;
+    final rectLeft = (screenWidth - rectWidth) / 2;
+    final rectTop = (screenHeight - rectHeight) / 2;
+    
+    // Convert screen coordinates to image coordinates
+    final imageWidth = originalImage.width;
+    final imageHeight = originalImage.height;
+    
+    // Calculate scale factors
+    final scaleX = imageWidth / screenWidth;
+    final scaleY = imageHeight / screenHeight;
+    
+    // Apply scaling to crop coordinates
+    final cropX = (rectLeft * scaleX).round();
+    final cropY = (rectTop * scaleY).round();
+    final cropWidth = (rectWidth * scaleX).round();
+    final cropHeight = (rectHeight * scaleY).round();
+    
+    // Crop the image
+    final croppedImage = img.copyCrop(
+      originalImage,
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+    
+    // Save the cropped image
+    final croppedFile = File('${imagePath}_cropped.jpg');
+    await croppedFile.writeAsBytes(img.encodeJpg(croppedImage));
+    
+    return croppedFile;
   }
 
   /// Extract the most likely medication name from recognized text.
