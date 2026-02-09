@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
+import 'package:drift/drift.dart' as drift;
 import '../components/step_progress_indicator.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/medication_camera_dialog.dart';
@@ -116,23 +117,38 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   }
 
   Future<void> _showAddUserDialog() async {
-    final controller = TextEditingController();
+    final nameController = TextEditingController();
+    final ageController = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Dodaj novega uporabnika'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Ime uporabnika',
-            hintText: 'Vnesite ime',
-          ),
-          autofocus: true,
-          onSubmitted: (_) {
-            if (controller.text.trim().isNotEmpty) {
-              Navigator.pop(context, true);
-            }
-          },
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Ime uporabnika',
+                hintText: 'Vnesite ime',
+              ),
+              autofocus: true,
+              onSubmitted: (_) {
+                if (nameController.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ageController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Starost (neobvezno)',
+                hintText: 'Vnesite starost',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -141,7 +157,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
           ),
           FilledButton(
             onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
+              if (nameController.text.trim().isNotEmpty) {
                 Navigator.pop(context, true);
               }
             },
@@ -151,12 +167,17 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
       ),
     );
 
-    if (result == true && controller.text.trim().isNotEmpty) {
-      final userName = controller.text.trim();
+    if (result == true && nameController.text.trim().isNotEmpty) {
+      final userName = nameController.text.trim();
+      final ageText = ageController.text.trim();
+      final age = ageText.isNotEmpty ? int.tryParse(ageText) : null;
       final db = ref.read(databaseProvider);
       final id = await db
           .into(db.users)
-          .insert(UsersCompanion.insert(name: userName));
+          .insert(UsersCompanion.insert(
+            name: userName,
+            age: drift.Value(age),
+          ));
       final newUser = await (db.select(
         db.users,
       )..where((u) => u.id.equals(id))).getSingle();

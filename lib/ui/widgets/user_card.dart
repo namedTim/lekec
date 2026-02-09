@@ -3,11 +3,13 @@ import 'package:material_symbols_icons/symbols.dart';
 
 class UserCard extends StatelessWidget {
   final String userName;
+  final int? userAge;
   final VoidCallback onTap;
 
   const UserCard({
     super.key,
     required this.userName,
+    this.userAge,
     required this.onTap,
   });
 
@@ -51,11 +53,25 @@ class UserCard extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                userName,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    userName,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (userAge != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '$userAge let',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Icon(

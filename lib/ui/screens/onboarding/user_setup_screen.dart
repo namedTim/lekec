@@ -4,7 +4,7 @@ import '../../../database/tables/onboarding_settings.dart';
 
 class UserSetupScreen extends StatefulWidget {
   final UserType userType;
-  final Function(String? familyName, List<String> userNames) onNext;
+  final Function(String? familyName, List<String> userNames, List<int?> userAges) onNext;
 
   const UserSetupScreen({
     super.key,
@@ -19,21 +19,28 @@ class UserSetupScreen extends StatefulWidget {
 class _UserSetupScreenState extends State<UserSetupScreen> {
   final _familyNameController = TextEditingController();
   final _userNameController = TextEditingController();
+  final _userAgeController = TextEditingController();
   final List<String> _userNames = [];
+  final List<int?> _userAges = [];
 
   @override
   void dispose() {
     _familyNameController.dispose();
     _userNameController.dispose();
+    _userAgeController.dispose();
     super.dispose();
   }
 
   void _addUser() {
     final name = _userNameController.text.trim();
     if (name.isNotEmpty && !_userNames.contains(name)) {
+      final ageText = _userAgeController.text.trim();
+      final age = ageText.isNotEmpty ? int.tryParse(ageText) : null;
       setState(() {
         _userNames.add(name);
+        _userAges.add(age);
         _userNameController.clear();
+        _userAgeController.clear();
       });
     }
   }
@@ -41,6 +48,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   void _removeUser(int index) {
     setState(() {
       _userNames.removeAt(index);
+      _userAges.removeAt(index);
     });
   }
 
@@ -113,6 +121,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                     Row(
                       children: [
                         Expanded(
+                          flex: 3,
                           child: TextField(
                             controller: _userNameController,
                             decoration: InputDecoration(
@@ -123,6 +132,23 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                                       ? 'Ime'
                                       : 'Ime',
                               prefixIcon: const Icon(Symbols.person_add),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onSubmitted: (_) => _addUser(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _userAgeController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Starost',
+                              hintText: 'Leta',
+                              prefixIcon: const Icon(Symbols.cake),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -218,6 +244,9 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                                 ),
                               ),
                               title: Text(_userNames[index]),
+                              subtitle: _userAges[index] != null
+                                  ? Text('${_userAges[index]} let')
+                                  : null,
                               trailing: IconButton(
                                 icon: Icon(
                                   Symbols.delete,
@@ -276,6 +305,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                                   : _familyNameController.text.trim()
                               : null,
                           _userNames,
+                          _userAges,
                         );
                       }
                     : null,

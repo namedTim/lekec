@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+/// Result returned from AddUserDialog containing the user's name and optional age.
+class AddUserResult {
+  final String name;
+  final int? age;
+
+  AddUserResult({required this.name, this.age});
+}
+
 class AddUserDialog extends StatefulWidget {
   const AddUserDialog({super.key});
 
@@ -11,10 +19,12 @@ class AddUserDialog extends StatefulWidget {
 class _AddUserDialogState extends State<AddUserDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _ageController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -57,6 +67,28 @@ class _AddUserDialogState extends State<AddUserDialog> {
                 return null;
               },
             ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _ageController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Starost (neobvezno)',
+                hintText: 'Vnesite starost',
+                prefixIcon: const Icon(Symbols.cake),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              validator: (value) {
+                if (value != null && value.trim().isNotEmpty) {
+                  final age = int.tryParse(value.trim());
+                  if (age == null || age < 0 || age > 150) {
+                    return 'Vnesite veljavno starost';
+                  }
+                }
+                return null;
+              },
+            ),
           ],
         ),
       ),
@@ -68,7 +100,14 @@ class _AddUserDialogState extends State<AddUserDialog> {
         FilledButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Navigator.of(context).pop(_nameController.text.trim());
+              final ageText = _ageController.text.trim();
+              final age = ageText.isNotEmpty ? int.tryParse(ageText) : null;
+              Navigator.of(context).pop(
+                AddUserResult(
+                  name: _nameController.text.trim(),
+                  age: age,
+                ),
+              );
             }
           },
           child: const Text('Dodaj'),

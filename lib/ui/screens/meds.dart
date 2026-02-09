@@ -91,20 +91,21 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   }
 
   Future<void> _showAddUserDialog() async {
-    final userName = await showDialog<String>(
+    final result = await showDialog<AddUserResult>(
       context: context,
       builder: (context) => const AddUserDialog(),
     );
 
-    if (userName != null && userName.isNotEmpty) {
+    if (result != null && result.name.isNotEmpty) {
       try {
         final db = ref.read(databaseProvider);
         await db
             .into(db.users)
             .insert(
               UsersCompanion.insert(
-                name: userName,
+                name: result.name,
                 createdAt: drift.Value(DateTime.now()),
+                age: drift.Value(result.age),
               ),
             );
 
@@ -112,7 +113,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Uporabnik $userName dodan'),
+              content: Text('Uporabnik ${result.name} dodan'),
               backgroundColor: Colors.green,
             ),
           );
@@ -527,6 +528,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                 final user = users[index];
                 return UserCard(
                   userName: user.name,
+                  userAge: user.age,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

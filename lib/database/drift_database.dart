@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -69,6 +69,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 8) {
           // Add dosageAmount column to medication_intake_logs table
           await m.addColumn(medicationIntakeLogs, medicationIntakeLogs.dosageAmount);
+        }
+        if (from < 9) {
+          // Add age column to users table
+          await m.addColumn(users, users.age);
         }
       },
     );
