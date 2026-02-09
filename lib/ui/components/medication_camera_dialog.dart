@@ -139,46 +139,10 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height * 0.55,
         color: Colors.black,
-        child: Column(
+        child: Stack(
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: Colors.black,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.auto_awesome,
-                        color: colors.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'AI zajem',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Symbols.close, color: Colors.white70),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Camera / Status area
-            Expanded(
+            // Camera / Status area - full height
+            Positioned.fill(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -306,47 +270,95 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
               ),
             ),
 
-            // Bottom area
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              color: Colors.black,
-              child: _phase == _CapturePhase.camera
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
+            // Header at top
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black, Colors.black.withOpacity(0)],
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          'Usmerite kamero na škatlo ali nalepko',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 13,
-                          ),
-                          textAlign: TextAlign.center,
+                        Icon(
+                          Symbols.auto_awesome,
+                          color: colors.primary,
+                          size: 20,
                         ),
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: _captureAndProcess,
-                          child: Container(
-                            width: 68,
-                            height: 68,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.5),
-                                width: 4,
-                              ),
-                            ),
-                            child: const Icon(
-                              Symbols.photo_camera,
-                              size: 30,
-                              color: Colors.black,
-                            ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'AI zajem',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
-                    )
-                  : const SizedBox(height: 68),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Symbols.close, color: Colors.white70),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+
+            // Capture button - centered in bottom half
+            if (_phase == _CapturePhase.camera)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: MediaQuery.of(context).size.height * 0.55 * 0.5,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Usmerite kamero na škatlo ali nalepko',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    GestureDetector(
+                      onTap: _captureAndProcess,
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.5),
+                            width: 4,
+                          ),
+                        ),
+                        child: const Icon(
+                          Symbols.photo_camera,
+                          size: 30,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

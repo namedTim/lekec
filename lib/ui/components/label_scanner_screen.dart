@@ -253,11 +253,12 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
                   ),
                 ),
 
-                // Capture button at bottom
+                // Capture button - centered in bottom half of screen
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 48,
+                  bottom: 0,
+                  height: MediaQuery.of(context).size.height * 0.5, // bottom half
                   child: Center(
                     child: GestureDetector(
                       onTap: _isProcessing ? null : _captureAndRecognize,

@@ -117,69 +117,20 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   }
 
   Future<void> _showAddUserDialog() async {
-    final nameController = TextEditingController();
-    final ageController = TextEditingController();
-    final result = await showDialog<bool>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Dodaj novega uporabnika'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Ime uporabnika',
-                hintText: 'Vnesite ime',
-              ),
-              autofocus: true,
-              onSubmitted: (_) {
-                if (nameController.text.trim().isNotEmpty) {
-                  Navigator.pop(context, true);
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: ageController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Starost (neobvezno)',
-                hintText: 'Vnesite starost',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Prekliči'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (nameController.text.trim().isNotEmpty) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Dodaj'),
-          ),
-        ],
-      ),
+      builder: (context) => const _AddUserInMedicationDialog(),
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
-      final userName = nameController.text.trim();
-      final ageText = ageController.text.trim();
-      final age = ageText.isNotEmpty ? int.tryParse(ageText) : null;
-      final db = ref.read(databaseProvider);
-      final id = await db
-          .into(db.users)
-          .insert(UsersCompanion.insert(
-            name: userName,
-            age: drift.Value(age),
-          ));
-      final newUser = await (db.select(
-        db.users,
+    if (result != null && result['name'] != null) {
+      final userName = result['name'] as String;
+      final age = result['age'] as int?;
+      final database = ref.read(databaseProvider);
+      final id = await database
+          .into(database.users)
+          .insert(UsersCompanion.insert(name: userName, age: drift.Value(age)));
+      final newUser = await (database.select(
+        database.users,
       )..where((u) => u.id.equals(id))).getSingle();
 
       setState(() {
@@ -704,6 +655,126 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         currentStep: 1,
         totalSteps: 3,
       ),
+    );
+  }
+}
+
+class _AddUserInMedicationDialog extends StatefulWidget {
+  const _AddUserInMedicationDialog();
+
+  @override
+  State<_AddUserInMedicationDialog> createState() =>
+      _AddUserInMedicationDialogState();
+}
+
+class _AddUserInMedicationDialogState
+    extends State<_AddUserInMedicationDialog> {
+  final _nameController = TextEditingController();
+  int? _birthYear;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectBirthYear() async {
+    final now = DateTime.now();
+    final initialDate = _birthYear != null
+        ? DateTime(_birthYear!)
+        : DateTime(now.year - 18);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1920),
+      lastDate: now,
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Izberite leto rojstva',
+      cancelText: 'Prekliči',
+      confirmText: 'Potrdi',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _birthYear = picked.year;
+      });
+    }
+  }
+
+  int? _calculateAge() {
+    if (_birthYear == null) return null;
+    final now = DateTime.now();
+    return now.year - _birthYear!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final age = _calculateAge();
+
+    return AlertDialog(
+      title: const Text('Dodaj novega uporabnika'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Ime uporabnika',
+              hintText: 'Vnesite ime',
+              prefixIcon: const Icon(Symbols.person),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: _selectBirthYear,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Leto rojstva (neobvezno)',
+                prefixIcon: const Icon(Symbols.cake),
+                suffixIcon: const Icon(Symbols.calendar_month),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                _birthYear != null
+                    ? '$_birthYear ($age let)'
+                    : 'Tapnite za izbiro',
+                style: TextStyle(
+                  color: _birthYear != null
+                      ? null
+                      : colors.onSurfaceVariant.withOpacity(0.6),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Prekliči'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_nameController.text.trim().isNotEmpty) {
+              Navigator.pop(context, {
+                'name': _nameController.text.trim(),
+                'age': _calculateAge(),
+              });
+            }
+          },
+          child: const Text('Dodaj'),
+        ),
+      ],
     );
   }
 }

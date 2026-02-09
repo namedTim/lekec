@@ -261,59 +261,64 @@ class GeminiMedicationService {
       final imageBytes = await imageFile.readAsBytes();
 
       final prompt = '''
-Analyze this medication packaging/label image and extract the following information.
-The label may be in Slovenian or English.
+Analiziraj sliko embalaže/nalepke zdravila in izvleci naslednje informacije.
+Nalepka je lahko v slovenščini ali angleščini, vendar MORAŠ odgovoriti IZKLJUČNO V SLOVENŠČINI.
 
-Extract:
-1. Medication name (brand name or generic name visible on the box/label)
-2. Type of medication (tablets/tablete, capsules/kapsule, drops/kapljice, ampules/ampule, injections/injekcije, sprays/pršila, patches/obliži, puffs, syrup/sirup, etc.)
-3. Pill/dosage strength (e.g., "500mg", "10mg", "2.5ml", etc.)
-4. Quantity in box/package (number of pills, ampules, ml, etc.)
-5. Pharmacy name if visible (lekarna)
-6. Patient name if this is a prescription label
-7. Recommended dosage frequency - parse carefully:
-   - "enkrat dnevno" / "1x daily" = once daily
-   - "dvakrat dnevno" / "2x daily" = twice daily  
-   - "3x na dan" / "3x dnevno" = 3 times per day
-   - "po potrebi" / "as needed" / "ob bolečini" = as needed
-   - "na X ur" / "every X hours" = interval based (extract X)
-   - "ciklično" / cyclic patterns like "10 dni jemanja, 20 dni pavze" = cyclic
-   - specific days mentioned = specific days
-8. Amount per dose (e.g., "2 tableti", "1 kapsula" = how many to take each time)
-9. Intake advice (pred obrokom/before meal, z obrokom/with meal, po obroku/after meal, na tešče/empty stomach)
-10. Suggested times of day - Based on the dosage frequency and any specific timing instructions (zjutraj/morning, zvečer/evening, pred spanjem/before sleep, etc.), suggest appropriate times in 24h format. Use sensible defaults:
-    - 1x daily: ["08:00"] (morning) unless label says evening/pred spanjem then ["20:00"]
-    - 2x daily: ["08:00", "20:00"] (morning and evening)
-    - 3x daily: ["08:00", "14:00", "20:00"] (morning, afternoon, evening)
-    - 4x daily: ["08:00", "12:00", "16:00", "20:00"]
-    - If specific times mentioned on label (e.g., "ob 8h in 20h"), use those exact times
-11. Any other important notes
+Izvleci:
+1. Ime zdravila z jakostjo (npr. "Lekadol 500 mg", "Metamizol STADA 500 mg", "Aspirin 100 mg") - VEDNO vključi mg/ml jakost v imenu, če je vidna
+2. Oblika zdravila (tablete, kapsule, kapljice, ampule, injekcije, pršila, obliži, puff, sirup, itd.)
+3. Jakost (npr. "500 mg", "10 mg", "2.5 ml", itd.) - to je ločeno polje
+4. Količina v škatli/pakiranju (število tablet, ampul, ml, itd.)
+5. Ime lekarne, če je vidno
+6. Ime pacienta, če je to receptna nalepka
+7. Priporočena pogostost jemanja - natančno razčleni:
+   - "enkrat dnevno" / "1x daily" = enkrat dnevno
+   - "dvakrat dnevno" / "2x daily" = dvakrat dnevno  
+   - "3x na dan" / "3x dnevno" = 3-krat dnevno
+   - "po potrebi" / "as needed" / "ob bolečini" = po potrebi
+   - "na X ur" / "every X hours" = interval (izvleci X)
+   - "ciklično" npr. "10 dni jemanja, 20 dni pavze" = ciklično
+   - omenjeni specifični dnevi = specifični dnevi
+8. Količina na odmerek (npr. "2 tableti", "1 kapsula" = koliko vzeti vsak odmerek)
+9. Nasveti za jemanje - ZDRUŽI VSE nasvete v eno polje, vključno z:
+   - Čas jemanja: "pred obrokom", "z obrokom", "po jedi", "na tešče", "pred spanjem"
+   - Opozorila in omejitve: "NE SKUPAJ Z ...", "brez alkohola", "ne z mlekom"
+   - Primer: če piše "2 x 1 kapsulo po jedi, NE SKUPAJ Z ANALGINOM" naj bo intakeAdvice: "Po jedi. Ne jemati skupaj z analginom."
+   - Vse nasvete prevedi v slovenščino!
+10. Predlagani časi jemanja - na podlagi pogostosti in navodil predlagaj primerne čase v 24-urnem formatu:
+    - 1x dnevno: ["08:00"] (zjutraj) razen če piše zvečer/pred spanjem potem ["20:00"]
+    - 2x dnevno: ["08:00", "20:00"] (zjutraj in zvečer)
+    - 3x dnevno: ["08:00", "14:00", "20:00"] (zjutraj, popoldne, zvečer)
+    - 4x dnevno: ["08:00", "12:00", "16:00", "20:00"]
+    - Če so navedeni specifični časi (npr. "ob 8h in 20h"), uporabi te
+11. Morebitne druge pomembne opombe
 
-Respond ONLY in valid JSON format:
+Odgovori IZKLJUČNO v veljavnem JSON formatu:
 {
-  "medicationName": "string or null",
-  "medicationType": "string or null",
-  "pillSize": "string or null",
-  "quantityInBox": number or null,
-  "pharmacyName": "string or null",
-  "patientName": "string or null",
-  "intakeAdvice": "string or null",
+  "medicationName": "ime z jakostjo npr. Lekadol 500 mg ali null",
+  "medicationType": "oblika v slovenščini ali null",
+  "pillSize": "jakost ali null",
+  "quantityInBox": število ali null,
+  "pharmacyName": "ime lekarne ali null",
+  "patientName": "ime pacienta ali null",
+  "intakeAdvice": "vsi nasveti za jemanje v slovenščini ali null",
   "dosageFrequency": {
-    "timesPerDay": number or null,
-    "amountPerDose": number or null,
-    "intervalHours": number or null,
+    "timesPerDay": število ali null,
+    "amountPerDose": število ali null,
+    "intervalHours": število ali null,
     "isAsNeeded": boolean,
     "isCyclic": boolean,
-    "cyclicDaysOn": number or null,
-    "cyclicDaysOff": number or null,
-    "specificDays": [array of day numbers 0-6] or null,
-    "rawText": "original frequency text from label or null",
-    "suggestedTimes": ["HH:MM", "HH:MM", ...] array of suggested times in 24h format or null
+    "cyclicDaysOn": število ali null,
+    "cyclicDaysOff": število ali null,
+    "specificDays": [seznam dni 0-6] ali null,
+    "rawText": "originalno besedilo pogostosti ali null",
+    "suggestedTimes": ["HH:MM", "HH:MM", ...] predlagani časi v 24-urnem formatu ali null
   },
-  "notes": "any additional important notes or null"
+  "notes": "dodatne pomembne opombe v slovenščini ali null"
 }
 
-Use null for fields you cannot identify. Do not include any text outside the JSON.
+Uporabi null za polja, ki jih ne moreš identificirati. Ne vključi nobenega besedila izven JSON-a.
+VSE vrednosti morajo biti v SLOVENŠČINI, tudi če je nalepka v angleščini!
 ''';
 
       final content = [

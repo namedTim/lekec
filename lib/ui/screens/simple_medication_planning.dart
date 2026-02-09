@@ -50,6 +50,9 @@ class _SimpleMedicationPlanningScreenState
   @override
   void initState() {
     super.initState();
+    // Default start date to today
+    _startDate = DateTime.now();
+    
     // Auto-fill from extracted data if available
     if (widget.extractedData != null) {
       // Set quantity per dose
@@ -225,7 +228,7 @@ class _SimpleMedicationPlanningScreenState
         medicationId: medicationId,
         startDate: _startDate ?? DateTime.now(),
         dosageAmount: _quantity.toDouble(),
-        initialQuantity: _initialQuantity?.toDouble(),
+        initialQuantity: _initialQuantity.toDouble(),
         ruleType: ruleType,
         times: times,
       );
@@ -339,6 +342,36 @@ class _SimpleMedicationPlanningScreenState
                   onTap: _selectFirstIntakeTime,
                   isAiSuggested: _isTimeAiSuggested,
                 ),
+                
+                // Show second intake time info for twice daily
+                if (widget.frequency == FrequencyOption.twiceDaily && _firstIntakeTime != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.secondaryContainer.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Symbols.info,
+                          size: 18,
+                          color: colors.onSecondaryContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Drugi vnos bo čez 12 ur ob ${_formatTime(TimeOfDay(hour: (_firstIntakeTime!.hour + 12) % 24, minute: _firstIntakeTime!.minute))}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSecondaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Quantity
