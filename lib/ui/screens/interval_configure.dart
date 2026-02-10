@@ -10,6 +10,7 @@ import '../../features/meds/providers/medications_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
 
 class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -40,6 +41,7 @@ class _IntervalConfigureScreenState
   int _initialQuantity = 0;
   int _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = false;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +265,14 @@ class _IntervalConfigureScreenState
                 ),
               ),
 
+              const SizedBox(height: 16),
+
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+
               const Spacer(),
 
               FilledButton(
@@ -315,6 +325,7 @@ class _IntervalConfigureScreenState
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 

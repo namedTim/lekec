@@ -8,7 +8,8 @@ class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key, required this.onNext});
 
   @override
-  State<UserTypeSelectionScreen> createState() => _UserTypeSelectionScreenState();
+  State<UserTypeSelectionScreen> createState() =>
+      _UserTypeSelectionScreenState();
 }
 
 class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
@@ -20,10 +21,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
     final colors = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nastavitev'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Nastavitev'), centerTitle: true),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -31,7 +29,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              
+
               Text(
                 'Kako boste uporabljali Lekec?',
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -39,9 +37,9 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               Text(
                 'To nam pomaga prilagoditi aplikacijo vašim potrebam',
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -49,21 +47,22 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Personal Use Option
               _UserTypeCard(
                 icon: Symbols.person,
                 title: 'Osebna uporaba',
-                description: 'Uporabljam aplikacijo za sledenje svojim zdravilom',
+                description:
+                    'Uporabljam aplikacijo za sledenje svojim zdravilom',
                 isSelected: _selectedType == UserType.personal,
                 onTap: () => setState(() => _selectedType = UserType.personal),
                 colors: colors,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Family Use Option
               _UserTypeCard(
                 icon: Symbols.family_restroom,
@@ -73,21 +72,22 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 onTap: () => setState(() => _selectedType = UserType.family),
                 colors: colors,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Caregiver Option
               _UserTypeCard(
                 icon: Symbols.medical_services,
                 title: 'Negovalec / Zdravstveni delavec',
-                description: 'Pomagam starejšim ali več osebam pri jemanju zdravil',
+                description:
+                    'Pomagam starejšim ali več osebam pri jemanju zdravil',
                 isSelected: _selectedType == UserType.caregiver,
                 onTap: () => setState(() => _selectedType = UserType.caregiver),
                 colors: colors,
               ),
-              
+
               const Spacer(),
-              
+
               // Continue Button
               FilledButton(
                 onPressed: _selectedType != null
@@ -95,19 +95,17 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                     : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
             ],
           ),
@@ -143,7 +141,9 @@ class _UserTypeCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isSelected ? colors.primary : colors.outline.withOpacity(0.5),
+            color: isSelected
+                ? colors.primary
+                : colors.outline.withOpacity(0.5),
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(16),
@@ -191,11 +191,7 @@ class _UserTypeCard extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              Icon(
-                Symbols.check_circle,
-                color: colors.primary,
-                fill: 1,
-              ),
+              Icon(Symbols.check_circle, color: colors.primary, fill: 1),
           ],
         ),
       ),

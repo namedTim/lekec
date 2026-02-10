@@ -10,6 +10,7 @@ import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../../services/gemini_medication_service.dart';
 import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
 
 class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -41,6 +42,7 @@ class _MultipleTimesSelectTimesScreenState
   int _initialQuantity = 0;
   int _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = false;
 
   @override
   void initState() {
@@ -421,6 +423,13 @@ class _MultipleTimesSelectTimesScreenState
               ),
               const SizedBox(height: 16),
 
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+              const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: allTimesSelected && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
@@ -469,6 +478,7 @@ class _MultipleTimesSelectTimesScreenState
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 

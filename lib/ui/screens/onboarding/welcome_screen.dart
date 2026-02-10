@@ -19,16 +19,13 @@ class WelcomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              
+
               // App Icon/Logo
               Container(
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: colors.primary,
-                    width: 2,
-                  ),
+                  border: Border.all(color: colors.primary, width: 2),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Icon(
@@ -38,9 +35,9 @@ class WelcomeScreen extends StatelessWidget {
                   fill: 1,
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Welcome Title
               Text(
                 'Pozdravljeni v Lekec',
@@ -50,9 +47,9 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Subtitle
               Text(
                 'Vaš osebni pomočnik za spremljanje jemanja zdravil',
@@ -61,55 +58,64 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 48),
-              
+
               // Features List
+              _FeatureItem(
+                icon: Symbols.photo_camera,
+                title: 'AI branje zdravil',
+                description:
+                    'Slikajte recept zdravila in podatki se samodejno izpolnijo',
+                colors: colors,
+              ),
+
+              const SizedBox(height: 20),
+
               _FeatureItem(
                 icon: Symbols.alarm,
                 title: 'Pametni opomniki',
-                description: 'Vedno vzemite pravilen odmerek ob pravem času',
+                description: 'Obvestila in kritični alarmi ob pravem času',
                 colors: colors,
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               _FeatureItem(
                 icon: Symbols.calendar_month,
                 title: 'Prilagodljivi urnik',
                 description: 'Načrtujte jemanje zdravil po svojih potrebah',
                 colors: colors,
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               _FeatureItem(
                 icon: Symbols.group,
                 title: 'Več uporabnikov',
-                description: 'Upravljajte zdravila za celo družino ali skrbite za druge',
+                description:
+                    'Upravljajte zdravila za celo družino ali skrbite za druge',
                 colors: colors,
               ),
-              
+
               const Spacer(),
-              
+
               // Get Started Button
               FilledButton(
                 onPressed: onNext,
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: const Text(
                   'Začnimo',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
             ],
           ),
@@ -140,17 +146,10 @@ class _FeatureItem extends StatelessWidget {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            border: Border.all(
-              color: colors.primary,
-              width: 2,
-            ),
+            border: Border.all(color: colors.primary, width: 2),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: colors.primary,
-            size: 28,
-          ),
+          child: Icon(icon, color: colors.primary, size: 28),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -167,10 +166,7 @@ class _FeatureItem extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: colors.onSurfaceVariant,
-                ),
+                style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant),
               ),
             ],
           ),

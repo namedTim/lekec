@@ -29,7 +29,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 3) {
+    if (_currentPage < 4) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -47,7 +47,8 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final greeting = widget.userType == UserType.personal && widget.userName != null
+    final greeting =
+        widget.userType == UserType.personal && widget.userName != null
         ? 'Pozdravljeni, ${widget.userName}!'
         : null;
 
@@ -64,7 +65,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                   const SizedBox(width: 80), // Spacer for center alignment
                   // Page Indicator
                   Row(
-                    children: List.generate(4, (index) {
+                    children: List.generate(5, (index) {
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: _currentPage == index ? 24 : 8,
@@ -85,7 +86,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                 ],
               ),
             ),
-            
+
             // PageView
             Expanded(
               child: PageView(
@@ -102,26 +103,38 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                     title: 'Dodajte zdravila',
                     description:
                         'Preprosto dodajte zdravila, ki jih jemljete. '
-                        'Določite vrsto zdravila, odmero in navodila za jemanje.',
-                    colors: colors,
-                  ),
-                  _GuidePage(
-                    icon: Symbols.schedule,
-                    title: 'Nastavite urnike',
-                    description:
-                        'Prilagodite urnik jemanja po svojih potrebah. '
-                        'Izberite med preprostimi ali naprednimi možnostmi: '
+                        'Določite vrsto zdravila, odmero in navodila za jemanje. '
+                        'Izberite med preprostimi ali naprednimi urniki: '
                         'dnevno, intervalsko, specifični dnevi, ciklično in več.',
                     colors: colors,
                   ),
                   _GuidePage(
-                    icon: Symbols.notifications_active,
-                    title: 'Prejmite opomnike',
+                    icon: Symbols.photo_camera,
+                    title: 'AI branje zdravil',
                     description:
-                        'Aplikacija vas bo opozorila, ko pride čas za jemanje zdravil. '
-                        'Potrdite jemanje ali ga odložite. Za kritična zdravila '
-                        'lahko omogočite kritične opomnike z zvonenjem in vibriranjem '
-                        '(spremenljivo v nastavitvah).',
+                        'Slikajte recept zdravila s kamero – '
+                        'umetna inteligenca bo samodejno prebrala ime, '
+                        'odmero, pogostost jemanja in število v škatli. '
+                        'Podatki se izpolnijo avtomatsko, vi pa jih le potrdite.',
+                    colors: colors,
+                  ),
+                  _GuidePage(
+                    icon: Symbols.notifications,
+                    title: 'Potisna obvestila',
+                    description:
+                        'Ob vsakem opomniku prejmete potisno obvestilo na telefon. '
+                        'Obvestilo se prikaže v vrstici z obvestili – '
+                        'tapnite ga, da potrdite jemanje ali ga odložite.',
+                    colors: colors,
+                  ),
+                  _GuidePage(
+                    icon: Symbols.alarm,
+                    title: 'Kritični opomniki',
+                    description:
+                        'Za najpomembnejša zdravila omogočite kritične opomnike. '
+                        'Telefon bo glasno zvonil in vibriral ter prikazal obvestilo na zaslonu – '
+                        'tudi ko je zaslon ugasnjen ali telefon utišan (ne v načinu Ne moti). '
+                        'Melodijo in vibracijo lahko spremenite v nastavitvah.',
                     colors: colors,
                   ),
                   _GuidePage(
@@ -135,7 +148,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                 ],
               ),
             ),
-            
+
             // Bottom Button
             Padding(
               padding: const EdgeInsets.all(24.0),
@@ -149,7 +162,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                   ),
                 ),
                 child: Text(
-                  _currentPage < 3 ? 'Naprej' : 'Začnimo!',
+                  _currentPage < 4 ? 'Naprej' : 'Začnimo!',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -199,28 +212,20 @@ class _GuidePage extends StatelessWidget {
             ),
             const SizedBox(height: 40),
           ],
-          
+
           // Icon
           Container(
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              border: Border.all(
-                color: colors.primary,
-                width: 2,
-              ),
+              border: Border.all(color: colors.primary, width: 2),
               borderRadius: BorderRadius.circular(30),
             ),
-            child: Icon(
-              icon,
-              size: 64,
-              color: colors.primary,
-              fill: 1,
-            ),
+            child: Icon(icon, size: 64, color: colors.primary, fill: 1),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Title
           Text(
             title,
@@ -229,9 +234,9 @@ class _GuidePage extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Description
           Text(
             description,

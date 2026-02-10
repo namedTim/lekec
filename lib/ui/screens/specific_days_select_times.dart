@@ -9,6 +9,7 @@ import '../../features/meds/providers/medications_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
 
 class SpecificDaysSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -37,6 +38,7 @@ class _SpecificDaysSelectTimesScreenState
   int _initialQuantity = 0;
   int _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = false;
 
   final List<String> _dayNames = [
     'Ponedeljek',
@@ -289,6 +291,13 @@ class _SpecificDaysSelectTimesScreenState
               ),
               const SizedBox(height: 16),
 
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+              const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: _times.isNotEmpty && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
@@ -337,6 +346,7 @@ class _SpecificDaysSelectTimesScreenState
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 

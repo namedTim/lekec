@@ -8,6 +8,7 @@ import '../../database/tables/medications.dart';
 import '../../services/gemini_medication_service.dart';
 import '../components/quantity_selector.dart';
 import '../components/step_progress_indicator.dart';
+import '../components/critical_reminder_recap.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../data/services/notification_service.dart';
@@ -46,13 +47,14 @@ class _SimpleMedicationPlanningScreenState
   int _initialQuantity = 0;
   bool _isSaving = false;
   bool _isTimeAiSuggested = false;
+  bool _criticalReminder = false;
 
   @override
   void initState() {
     super.initState();
     // Default start date to today
     _startDate = DateTime.now();
-    
+
     // Auto-fill from extracted data if available
     if (widget.extractedData != null) {
       // Set quantity per dose
@@ -187,6 +189,7 @@ class _SimpleMedicationPlanningScreenState
         MedicationsCompanion(
           name: drift.Value(widget.medicationName),
           medType: drift.Value(widget.medType),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 
@@ -342,9 +345,10 @@ class _SimpleMedicationPlanningScreenState
                   onTap: _selectFirstIntakeTime,
                   isAiSuggested: _isTimeAiSuggested,
                 ),
-                
+
                 // Show second intake time info for twice daily
-                if (widget.frequency == FrequencyOption.twiceDaily && _firstIntakeTime != null) ...[
+                if (widget.frequency == FrequencyOption.twiceDaily &&
+                    _firstIntakeTime != null) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -392,7 +396,7 @@ class _SimpleMedicationPlanningScreenState
                       : 'Izberite količino',
                   onTap: _selectInitialQuantity,
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 16),
               ] else ...[
                 Text(
                   'Zdravilo bo na voljo za ročni vnos brez opomnikov.',
@@ -400,6 +404,16 @@ class _SimpleMedicationPlanningScreenState
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
+              ],
+
+              // Critical Reminder Recap
+              if (widget.frequency != FrequencyOption.asNeeded) ...[
+                CriticalReminderRecap(
+                  enabled: _criticalReminder,
+                  onChanged: (value) =>
+                      setState(() => _criticalReminder = value),
+                ),
+                const SizedBox(height: 24),
               ],
 
               FilledButton(
