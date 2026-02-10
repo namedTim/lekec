@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
 
 class IntakeLogService {
   final AppDatabase db;
@@ -77,7 +78,8 @@ class IntakeLogService {
       )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
     }
 
-    if (medication == null) return null;
+    if (medication == null || medication.status == MedicationStatus.deleted)
+      return null;
 
     final scheduledTime = nextIntake.scheduledTime;
     final timeDiff = now.difference(scheduledTime);
@@ -123,14 +125,16 @@ class IntakeLogService {
         db.medications,
       )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
 
-      if (medication == null) continue;
+      if (medication == null || medication.status == MedicationStatus.deleted)
+        continue;
 
       // Check if it's a one-time entry
       final rule = await (db.select(
         db.medicationScheduleRules,
       )..where((t) => t.planId.equals(plan.id))).getSingleOrNull();
 
-      final isOneTime = rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
+      final isOneTime =
+          rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
 
       final timeKey =
           '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';

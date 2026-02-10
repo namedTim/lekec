@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
 
 /// Service to generate future medication intake entries
 class IntakeScheduleGenerator {
@@ -31,6 +32,18 @@ class IntakeScheduleGenerator {
     int totalGenerated = 0;
 
     for (final plan in activePlans) {
+      // Skip plans belonging to deleted medications
+      final medication = await (db.select(
+        db.medications,
+      )..where((m) => m.id.equals(plan.medicationId))).getSingleOrNull();
+      if (medication == null || medication.status == MedicationStatus.deleted) {
+        developer.log(
+          'Plan ${plan.id}: skipping - medication ${plan.medicationId} is deleted or missing',
+          name: 'IntakeScheduler',
+        );
+        continue;
+      }
+
       final generated = await _generateForPlan(plan, now, horizon);
       totalGenerated += generated;
       developer.log(

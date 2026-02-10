@@ -23,7 +23,8 @@ class MedicationService {
     final existingMeds =
         await (db.select(db.medications)
               ..where((m) => m.name.equals(name))
-              ..where((m) => m.medType.equalsValue(medType)))
+              ..where((m) => m.medType.equalsValue(medType))
+              ..where((m) => m.status.equalsValue(MedicationStatus.active)))
             .get();
 
     if (existingMeds.isNotEmpty) {
@@ -46,17 +47,18 @@ class MedicationService {
     final now = DateTime.now();
 
     // Get all future intake logs for this medication before deleting
-    final futureIntakes = await (db.select(db.medicationIntakeLogs)
-          ..where((log) => log.medicationId.equals(medicationId))
-          ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
-        .get();
+    final futureIntakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((log) => log.medicationId.equals(medicationId))
+              ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+            .get();
 
     // Cancel all alarms and notifications for these intakes
     final notificationService = NotificationService();
     for (final intake in futureIntakes) {
       // Cancel alarm (for critical reminders)
       await Alarm.stop(intake.id);
-      
+
       // Cancel notification (for regular reminders)
       await notificationService.cancelNotification(intake.id);
     }
@@ -67,6 +69,23 @@ class MedicationService {
     )..where((m) => m.id.equals(medicationId))).write(
       MedicationsCompanion(status: drift.Value(MedicationStatus.deleted)),
     );
+
+    // Deactivate all plans for this medication so they are not regenerated
+    await (db.update(db.medicationPlans)
+          ..where((p) => p.medicationId.equals(medicationId)))
+        .write(const MedicationPlansCompanion(isActive: drift.Value(false)));
+
+    // Deactivate all schedule rules for this medication's plans
+    final plans = await (db.select(
+      db.medicationPlans,
+    )..where((p) => p.medicationId.equals(medicationId))).get();
+    for (final plan in plans) {
+      await (db.update(
+        db.medicationScheduleRules,
+      )..where((r) => r.planId.equals(plan.id))).write(
+        const MedicationScheduleRulesCompanion(isActive: drift.Value(false)),
+      );
+    }
 
     // Delete all future intake logs (keep historical data)
     await (db.delete(db.medicationIntakeLogs)
