@@ -26,6 +26,7 @@ class UserSetupScreen extends StatefulWidget {
 class _UserSetupScreenState extends State<UserSetupScreen> {
   final _familyNameController = TextEditingController();
   final _userNameController = TextEditingController();
+  final _userNameFocusNode = FocusNode();
   final List<String> _userNames = [];
   final List<int?> _userAges = [];
   final List<String?> _userGenders = [];
@@ -53,6 +54,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   void dispose() {
     _familyNameController.dispose();
     _userNameController.dispose();
+    _userNameFocusNode.dispose();
     super.dispose();
   }
 
@@ -78,7 +80,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
         _selectedBirthYear = picked.year;
       });
     }
-    if (mounted) FocusScope.of(context).unfocus();
+    if (mounted) _userNameFocusNode.unfocus();
   }
 
   int? _calculateAge() {
@@ -175,6 +177,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                     // User Name Input
                     TextField(
                       controller: _userNameController,
+                      focusNode: _userNameFocusNode,
                       decoration: InputDecoration(
                         labelText: _getInputLabel(),
                         hintText: widget.userType == UserType.personal
