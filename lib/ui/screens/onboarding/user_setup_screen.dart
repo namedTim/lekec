@@ -29,6 +29,14 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   int? _selectedBirthYear;
 
   @override
+  void initState() {
+    super.initState();
+    _userNameController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _familyNameController.dispose();
     _userNameController.dispose();
@@ -163,7 +171,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onSubmitted: (_) => _addUser(),
+                      onSubmitted: (_) => FocusScope.of(context).unfocus(),
                     ),
 
                     const SizedBox(height: 12),
