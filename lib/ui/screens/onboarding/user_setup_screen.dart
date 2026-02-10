@@ -8,6 +8,7 @@ class UserSetupScreen extends StatefulWidget {
     String? familyName,
     List<String> userNames,
     List<int?> userAges,
+    List<String?> userGenders,
   )
   onNext;
 
@@ -26,7 +27,9 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   final _userNameController = TextEditingController();
   final List<String> _userNames = [];
   final List<int?> _userAges = [];
+  final List<String?> _userGenders = [];
   int? _selectedBirthYear;
+  String? _selectedGender;
 
   @override
   void initState() {
@@ -65,6 +68,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
         _selectedBirthYear = picked.year;
       });
     }
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   int? _calculateAge() {
@@ -79,8 +83,10 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
       setState(() {
         _userNames.add(name);
         _userAges.add(_calculateAge());
+        _userGenders.add(_selectedGender);
         _userNameController.clear();
         _selectedBirthYear = null;
+        _selectedGender = null;
       });
     }
   }
@@ -89,6 +95,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
     setState(() {
       _userNames.removeAt(index);
       _userAges.removeAt(index);
+      _userGenders.removeAt(index);
     });
   }
 
@@ -207,6 +214,63 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                             ),
                           ),
                         ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Gender Picker
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Spol (neobvezno)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment<String>(
+                                    value: 'male',
+                                    label: Text('Moški'),
+                                    icon: Icon(Symbols.male),
+                                  ),
+                                  ButtonSegment<String>(
+                                    value: 'female',
+                                    label: Text('Ženski'),
+                                    icon: Icon(Symbols.female),
+                                  ),
+                                ],
+                                selected: _selectedGender != null
+                                    ? {_selectedGender!}
+                                    : {},
+                                onSelectionChanged: (selected) {
+                                  setState(() {
+                                    _selectedGender = selected.isEmpty
+                                        ? null
+                                        : selected.first;
+                                  });
+                                },
+                                emptySelectionAllowed: true,
+                                style: ButtonStyle(
+                                  shape: WidgetStatePropertyAll(
+                                    RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  visualDensity: VisualDensity.comfortable,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(width: 12),
                         FilledButton.icon(
                           onPressed: _userNameController.text.trim().isNotEmpty
@@ -290,9 +354,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                                 ),
                               ),
                               title: Text(_userNames[index]),
-                              subtitle: _userAges[index] != null
-                                  ? Text('${_userAges[index]} let')
-                                  : null,
+                              subtitle: _buildUserSubtitle(index),
                               trailing: IconButton(
                                 icon: Icon(Symbols.delete, color: colors.error),
                                 onPressed: () => _removeUser(index),
@@ -349,6 +411,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                               : null,
                           _userNames,
                           _userAges,
+                          _userGenders,
                         );
                       }
                     : null,
@@ -405,6 +468,25 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
         return 'Dodajte družinske člane, ki bodo uporabljali aplikacijo';
       case UserType.caregiver:
         return 'Dodajte imena oseb, katerim pomagate pri jemanju zdravil';
+    }
+  }
+
+  Widget? _buildUserSubtitle(int index) {
+    final parts = <String>[];
+    if (_userAges[index] != null) parts.add('${_userAges[index]} let');
+    if (_userGenders[index] != null)
+      parts.add(_genderLabel(_userGenders[index]!));
+    return parts.isNotEmpty ? Text(parts.join(' · ')) : null;
+  }
+
+  String _genderLabel(String gender) {
+    switch (gender) {
+      case 'female':
+        return 'Ženski';
+      case 'male':
+        return 'Moški';
+      default:
+        return gender;
     }
   }
 }

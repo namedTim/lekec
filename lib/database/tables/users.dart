@@ -4,6 +4,10 @@ class Users extends Table {
   IntColumn get id => integer().autoIncrement()(); // UUID
   TextColumn get name => text()();
   IntColumn get age => integer().nullable()();
+
+  /// Gender: 'male', 'female', or 'other'. Nullable for backwards compatibility.
+  TextColumn get gender => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 }

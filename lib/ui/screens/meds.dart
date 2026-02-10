@@ -106,6 +106,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                 name: result.name,
                 createdAt: drift.Value(DateTime.now()),
                 age: drift.Value(result.age),
+                gender: drift.Value(result.gender),
               ),
             );
 

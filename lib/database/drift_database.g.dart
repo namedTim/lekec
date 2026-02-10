@@ -39,6 +39,15 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _genderMeta = const VerificationMeta('gender');
+  @override
+  late final GeneratedColumn<String> gender = GeneratedColumn<String>(
+    'gender',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -67,7 +76,14 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     defaultValue: const Constant(true),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, age, createdAt, isActive];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    age,
+    gender,
+    createdAt,
+    isActive,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -95,6 +111,12 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
       context.handle(
         _ageMeta,
         age.isAcceptableOrUnknown(data['age']!, _ageMeta),
+      );
+    }
+    if (data.containsKey('gender')) {
+      context.handle(
+        _genderMeta,
+        gender.isAcceptableOrUnknown(data['gender']!, _genderMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -130,6 +152,10 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.int,
         data['${effectivePrefix}age'],
       ),
+      gender: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}gender'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -151,12 +177,16 @@ class User extends DataClass implements Insertable<User> {
   final int id;
   final String name;
   final int? age;
+
+  /// Gender: 'male', 'female', or 'other'. Nullable for backwards compatibility.
+  final String? gender;
   final DateTime createdAt;
   final bool isActive;
   const User({
     required this.id,
     required this.name,
     this.age,
+    this.gender,
     required this.createdAt,
     required this.isActive,
   });
@@ -168,6 +198,9 @@ class User extends DataClass implements Insertable<User> {
     if (!nullToAbsent || age != null) {
       map['age'] = Variable<int>(age);
     }
+    if (!nullToAbsent || gender != null) {
+      map['gender'] = Variable<String>(gender);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['is_active'] = Variable<bool>(isActive);
     return map;
@@ -178,6 +211,9 @@ class User extends DataClass implements Insertable<User> {
       id: Value(id),
       name: Value(name),
       age: age == null && nullToAbsent ? const Value.absent() : Value(age),
+      gender: gender == null && nullToAbsent
+          ? const Value.absent()
+          : Value(gender),
       createdAt: Value(createdAt),
       isActive: Value(isActive),
     );
@@ -192,6 +228,7 @@ class User extends DataClass implements Insertable<User> {
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       age: serializer.fromJson<int?>(json['age']),
+      gender: serializer.fromJson<String?>(json['gender']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
@@ -203,6 +240,7 @@ class User extends DataClass implements Insertable<User> {
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
       'age': serializer.toJson<int?>(age),
+      'gender': serializer.toJson<String?>(gender),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'isActive': serializer.toJson<bool>(isActive),
     };
@@ -212,12 +250,14 @@ class User extends DataClass implements Insertable<User> {
     int? id,
     String? name,
     Value<int?> age = const Value.absent(),
+    Value<String?> gender = const Value.absent(),
     DateTime? createdAt,
     bool? isActive,
   }) => User(
     id: id ?? this.id,
     name: name ?? this.name,
     age: age.present ? age.value : this.age,
+    gender: gender.present ? gender.value : this.gender,
     createdAt: createdAt ?? this.createdAt,
     isActive: isActive ?? this.isActive,
   );
@@ -226,6 +266,7 @@ class User extends DataClass implements Insertable<User> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       age: data.age.present ? data.age.value : this.age,
+      gender: data.gender.present ? data.gender.value : this.gender,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
@@ -237,6 +278,7 @@ class User extends DataClass implements Insertable<User> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('age: $age, ')
+          ..write('gender: $gender, ')
           ..write('createdAt: $createdAt, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -244,7 +286,7 @@ class User extends DataClass implements Insertable<User> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, age, createdAt, isActive);
+  int get hashCode => Object.hash(id, name, age, gender, createdAt, isActive);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -252,6 +294,7 @@ class User extends DataClass implements Insertable<User> {
           other.id == this.id &&
           other.name == this.name &&
           other.age == this.age &&
+          other.gender == this.gender &&
           other.createdAt == this.createdAt &&
           other.isActive == this.isActive);
 }
@@ -260,12 +303,14 @@ class UsersCompanion extends UpdateCompanion<User> {
   final Value<int> id;
   final Value<String> name;
   final Value<int?> age;
+  final Value<String?> gender;
   final Value<DateTime> createdAt;
   final Value<bool> isActive;
   const UsersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.age = const Value.absent(),
+    this.gender = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isActive = const Value.absent(),
   });
@@ -273,6 +318,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.id = const Value.absent(),
     required String name,
     this.age = const Value.absent(),
+    this.gender = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : name = Value(name);
@@ -280,6 +326,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Expression<int>? id,
     Expression<String>? name,
     Expression<int>? age,
+    Expression<String>? gender,
     Expression<DateTime>? createdAt,
     Expression<bool>? isActive,
   }) {
@@ -287,6 +334,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (age != null) 'age': age,
+      if (gender != null) 'gender': gender,
       if (createdAt != null) 'created_at': createdAt,
       if (isActive != null) 'is_active': isActive,
     });
@@ -296,6 +344,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Value<int>? id,
     Value<String>? name,
     Value<int?>? age,
+    Value<String?>? gender,
     Value<DateTime>? createdAt,
     Value<bool>? isActive,
   }) {
@@ -303,6 +352,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       id: id ?? this.id,
       name: name ?? this.name,
       age: age ?? this.age,
+      gender: gender ?? this.gender,
       createdAt: createdAt ?? this.createdAt,
       isActive: isActive ?? this.isActive,
     );
@@ -320,6 +370,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (age.present) {
       map['age'] = Variable<int>(age.value);
     }
+    if (gender.present) {
+      map['gender'] = Variable<String>(gender.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -335,6 +388,7 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('age: $age, ')
+          ..write('gender: $gender, ')
           ..write('createdAt: $createdAt, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -3425,6 +3479,813 @@ class OnboardingSettingsCompanion extends UpdateCompanion<OnboardingSetting> {
   }
 }
 
+class $MoodEntriesTable extends MoodEntries
+    with TableInfo<$MoodEntriesTable, MoodEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MoodEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES users (id)',
+    ),
+  );
+  static const VerificationMeta _moodLevelMeta = const VerificationMeta(
+    'moodLevel',
+  );
+  @override
+  late final GeneratedColumn<int> moodLevel = GeneratedColumn<int>(
+    'mood_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    userId,
+    moodLevel,
+    note,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'mood_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MoodEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('mood_level')) {
+      context.handle(
+        _moodLevelMeta,
+        moodLevel.isAcceptableOrUnknown(data['mood_level']!, _moodLevelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_moodLevelMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MoodEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MoodEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}user_id'],
+      )!,
+      moodLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}mood_level'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MoodEntriesTable createAlias(String alias) {
+    return $MoodEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class MoodEntry extends DataClass implements Insertable<MoodEntry> {
+  final int id;
+  final int userId;
+
+  /// Mood level from 1 (very bad) to 5 (great)
+  final int moodLevel;
+
+  /// Optional note about the mood
+  final String? note;
+  final DateTime createdAt;
+  const MoodEntry({
+    required this.id,
+    required this.userId,
+    required this.moodLevel,
+    this.note,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['user_id'] = Variable<int>(userId);
+    map['mood_level'] = Variable<int>(moodLevel);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  MoodEntriesCompanion toCompanion(bool nullToAbsent) {
+    return MoodEntriesCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      moodLevel: Value(moodLevel),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MoodEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MoodEntry(
+      id: serializer.fromJson<int>(json['id']),
+      userId: serializer.fromJson<int>(json['userId']),
+      moodLevel: serializer.fromJson<int>(json['moodLevel']),
+      note: serializer.fromJson<String?>(json['note']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'userId': serializer.toJson<int>(userId),
+      'moodLevel': serializer.toJson<int>(moodLevel),
+      'note': serializer.toJson<String?>(note),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  MoodEntry copyWith({
+    int? id,
+    int? userId,
+    int? moodLevel,
+    Value<String?> note = const Value.absent(),
+    DateTime? createdAt,
+  }) => MoodEntry(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    moodLevel: moodLevel ?? this.moodLevel,
+    note: note.present ? note.value : this.note,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MoodEntry copyWithCompanion(MoodEntriesCompanion data) {
+    return MoodEntry(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      moodLevel: data.moodLevel.present ? data.moodLevel.value : this.moodLevel,
+      note: data.note.present ? data.note.value : this.note,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MoodEntry(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('moodLevel: $moodLevel, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, userId, moodLevel, note, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MoodEntry &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.moodLevel == this.moodLevel &&
+          other.note == this.note &&
+          other.createdAt == this.createdAt);
+}
+
+class MoodEntriesCompanion extends UpdateCompanion<MoodEntry> {
+  final Value<int> id;
+  final Value<int> userId;
+  final Value<int> moodLevel;
+  final Value<String?> note;
+  final Value<DateTime> createdAt;
+  const MoodEntriesCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.moodLevel = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  MoodEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required int userId,
+    required int moodLevel,
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : userId = Value(userId),
+       moodLevel = Value(moodLevel);
+  static Insertable<MoodEntry> custom({
+    Expression<int>? id,
+    Expression<int>? userId,
+    Expression<int>? moodLevel,
+    Expression<String>? note,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (moodLevel != null) 'mood_level': moodLevel,
+      if (note != null) 'note': note,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  MoodEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? userId,
+    Value<int>? moodLevel,
+    Value<String?>? note,
+    Value<DateTime>? createdAt,
+  }) {
+    return MoodEntriesCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      moodLevel: moodLevel ?? this.moodLevel,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (moodLevel.present) {
+      map['mood_level'] = Variable<int>(moodLevel.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MoodEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('moodLevel: $moodLevel, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PeriodEntriesTable extends PeriodEntries
+    with TableInfo<$PeriodEntriesTable, PeriodEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PeriodEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES users (id)',
+    ),
+  );
+  static const VerificationMeta _entryTypeMeta = const VerificationMeta(
+    'entryType',
+  );
+  @override
+  late final GeneratedColumn<String> entryType = GeneratedColumn<String>(
+    'entry_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _flowIntensityMeta = const VerificationMeta(
+    'flowIntensity',
+  );
+  @override
+  late final GeneratedColumn<int> flowIntensity = GeneratedColumn<int>(
+    'flow_intensity',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    userId,
+    entryType,
+    flowIntensity,
+    note,
+    date,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'period_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PeriodEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('entry_type')) {
+      context.handle(
+        _entryTypeMeta,
+        entryType.isAcceptableOrUnknown(data['entry_type']!, _entryTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryTypeMeta);
+    }
+    if (data.containsKey('flow_intensity')) {
+      context.handle(
+        _flowIntensityMeta,
+        flowIntensity.isAcceptableOrUnknown(
+          data['flow_intensity']!,
+          _flowIntensityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PeriodEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PeriodEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}user_id'],
+      )!,
+      entryType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entry_type'],
+      )!,
+      flowIntensity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}flow_intensity'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PeriodEntriesTable createAlias(String alias) {
+    return $PeriodEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class PeriodEntry extends DataClass implements Insertable<PeriodEntry> {
+  final int id;
+  final int userId;
+
+  /// Type of entry: 'start', 'end', 'note'
+  final String entryType;
+
+  /// Flow intensity 1 (light) to 3 (heavy), nullable for end/note types
+  final int? flowIntensity;
+
+  /// Optional note
+  final String? note;
+  final DateTime date;
+  final DateTime createdAt;
+  const PeriodEntry({
+    required this.id,
+    required this.userId,
+    required this.entryType,
+    this.flowIntensity,
+    this.note,
+    required this.date,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['user_id'] = Variable<int>(userId);
+    map['entry_type'] = Variable<String>(entryType);
+    if (!nullToAbsent || flowIntensity != null) {
+      map['flow_intensity'] = Variable<int>(flowIntensity);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['date'] = Variable<DateTime>(date);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PeriodEntriesCompanion toCompanion(bool nullToAbsent) {
+    return PeriodEntriesCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      entryType: Value(entryType),
+      flowIntensity: flowIntensity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(flowIntensity),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      date: Value(date),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PeriodEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PeriodEntry(
+      id: serializer.fromJson<int>(json['id']),
+      userId: serializer.fromJson<int>(json['userId']),
+      entryType: serializer.fromJson<String>(json['entryType']),
+      flowIntensity: serializer.fromJson<int?>(json['flowIntensity']),
+      note: serializer.fromJson<String?>(json['note']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'userId': serializer.toJson<int>(userId),
+      'entryType': serializer.toJson<String>(entryType),
+      'flowIntensity': serializer.toJson<int?>(flowIntensity),
+      'note': serializer.toJson<String?>(note),
+      'date': serializer.toJson<DateTime>(date),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PeriodEntry copyWith({
+    int? id,
+    int? userId,
+    String? entryType,
+    Value<int?> flowIntensity = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    DateTime? date,
+    DateTime? createdAt,
+  }) => PeriodEntry(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    entryType: entryType ?? this.entryType,
+    flowIntensity: flowIntensity.present
+        ? flowIntensity.value
+        : this.flowIntensity,
+    note: note.present ? note.value : this.note,
+    date: date ?? this.date,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PeriodEntry copyWithCompanion(PeriodEntriesCompanion data) {
+    return PeriodEntry(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      entryType: data.entryType.present ? data.entryType.value : this.entryType,
+      flowIntensity: data.flowIntensity.present
+          ? data.flowIntensity.value
+          : this.flowIntensity,
+      note: data.note.present ? data.note.value : this.note,
+      date: data.date.present ? data.date.value : this.date,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodEntry(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('entryType: $entryType, ')
+          ..write('flowIntensity: $flowIntensity, ')
+          ..write('note: $note, ')
+          ..write('date: $date, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, userId, entryType, flowIntensity, note, date, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PeriodEntry &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.entryType == this.entryType &&
+          other.flowIntensity == this.flowIntensity &&
+          other.note == this.note &&
+          other.date == this.date &&
+          other.createdAt == this.createdAt);
+}
+
+class PeriodEntriesCompanion extends UpdateCompanion<PeriodEntry> {
+  final Value<int> id;
+  final Value<int> userId;
+  final Value<String> entryType;
+  final Value<int?> flowIntensity;
+  final Value<String?> note;
+  final Value<DateTime> date;
+  final Value<DateTime> createdAt;
+  const PeriodEntriesCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.entryType = const Value.absent(),
+    this.flowIntensity = const Value.absent(),
+    this.note = const Value.absent(),
+    this.date = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  PeriodEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required int userId,
+    required String entryType,
+    this.flowIntensity = const Value.absent(),
+    this.note = const Value.absent(),
+    required DateTime date,
+    this.createdAt = const Value.absent(),
+  }) : userId = Value(userId),
+       entryType = Value(entryType),
+       date = Value(date);
+  static Insertable<PeriodEntry> custom({
+    Expression<int>? id,
+    Expression<int>? userId,
+    Expression<String>? entryType,
+    Expression<int>? flowIntensity,
+    Expression<String>? note,
+    Expression<DateTime>? date,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (entryType != null) 'entry_type': entryType,
+      if (flowIntensity != null) 'flow_intensity': flowIntensity,
+      if (note != null) 'note': note,
+      if (date != null) 'date': date,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  PeriodEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? userId,
+    Value<String>? entryType,
+    Value<int?>? flowIntensity,
+    Value<String?>? note,
+    Value<DateTime>? date,
+    Value<DateTime>? createdAt,
+  }) {
+    return PeriodEntriesCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      entryType: entryType ?? this.entryType,
+      flowIntensity: flowIntensity ?? this.flowIntensity,
+      note: note ?? this.note,
+      date: date ?? this.date,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (entryType.present) {
+      map['entry_type'] = Variable<String>(entryType.value);
+    }
+    if (flowIntensity.present) {
+      map['flow_intensity'] = Variable<int>(flowIntensity.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PeriodEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('entryType: $entryType, ')
+          ..write('flowIntensity: $flowIntensity, ')
+          ..write('note: $note, ')
+          ..write('date: $date, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3440,6 +4301,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $OnboardingSettingsTable onboardingSettings =
       $OnboardingSettingsTable(this);
+  late final $MoodEntriesTable moodEntries = $MoodEntriesTable(this);
+  late final $PeriodEntriesTable periodEntries = $PeriodEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3452,6 +4315,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     medicationIntakeLogs,
     appSettings,
     onboardingSettings,
+    moodEntries,
+    periodEntries,
   ];
 }
 
@@ -3460,6 +4325,7 @@ typedef $$UsersTableCreateCompanionBuilder =
       Value<int> id,
       required String name,
       Value<int?> age,
+      Value<String?> gender,
       Value<DateTime> createdAt,
       Value<bool> isActive,
     });
@@ -3468,6 +4334,7 @@ typedef $$UsersTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> name,
       Value<int?> age,
+      Value<String?> gender,
       Value<DateTime> createdAt,
       Value<bool> isActive,
     });
@@ -3541,6 +4408,42 @@ final class $$UsersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$MoodEntriesTable, List<MoodEntry>>
+  _moodEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.moodEntries,
+    aliasName: $_aliasNameGenerator(db.users.id, db.moodEntries.userId),
+  );
+
+  $$MoodEntriesTableProcessedTableManager get moodEntriesRefs {
+    final manager = $$MoodEntriesTableTableManager(
+      $_db,
+      $_db.moodEntries,
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_moodEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$PeriodEntriesTable, List<PeriodEntry>>
+  _periodEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.periodEntries,
+    aliasName: $_aliasNameGenerator(db.users.id, db.periodEntries.userId),
+  );
+
+  $$PeriodEntriesTableProcessedTableManager get periodEntriesRefs {
+    final manager = $$PeriodEntriesTableTableManager(
+      $_db,
+      $_db.periodEntries,
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_periodEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
@@ -3563,6 +4466,11 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<int> get age => $composableBuilder(
     column: $table.age,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gender => $composableBuilder(
+    column: $table.gender,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3650,6 +4558,56 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
     );
     return f(composer);
   }
+
+  Expression<bool> moodEntriesRefs(
+    Expression<bool> Function($$MoodEntriesTableFilterComposer f) f,
+  ) {
+    final $$MoodEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.moodEntries,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MoodEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.moodEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> periodEntriesRefs(
+    Expression<bool> Function($$PeriodEntriesTableFilterComposer f) f,
+  ) {
+    final $$PeriodEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.periodEntries,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeriodEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.periodEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableOrderingComposer
@@ -3673,6 +4631,11 @@ class $$UsersTableOrderingComposer
 
   ColumnOrderings<int> get age => $composableBuilder(
     column: $table.age,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gender => $composableBuilder(
+    column: $table.gender,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3704,6 +4667,9 @@ class $$UsersTableAnnotationComposer
 
   GeneratedColumn<int> get age =>
       $composableBuilder(column: $table.age, builder: (column) => column);
+
+  GeneratedColumn<String> get gender =>
+      $composableBuilder(column: $table.gender, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3786,6 +4752,56 @@ class $$UsersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> moodEntriesRefs<T extends Object>(
+    Expression<T> Function($$MoodEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$MoodEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.moodEntries,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MoodEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.moodEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> periodEntriesRefs<T extends Object>(
+    Expression<T> Function($$PeriodEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$PeriodEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.periodEntries,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeriodEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.periodEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableTableManager
@@ -3805,6 +4821,8 @@ class $$UsersTableTableManager
             bool medicationPlansRefs,
             bool medicationIntakeLogsRefs,
             bool appSettingsRefs,
+            bool moodEntriesRefs,
+            bool periodEntriesRefs,
           })
         > {
   $$UsersTableTableManager(_$AppDatabase db, $UsersTable table)
@@ -3823,12 +4841,14 @@ class $$UsersTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int?> age = const Value.absent(),
+                Value<String?> gender = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => UsersCompanion(
                 id: id,
                 name: name,
                 age: age,
+                gender: gender,
                 createdAt: createdAt,
                 isActive: isActive,
               ),
@@ -3837,12 +4857,14 @@ class $$UsersTableTableManager
                 Value<int> id = const Value.absent(),
                 required String name,
                 Value<int?> age = const Value.absent(),
+                Value<String?> gender = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => UsersCompanion.insert(
                 id: id,
                 name: name,
                 age: age,
+                gender: gender,
                 createdAt: createdAt,
                 isActive: isActive,
               ),
@@ -3857,6 +4879,8 @@ class $$UsersTableTableManager
                 medicationPlansRefs = false,
                 medicationIntakeLogsRefs = false,
                 appSettingsRefs = false,
+                moodEntriesRefs = false,
+                periodEntriesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -3864,6 +4888,8 @@ class $$UsersTableTableManager
                     if (medicationPlansRefs) db.medicationPlans,
                     if (medicationIntakeLogsRefs) db.medicationIntakeLogs,
                     if (appSettingsRefs) db.appSettings,
+                    if (moodEntriesRefs) db.moodEntries,
+                    if (periodEntriesRefs) db.periodEntries,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -3931,6 +4957,44 @@ class $$UsersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (moodEntriesRefs)
+                        await $_getPrefetchedData<User, $UsersTable, MoodEntry>(
+                          currentTable: table,
+                          referencedTable: $$UsersTableReferences
+                              ._moodEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UsersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).moodEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.userId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (periodEntriesRefs)
+                        await $_getPrefetchedData<
+                          User,
+                          $UsersTable,
+                          PeriodEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$UsersTableReferences
+                              ._periodEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UsersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).periodEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.userId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3955,6 +5019,8 @@ typedef $$UsersTableProcessedTableManager =
         bool medicationPlansRefs,
         bool medicationIntakeLogsRefs,
         bool appSettingsRefs,
+        bool moodEntriesRefs,
+        bool periodEntriesRefs,
       })
     >;
 typedef $$MedicationsTableCreateCompanionBuilder =
@@ -6731,6 +7797,674 @@ typedef $$OnboardingSettingsTableProcessedTableManager =
       OnboardingSetting,
       PrefetchHooks Function()
     >;
+typedef $$MoodEntriesTableCreateCompanionBuilder =
+    MoodEntriesCompanion Function({
+      Value<int> id,
+      required int userId,
+      required int moodLevel,
+      Value<String?> note,
+      Value<DateTime> createdAt,
+    });
+typedef $$MoodEntriesTableUpdateCompanionBuilder =
+    MoodEntriesCompanion Function({
+      Value<int> id,
+      Value<int> userId,
+      Value<int> moodLevel,
+      Value<String?> note,
+      Value<DateTime> createdAt,
+    });
+
+final class $$MoodEntriesTableReferences
+    extends BaseReferences<_$AppDatabase, $MoodEntriesTable, MoodEntry> {
+  $$MoodEntriesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $UsersTable _userIdTable(_$AppDatabase db) => db.users.createAlias(
+    $_aliasNameGenerator(db.moodEntries.userId, db.users.id),
+  );
+
+  $$UsersTableProcessedTableManager get userId {
+    final $_column = $_itemColumn<int>('user_id')!;
+
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_userIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MoodEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $MoodEntriesTable> {
+  $$MoodEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get moodLevel => $composableBuilder(
+    column: $table.moodLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$UsersTableFilterComposer get userId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MoodEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MoodEntriesTable> {
+  $$MoodEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get moodLevel => $composableBuilder(
+    column: $table.moodLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$UsersTableOrderingComposer get userId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MoodEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MoodEntriesTable> {
+  $$MoodEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get moodLevel =>
+      $composableBuilder(column: $table.moodLevel, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$UsersTableAnnotationComposer get userId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MoodEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MoodEntriesTable,
+          MoodEntry,
+          $$MoodEntriesTableFilterComposer,
+          $$MoodEntriesTableOrderingComposer,
+          $$MoodEntriesTableAnnotationComposer,
+          $$MoodEntriesTableCreateCompanionBuilder,
+          $$MoodEntriesTableUpdateCompanionBuilder,
+          (MoodEntry, $$MoodEntriesTableReferences),
+          MoodEntry,
+          PrefetchHooks Function({bool userId})
+        > {
+  $$MoodEntriesTableTableManager(_$AppDatabase db, $MoodEntriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MoodEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MoodEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MoodEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> userId = const Value.absent(),
+                Value<int> moodLevel = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => MoodEntriesCompanion(
+                id: id,
+                userId: userId,
+                moodLevel: moodLevel,
+                note: note,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int userId,
+                required int moodLevel,
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => MoodEntriesCompanion.insert(
+                id: id,
+                userId: userId,
+                moodLevel: moodLevel,
+                note: note,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MoodEntriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({userId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (userId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.userId,
+                                referencedTable: $$MoodEntriesTableReferences
+                                    ._userIdTable(db),
+                                referencedColumn: $$MoodEntriesTableReferences
+                                    ._userIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MoodEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MoodEntriesTable,
+      MoodEntry,
+      $$MoodEntriesTableFilterComposer,
+      $$MoodEntriesTableOrderingComposer,
+      $$MoodEntriesTableAnnotationComposer,
+      $$MoodEntriesTableCreateCompanionBuilder,
+      $$MoodEntriesTableUpdateCompanionBuilder,
+      (MoodEntry, $$MoodEntriesTableReferences),
+      MoodEntry,
+      PrefetchHooks Function({bool userId})
+    >;
+typedef $$PeriodEntriesTableCreateCompanionBuilder =
+    PeriodEntriesCompanion Function({
+      Value<int> id,
+      required int userId,
+      required String entryType,
+      Value<int?> flowIntensity,
+      Value<String?> note,
+      required DateTime date,
+      Value<DateTime> createdAt,
+    });
+typedef $$PeriodEntriesTableUpdateCompanionBuilder =
+    PeriodEntriesCompanion Function({
+      Value<int> id,
+      Value<int> userId,
+      Value<String> entryType,
+      Value<int?> flowIntensity,
+      Value<String?> note,
+      Value<DateTime> date,
+      Value<DateTime> createdAt,
+    });
+
+final class $$PeriodEntriesTableReferences
+    extends BaseReferences<_$AppDatabase, $PeriodEntriesTable, PeriodEntry> {
+  $$PeriodEntriesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $UsersTable _userIdTable(_$AppDatabase db) => db.users.createAlias(
+    $_aliasNameGenerator(db.periodEntries.userId, db.users.id),
+  );
+
+  $$UsersTableProcessedTableManager get userId {
+    final $_column = $_itemColumn<int>('user_id')!;
+
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_userIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PeriodEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $PeriodEntriesTable> {
+  $$PeriodEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entryType => $composableBuilder(
+    column: $table.entryType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get flowIntensity => $composableBuilder(
+    column: $table.flowIntensity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$UsersTableFilterComposer get userId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PeriodEntriesTable> {
+  $$PeriodEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entryType => $composableBuilder(
+    column: $table.entryType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get flowIntensity => $composableBuilder(
+    column: $table.flowIntensity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$UsersTableOrderingComposer get userId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PeriodEntriesTable> {
+  $$PeriodEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get entryType =>
+      $composableBuilder(column: $table.entryType, builder: (column) => column);
+
+  GeneratedColumn<int> get flowIntensity => $composableBuilder(
+    column: $table.flowIntensity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$UsersTableAnnotationComposer get userId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PeriodEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PeriodEntriesTable,
+          PeriodEntry,
+          $$PeriodEntriesTableFilterComposer,
+          $$PeriodEntriesTableOrderingComposer,
+          $$PeriodEntriesTableAnnotationComposer,
+          $$PeriodEntriesTableCreateCompanionBuilder,
+          $$PeriodEntriesTableUpdateCompanionBuilder,
+          (PeriodEntry, $$PeriodEntriesTableReferences),
+          PeriodEntry,
+          PrefetchHooks Function({bool userId})
+        > {
+  $$PeriodEntriesTableTableManager(_$AppDatabase db, $PeriodEntriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PeriodEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PeriodEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PeriodEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> userId = const Value.absent(),
+                Value<String> entryType = const Value.absent(),
+                Value<int?> flowIntensity = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => PeriodEntriesCompanion(
+                id: id,
+                userId: userId,
+                entryType: entryType,
+                flowIntensity: flowIntensity,
+                note: note,
+                date: date,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int userId,
+                required String entryType,
+                Value<int?> flowIntensity = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                required DateTime date,
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => PeriodEntriesCompanion.insert(
+                id: id,
+                userId: userId,
+                entryType: entryType,
+                flowIntensity: flowIntensity,
+                note: note,
+                date: date,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$PeriodEntriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({userId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (userId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.userId,
+                                referencedTable: $$PeriodEntriesTableReferences
+                                    ._userIdTable(db),
+                                referencedColumn: $$PeriodEntriesTableReferences
+                                    ._userIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PeriodEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PeriodEntriesTable,
+      PeriodEntry,
+      $$PeriodEntriesTableFilterComposer,
+      $$PeriodEntriesTableOrderingComposer,
+      $$PeriodEntriesTableAnnotationComposer,
+      $$PeriodEntriesTableCreateCompanionBuilder,
+      $$PeriodEntriesTableUpdateCompanionBuilder,
+      (PeriodEntry, $$PeriodEntriesTableReferences),
+      PeriodEntry,
+      PrefetchHooks Function({bool userId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6752,4 +8486,8 @@ class $AppDatabaseManager {
       $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$OnboardingSettingsTableTableManager get onboardingSettings =>
       $$OnboardingSettingsTableTableManager(_db, _db.onboardingSettings);
+  $$MoodEntriesTableTableManager get moodEntries =>
+      $$MoodEntriesTableTableManager(_db, _db.moodEntries);
+  $$PeriodEntriesTableTableManager get periodEntries =>
+      $$PeriodEntriesTableTableManager(_db, _db.periodEntries);
 }

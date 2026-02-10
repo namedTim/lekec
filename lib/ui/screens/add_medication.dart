@@ -125,10 +125,17 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     if (result != null && result['name'] != null) {
       final userName = result['name'] as String;
       final age = result['age'] as int?;
+      final gender = result['gender'] as String?;
       final database = ref.read(databaseProvider);
       final id = await database
           .into(database.users)
-          .insert(UsersCompanion.insert(name: userName, age: drift.Value(age)));
+          .insert(
+            UsersCompanion.insert(
+              name: userName,
+              age: drift.Value(age),
+              gender: drift.Value(gender),
+            ),
+          );
       final newUser = await (database.select(
         database.users,
       )..where((u) => u.id.equals(id))).getSingle();
@@ -671,6 +678,7 @@ class _AddUserInMedicationDialogState
     extends State<_AddUserInMedicationDialog> {
   final _nameController = TextEditingController();
   int? _birthYear;
+  String? _selectedGender;
 
   @override
   void dispose() {
@@ -700,6 +708,7 @@ class _AddUserInMedicationDialogState
         _birthYear = picked.year;
       });
     }
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   int? _calculateAge() {
@@ -756,6 +765,39 @@ class _AddUserInMedicationDialogState
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Spol (neobvezno)',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment<String>(
+                value: 'male',
+                label: Text('Moški'),
+                icon: Icon(Symbols.male),
+              ),
+              ButtonSegment<String>(
+                value: 'female',
+                label: Text('Ženski'),
+                icon: Icon(Symbols.female),
+              ),
+            ],
+            selected: _selectedGender != null ? {_selectedGender!} : {},
+            onSelectionChanged: (selected) {
+              setState(() {
+                _selectedGender = selected.isEmpty ? null : selected.first;
+              });
+            },
+            emptySelectionAllowed: true,
+            style: ButtonStyle(
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              visualDensity: VisualDensity.comfortable,
+            ),
+          ),
         ],
       ),
       actions: [
@@ -769,6 +811,7 @@ class _AddUserInMedicationDialogState
               Navigator.pop(context, {
                 'name': _nameController.text.trim(),
                 'age': _calculateAge(),
+                'gender': _selectedGender,
               });
             }
           },

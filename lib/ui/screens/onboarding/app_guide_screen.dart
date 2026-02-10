@@ -29,7 +29,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 4) {
+    if (_currentPage < 6) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -65,7 +65,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                   const SizedBox(width: 80), // Spacer for center alignment
                   // Page Indicator
                   Row(
-                    children: List.generate(5, (index) {
+                    children: List.generate(7, (index) {
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: _currentPage == index ? 24 : 8,
@@ -145,6 +145,26 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                         'Dodajajte opombe in sledite napredku pri rednem jemanju.',
                     colors: colors,
                   ),
+                  _GuidePage(
+                    icon: Symbols.mood,
+                    title: 'Beleženje razpoloženja',
+                    description:
+                        'Vsak dan zabeležite, kako se počutite – '
+                        'izberite med petimi razpoloženji od odličnega do slabega. '
+                        'Dodajte opombo in spremljajte svoje počutje skozi čas '
+                        'v profilu vsakega uporabnika.',
+                    colors: colors,
+                  ),
+                  _GuidePage(
+                    icon: Symbols.calendar_month,
+                    title: 'Spremljanje menstruacije',
+                    description:
+                        'Zabeležite začetek in konec menstruacije ter intenzivnost. '
+                        'Aplikacija samodejno izračuna povprečno dolžino cikla '
+                        'in naslednji predvideni datum. '
+                        'Na voljo za uporabnice z nastavljenim ženskim spolom.',
+                    colors: colors,
+                  ),
                 ],
               ),
             ),
@@ -162,7 +182,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                   ),
                 ),
                 child: Text(
-                  _currentPage < 4 ? 'Naprej' : 'Začnimo!',
+                  _currentPage < 6 ? 'Naprej' : 'Začnimo!',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

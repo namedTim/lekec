@@ -5,8 +5,9 @@ import 'package:material_symbols_icons/symbols.dart';
 class AddUserResult {
   final String name;
   final int? age;
+  final String? gender;
 
-  AddUserResult({required this.name, this.age});
+  AddUserResult({required this.name, this.age, this.gender});
 }
 
 class AddUserDialog extends StatefulWidget {
@@ -20,6 +21,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   int? _birthYear;
+  String? _selectedGender;
 
   @override
   void dispose() {
@@ -49,6 +51,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
         _birthYear = picked.year;
       });
     }
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   int? _calculateAge() {
@@ -123,6 +126,42 @@ class _AddUserDialogState extends State<AddUserDialog> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            // Gender picker
+            Text(
+              'Spol (neobvezno)',
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment<String>(
+                  value: 'male',
+                  label: Text('Moški'),
+                  icon: Icon(Symbols.male),
+                ),
+                ButtonSegment<String>(
+                  value: 'female',
+                  label: Text('Ženski'),
+                  icon: Icon(Symbols.female),
+                ),
+              ],
+              selected: _selectedGender != null ? {_selectedGender!} : {},
+              onSelectionChanged: (selected) {
+                setState(() {
+                  _selectedGender = selected.isEmpty ? null : selected.first;
+                });
+              },
+              emptySelectionAllowed: true,
+              style: ButtonStyle(
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                visualDensity: VisualDensity.comfortable,
+              ),
+            ),
           ],
         ),
       ),
@@ -138,6 +177,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
                 AddUserResult(
                   name: _nameController.text.trim(),
                   age: _calculateAge(),
+                  gender: _selectedGender,
                 ),
               );
             }

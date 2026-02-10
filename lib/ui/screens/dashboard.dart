@@ -11,9 +11,11 @@ import '../../ui/widgets/medication_card.dart';
 import '../../ui/widgets/medication_detail_dialog.dart';
 import '../../ui/components/confirmation_dialog.dart';
 import '../../data/services/intake_log_service.dart';
+import '../../data/services/mood_service.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/widgets/empty_state_card.dart';
+import '../../ui/components/mood_logging_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -339,6 +341,104 @@ class DashboardScreenState extends State<DashboardScreen>
     await loadTodaysIntakes(autoScroll: false);
   }
 
+  /// Pick a user if multiple users exist, or auto-select the only user
+  Future<int?> _pickUser() async {
+    if (_userNames.length == 1) {
+      return _userNames.keys.first;
+    }
+
+    return showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final colors = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Izberite uporabnika',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._userNames.entries.map((entry) {
+                return ListTile(
+                  leading: Icon(Symbols.person, color: colors.primary),
+                  title: Text(entry.value),
+                  onTap: () => Navigator.of(ctx).pop(entry.key),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _onLogMood() async {
+    _toggleSpeedDial();
+
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+
+    final result = await showMoodLoggingSheet(context: context);
+    if (result == null || !mounted) return;
+
+    try {
+      final moodService = MoodService(db);
+      await moodService.logMood(
+        userId: userId,
+        moodLevel: result['moodLevel'] as int,
+        note: result['note'] as String?,
+      );
+
+      if (mounted) {
+        final emoji = MoodService.moodEmojis[result['moodLevel'] as int]!;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$emoji Razpoloženje zabeleženo'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -489,7 +589,10 @@ class DashboardScreenState extends State<DashboardScreen>
 
                                 // For as-needed entries, dosage is stored in the intake log
                                 // Otherwise, use plan dosage
-                                final dosageAmount = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
+                                final dosageAmount =
+                                    intake.dosageAmount ??
+                                    plan?.dosageAmount ??
+                                    1.0;
                                 final dosageCount = dosageAmount.toInt();
 
                                 // Get user name
@@ -669,6 +772,50 @@ class DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                   ),
+                  // Option: Log mood
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Zabeleži razpoloženje',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'log_mood',
+                              mini: true,
+                              onPressed: _onLogMood,
+                              child: const Text(
+                                '😊',
+                                style: TextStyle(fontSize: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
@@ -689,7 +836,7 @@ class DashboardScreenState extends State<DashboardScreen>
             child: AnimatedRotation(
               turns: _isExpanded ? 0.125 : 0,
               duration: const Duration(milliseconds: 250),
-              child: const Icon(Symbols.pill),
+              child: const Icon(Symbols.add),
             ),
           ),
         ],

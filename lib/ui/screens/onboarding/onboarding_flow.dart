@@ -24,6 +24,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   String? _familyName;
   List<String> _userNames = [];
   List<int?> _userAges = [];
+  List<String?> _userGenders = [];
 
   void _nextStep() {
     setState(() {
@@ -38,11 +39,12 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     });
   }
 
-  void _handleUserSetup(String? familyName, List<String> userNames, List<int?> userAges) {
+  void _handleUserSetup(String? familyName, List<String> userNames, List<int?> userAges, List<String?> userGenders) {
     setState(() {
       _familyName = familyName;
       _userNames = userNames;
       _userAges = userAges;
+      _userGenders = userGenders;
       _currentStep++;
     });
   }
@@ -55,10 +57,12 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
       for (int i = 0; i < _userNames.length; i++) {
         final userName = _userNames[i];
         final userAge = i < _userAges.length ? _userAges[i] : null;
+        final userGender = i < _userGenders.length ? _userGenders[i] : null;
         await db.into(db.users).insert(
               UsersCompanion.insert(
                 name: userName,
                 age: drift.Value(userAge),
+                gender: drift.Value(userGender),
               ),
             );
       }

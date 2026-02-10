@@ -16,89 +16,111 @@ class WelcomeScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 24),
 
-              // App Icon/Logo
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  border: Border.all(color: colors.primary, width: 2),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Icon(
-                  Symbols.medication,
-                  size: 64,
-                  color: colors.primary,
-                  fill: 1,
-                ),
-              ),
+                      // App Icon/Logo
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: colors.primary, width: 2),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Icon(
+                          Symbols.medication,
+                          size: 64,
+                          color: colors.primary,
+                          fill: 1,
+                        ),
+                      ),
 
-              const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-              // Welcome Title
-              Text(
-                'Pozdravljeni v Lekec',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colors.primary,
+                      // Welcome Title
+                      Text(
+                        'Pozdravljeni v Lekec',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.primary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Subtitle
+                      Text(
+                        'Vaš osebni pomočnik za spremljanje jemanja zdravil',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 48),
+
+                      // Features List
+                      _FeatureItem(
+                        icon: Symbols.photo_camera,
+                        title: 'AI branje zdravil',
+                        description:
+                            'Slikajte recept zdravila in podatki se samodejno izpolnijo',
+                        colors: colors,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      _FeatureItem(
+                        icon: Symbols.alarm,
+                        title: 'Pametni opomniki',
+                        description:
+                            'Obvestila in kritični alarmi ob pravem času',
+                        colors: colors,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      _FeatureItem(
+                        icon: Symbols.calendar_month,
+                        title: 'Prilagodljivi urnik',
+                        description:
+                            'Načrtujte jemanje zdravil po svojih potrebah',
+                        colors: colors,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      _FeatureItem(
+                        icon: Symbols.group,
+                        title: 'Več uporabnikov',
+                        description:
+                            'Upravljajte zdravila za celo družino ali skrbite za druge',
+                        colors: colors,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      _FeatureItem(
+                        icon: Symbols.mood,
+                        title: 'Razpoloženje & menstruacija',
+                        description:
+                            'Beležite počutje in spremljajte menstrualni cikel',
+                        colors: colors,
+                      ),
+
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 16),
-
-              // Subtitle
-              Text(
-                'Vaš osebni pomočnik za spremljanje jemanja zdravil',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 48),
-
-              // Features List
-              _FeatureItem(
-                icon: Symbols.photo_camera,
-                title: 'AI branje zdravil',
-                description:
-                    'Slikajte recept zdravila in podatki se samodejno izpolnijo',
-                colors: colors,
-              ),
-
-              const SizedBox(height: 20),
-
-              _FeatureItem(
-                icon: Symbols.alarm,
-                title: 'Pametni opomniki',
-                description: 'Obvestila in kritični alarmi ob pravem času',
-                colors: colors,
-              ),
-
-              const SizedBox(height: 20),
-
-              _FeatureItem(
-                icon: Symbols.calendar_month,
-                title: 'Prilagodljivi urnik',
-                description: 'Načrtujte jemanje zdravil po svojih potrebah',
-                colors: colors,
-              ),
-
-              const SizedBox(height: 20),
-
-              _FeatureItem(
-                icon: Symbols.group,
-                title: 'Več uporabnikov',
-                description:
-                    'Upravljajte zdravila za celo družino ali skrbite za druge',
-                colors: colors,
-              ),
-
-              const Spacer(),
 
               // Get Started Button
               FilledButton(
@@ -115,8 +137,6 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-
-              const SizedBox(height: 16),
             ],
           ),
         ),
