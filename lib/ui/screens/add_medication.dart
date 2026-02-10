@@ -11,6 +11,7 @@ import '../components/confirmation_dialog.dart';
 import '../components/medication_camera_dialog.dart';
 import '../components/label_scanner_screen.dart';
 import '../../services/gemini_medication_service.dart';
+import '../../utils/gender_guesser.dart';
 import 'dart:developer' as developer;
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
@@ -679,6 +680,21 @@ class _AddUserInMedicationDialogState
   final _nameController = TextEditingController();
   int? _birthYear;
   String? _selectedGender;
+  bool _manualGenderSelection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (_manualGenderSelection) return;
+    final guess = guessGenderFromName(_nameController.text);
+    if (guess != _selectedGender) {
+      setState(() => _selectedGender = guess);
+    }
+  }
 
   @override
   void dispose() {
@@ -787,6 +803,7 @@ class _AddUserInMedicationDialogState
             selected: _selectedGender != null ? {_selectedGender!} : {},
             onSelectionChanged: (selected) {
               setState(() {
+                _manualGenderSelection = true;
                 _selectedGender = selected.isEmpty ? null : selected.first;
               });
             },

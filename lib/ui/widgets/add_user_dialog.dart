@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../utils/gender_guesser.dart';
 
 /// Result returned from AddUserDialog containing the user's name and optional age.
 class AddUserResult {
@@ -22,6 +23,21 @@ class _AddUserDialogState extends State<AddUserDialog> {
   final _nameController = TextEditingController();
   int? _birthYear;
   String? _selectedGender;
+  bool _manualGenderSelection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (_manualGenderSelection) return;
+    final guess = guessGenderFromName(_nameController.text);
+    if (guess != _selectedGender) {
+      setState(() => _selectedGender = guess);
+    }
+  }
 
   @override
   void dispose() {
@@ -149,6 +165,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
               selected: _selectedGender != null ? {_selectedGender!} : {},
               onSelectionChanged: (selected) {
                 setState(() {
+                  _manualGenderSelection = true;
                   _selectedGender = selected.isEmpty ? null : selected.first;
                 });
               },

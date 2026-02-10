@@ -328,7 +328,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
   void _onTap(BuildContext context, int index) {
     navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: true,
     );
   }
 }

@@ -9,6 +9,9 @@
 # Keep Flutter embedding
 -keep class io.flutter.embedding.** { *; }
 
+# Ignore Play Core (deferred components) - not used
+-dontwarn com.google.android.play.core.**
+
 # Drift / SQLite
 -keep class org.sqlite.** { *; }
 -keep class sqlite3.** { *; }

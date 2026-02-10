@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../database/tables/onboarding_settings.dart';
+import '../../../utils/gender_guesser.dart';
 
 class UserSetupScreen extends StatefulWidget {
   final UserType userType;
@@ -30,13 +31,22 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   final List<String?> _userGenders = [];
   int? _selectedBirthYear;
   String? _selectedGender;
+  bool _manualGenderSelection = false;
 
   @override
   void initState() {
     super.initState();
-    _userNameController.addListener(() {
-      setState(() {});
-    });
+    _userNameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (!_manualGenderSelection) {
+      final guess = guessGenderFromName(_userNameController.text);
+      if (guess != _selectedGender) {
+        _selectedGender = guess;
+      }
+    }
+    setState(() {});
   }
 
   @override
@@ -87,6 +97,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
         _userNameController.clear();
         _selectedBirthYear = null;
         _selectedGender = null;
+        _manualGenderSelection = false;
       });
     }
   }
@@ -253,6 +264,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                                     : {},
                                 onSelectionChanged: (selected) {
                                   setState(() {
+                                    _manualGenderSelection = true;
                                     _selectedGender = selected.isEmpty
                                         ? null
                                         : selected.first;
