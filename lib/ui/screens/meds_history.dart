@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
-import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/history_time_slot.dart';
 import '../widgets/empty_state_card.dart';
 import '../../data/services/history_service.dart';
+import '../../data/services/mood_service.dart';
 
 enum HistoryFilter { all, taken, missed }
+
+enum EntryType { medications, mood }
 
 class MedsHistoryScreen extends ConsumerStatefulWidget {
   const MedsHistoryScreen({super.key});
@@ -21,28 +23,36 @@ class MedsHistoryScreen extends ConsumerStatefulWidget {
 class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     with AutomaticKeepAliveClientMixin {
   HistoryFilter _currentFilter = HistoryFilter.all;
+  final Set<EntryType> _selectedEntryTypes = {
+    EntryType.medications,
+    EntryType.mood,
+  };
+  int? _selectedUserId; // null = all users
+  List<User> _users = [];
+
   final List<Map<String, dynamic>> _allEntries = [];
   bool _isLoading = false;
   bool _hasMore = true;
-  int _offset = 0;
+  int _medOffset = 0;
+  int _moodOffset = 0;
   final int _limit = 50;
   final ScrollController _scrollController = ScrollController();
   late HistoryService _historyService;
 
   @override
-  bool get wantKeepAlive => false; // Don't keep alive so we reload each time
+  bool get wantKeepAlive => false;
 
   @override
   void initState() {
     super.initState();
     _historyService = HistoryService(ref.read(databaseProvider));
     _scrollController.addListener(_onScroll);
+    _loadUsers();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh data every time the screen becomes visible
     if (_allEntries.isEmpty || !_isLoading) {
       _refreshHistory();
     }
@@ -52,6 +62,11 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    final users = await _historyService.getActiveUsers();
+    if (mounted) setState(() => _users = users);
   }
 
   void _onScroll() {
@@ -66,7 +81,8 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   Future<void> _refreshHistory() async {
     setState(() {
       _allEntries.clear();
-      _offset = 0;
+      _medOffset = 0;
+      _moodOffset = 0;
       _hasMore = true;
     });
     await _loadMoreHistory();
@@ -77,17 +93,46 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
 
     setState(() => _isLoading = true);
 
-    final newEntries = await _historyService.loadHistory(
-      limit: _limit,
-      offset: _offset,
-      onlyTaken: _currentFilter == HistoryFilter.taken ? true : null,
-      onlyMissed: _currentFilter == HistoryFilter.missed ? true : null,
-    );
+    final List<Map<String, dynamic>> newEntries = [];
+    bool medHasMore = false;
+    bool moodHasMore = false;
+
+    // Load medication entries
+    if (_selectedEntryTypes.contains(EntryType.medications)) {
+      final medEntries = await _historyService.loadHistory(
+        limit: _limit,
+        offset: _medOffset,
+        onlyTaken: _currentFilter == HistoryFilter.taken ? true : null,
+        onlyMissed: _currentFilter == HistoryFilter.missed ? true : null,
+        userId: _selectedUserId,
+      );
+      newEntries.addAll(medEntries);
+      _medOffset += _limit;
+      medHasMore = medEntries.length == _limit;
+    }
+
+    // Load mood entries
+    if (_selectedEntryTypes.contains(EntryType.mood)) {
+      final moodEntries = await _historyService.loadMoodHistory(
+        limit: _limit,
+        offset: _moodOffset,
+        userId: _selectedUserId,
+      );
+      newEntries.addAll(moodEntries);
+      _moodOffset += _limit;
+      moodHasMore = moodEntries.length == _limit;
+    }
+
+    // Sort all entries by time descending
+    newEntries.sort((a, b) {
+      final timeA = a['sortTime'] as DateTime;
+      final timeB = b['sortTime'] as DateTime;
+      return timeB.compareTo(timeA);
+    });
 
     setState(() {
       _allEntries.addAll(newEntries);
-      _offset += _limit;
-      _hasMore = newEntries.length == _limit;
+      _hasMore = medHasMore || moodHasMore;
       _isLoading = false;
     });
   }
@@ -134,20 +179,26 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     return '$hour:$minute';
   }
 
+  String? _getUserName(int userId) {
+    final user = _users.where((u) => u.id == userId).firstOrNull;
+    return user?.name;
+  }
+
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final groupedHistory = _groupEntriesByDate();
+    final showUserNames = _selectedUserId == null && _users.length > 1;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header with dropdown
+            // Header
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
                   Text(
@@ -156,48 +207,121 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                ],
+              ),
+            ),
+
+            // Filters row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  // User filter
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<HistoryFilter>(
-                          value: _currentFilter,
-                          isExpanded: true,
-                          dropdownColor: colors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                          items: const [
-                            DropdownMenuItem(
-                              value: HistoryFilter.all,
-                              child: Text('Vsa zdravila'),
-                            ),
-                            DropdownMenuItem(
-                              value: HistoryFilter.taken,
-                              child: Text('Vzeta zdravila'),
-                            ),
-                            DropdownMenuItem(
-                              value: HistoryFilter.missed,
-                              child: Text('Izpuščena zdravila'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _currentFilter = value);
-                              _refreshHistory();
-                            }
-                          },
+                    child: _buildDropdown<int?>(
+                      value: _selectedUserId,
+                      icon: Symbols.person,
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('Vsi uporabniki'),
                         ),
-                      ),
+                        ..._users.map(
+                          (u) => DropdownMenuItem<int?>(
+                            value: u.id,
+                            child: Text(u.name),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _selectedUserId = value);
+                        _refreshHistory();
+                      },
+                      colors: colors,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Med status filter
+                  Expanded(
+                    child: _buildDropdown<HistoryFilter>(
+                      value: _currentFilter,
+                      icon: Symbols.filter_list,
+                      items: const [
+                        DropdownMenuItem(
+                          value: HistoryFilter.all,
+                          child: Text('Vsi vnosi'),
+                        ),
+                        DropdownMenuItem(
+                          value: HistoryFilter.taken,
+                          child: Text('Vzeta'),
+                        ),
+                        DropdownMenuItem(
+                          value: HistoryFilter.missed,
+                          child: Text('Izpuščena'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _currentFilter = value);
+                          _refreshHistory();
+                        }
+                      },
+                      colors: colors,
                     ),
                   ),
                 ],
               ),
             ),
 
+            const SizedBox(height: 8),
+
+            // Entry type toggle chips
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _buildFilterChip(
+                    label: 'Zdravila',
+                    icon: Symbols.pill,
+                    selected: _selectedEntryTypes.contains(
+                      EntryType.medications,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedEntryTypes.add(EntryType.medications);
+                        } else if (_selectedEntryTypes.length > 1) {
+                          _selectedEntryTypes.remove(EntryType.medications);
+                        }
+                      });
+                      _refreshHistory();
+                    },
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Razpoloženje',
+                    icon: Symbols.mood,
+                    selected: _selectedEntryTypes.contains(EntryType.mood),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedEntryTypes.add(EntryType.mood);
+                        } else if (_selectedEntryTypes.length > 1) {
+                          _selectedEntryTypes.remove(EntryType.mood);
+                        }
+                      });
+                      _refreshHistory();
+                    },
+                    colors: colors,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // History list
             Expanded(
               child: _allEntries.isEmpty && _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -206,8 +330,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                       child: EmptyStateCard(
                         icon: Symbols.history,
                         title: 'Ni zgodovine',
-                        subtitle:
-                            'Zgodovina jemanja zdravil se bo prikazala tukaj',
+                        subtitle: 'Zgodovina se bo prikazala tukaj',
                       ),
                     )
                   : ListView.builder(
@@ -219,7 +342,6 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                       ),
                       itemCount: groupedHistory.length + (_hasMore ? 1 : 0),
                       itemBuilder: (context, index) {
-                        // Show loading indicator at the end
                         if (index == groupedHistory.length) {
                           return const Padding(
                             padding: EdgeInsets.all(16.0),
@@ -234,7 +356,6 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Date header
                             Padding(
                               padding: const EdgeInsets.only(
                                 top: 16,
@@ -245,68 +366,22 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                                 fontSize: 14,
                               ),
                             ),
-
-                            // Medications for this day
                             ...entries.map((entry) {
-                              final intake =
-                                  entry['intake'] as MedicationIntakeLog;
-                              final medication =
-                                  entry['medication'] as Medication;
-                              final plan = entry['plan'] as MedicationPlan?;
-                              final dosageAmount = plan?.dosageAmount ?? 1.0;
-                              final dosageCount = dosageAmount.toInt();
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Medication info
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            medication.name,
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                            style: theme.textTheme.bodyMedium
-                                                ?.copyWith(
-                                                  color:
-                                                      colors.onSurfaceVariant,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    const SizedBox(width: 16),
-
-                                    // Time and status
-                                    HistoryTimeSlot(
-                                      text: _formatTime(intake.scheduledTime),
-                                      backgroundColor: intake.wasTaken
-                                          ? Colors.green.shade100
-                                          : Colors.red.shade100,
-                                      textColor: intake.wasTaken
-                                          ? Colors.green.shade700
-                                          : Colors.red.shade700,
-                                      fontSize: 13,
-                                    ),
-                                  ],
-                                ),
-                              );
+                              if (entry['type'] == 'mood') {
+                                return _buildMoodCard(
+                                  entry,
+                                  theme,
+                                  colors,
+                                  showUserNames,
+                                );
+                              } else {
+                                return _buildMedicationCard(
+                                  entry,
+                                  theme,
+                                  colors,
+                                  showUserNames,
+                                );
+                              }
                             }),
                           ],
                         );
@@ -315,6 +390,203 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T value,
+    required IconData icon,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+    required ColorScheme colors,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: Icon(Symbols.arrow_drop_down, color: colors.onSurfaceVariant),
+          dropdownColor: colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          style: TextStyle(fontSize: 13, color: colors.onSurface),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+    required ColorScheme colors,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      avatar: Icon(icon, size: 18),
+      selected: selected,
+      onSelected: onSelected,
+      showCheckmark: false,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+
+  Widget _buildMedicationCard(
+    Map<String, dynamic> entry,
+    ThemeData theme,
+    ColorScheme colors,
+    bool showUserNames,
+  ) {
+    final intake = entry['intake'] as MedicationIntakeLog;
+    final medication = entry['medication'] as Medication;
+    final plan = entry['plan'] as MedicationPlan?;
+    final dosageAmount = plan?.dosageAmount ?? 1.0;
+    final dosageCount = dosageAmount.toInt();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  medication.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                if (showUserNames) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.person,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getUserName(intake.userId) ?? '',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          HistoryTimeSlot(
+            text: _formatTime(intake.scheduledTime),
+            backgroundColor: intake.wasTaken
+                ? Colors.green.shade100
+                : Colors.red.shade100,
+            textColor: intake.wasTaken
+                ? Colors.green.shade700
+                : Colors.red.shade700,
+            fontSize: 13,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMoodCard(
+    Map<String, dynamic> entry,
+    ThemeData theme,
+    ColorScheme colors,
+    bool showUserNames,
+  ) {
+    final mood = entry['mood'] as MoodEntry;
+    final emoji = MoodService.moodEmojis[mood.moodLevel] ?? '😐';
+    final label = MoodService.moodLabels[mood.moodLevel] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 28)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (mood.note != null && mood.note!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    mood.note!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (showUserNames) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.person,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getUserName(mood.userId) ?? '',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          HistoryTimeSlot(
+            text: _formatTime(mood.createdAt),
+            backgroundColor: colors.primaryContainer,
+            textColor: colors.onPrimaryContainer,
+            fontSize: 13,
+          ),
+        ],
       ),
     );
   }

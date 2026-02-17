@@ -6,13 +6,13 @@ class HistoryService {
 
   HistoryService(this.db);
 
-  /// Load medication history with pagination
-  /// Returns a list of entries with medication, plan, and intake details
+  /// Load medication history with pagination and optional user filter
   Future<List<Map<String, dynamic>>> loadHistory({
     required int limit,
     required int offset,
     bool? onlyTaken,
     bool? onlyMissed,
+    int? userId,
   }) async {
     final now = DateTime.now();
 
@@ -31,6 +31,11 @@ class HistoryService {
     // Only show past and current medications (not future)
     query = query
       ..where(db.medicationIntakeLogs.scheduledTime.isSmallerOrEqualValue(now));
+
+    // Apply user filter
+    if (userId != null) {
+      query = query..where(db.medicationIntakeLogs.userId.equals(userId));
+    }
 
     // Apply filter
     if (onlyTaken == true) {
@@ -56,6 +61,7 @@ class HistoryService {
       final plan = row.readTableOrNull(db.medicationPlans);
 
       return {
+        'type': 'medication',
         'intake': intake,
         'medication': medication,
         'plan': plan,
@@ -64,7 +70,49 @@ class HistoryService {
           intake.scheduledTime.month,
           intake.scheduledTime.day,
         ),
+        'sortTime': intake.scheduledTime,
       };
     }).toList();
+  }
+
+  /// Load mood history with pagination and optional user filter
+  Future<List<Map<String, dynamic>>> loadMoodHistory({
+    required int limit,
+    required int offset,
+    int? userId,
+  }) async {
+    final now = DateTime.now();
+
+    var query = db.select(db.moodEntries)
+      ..where((t) => t.createdAt.isSmallerOrEqualValue(now))
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)])
+      ..limit(limit, offset: offset);
+
+    if (userId != null) {
+      query = query..where((t) => t.userId.equals(userId));
+    }
+
+    final results = await query.get();
+
+    return results.map((entry) {
+      return {
+        'type': 'mood',
+        'mood': entry,
+        'date': DateTime(
+          entry.createdAt.year,
+          entry.createdAt.month,
+          entry.createdAt.day,
+        ),
+        'sortTime': entry.createdAt,
+      };
+    }).toList();
+  }
+
+  /// Get all active users
+  Future<List<User>> getActiveUsers() async {
+    return (db.select(db.users)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([(t) => drift.OrderingTerm.asc(t.name)]))
+        .get();
   }
 }
