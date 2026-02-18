@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
 import '../../features/core/providers/database_provider.dart';
@@ -330,7 +331,8 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                       child: EmptyStateCard(
                         icon: Symbols.history,
                         title: 'Ni zgodovine',
-                        subtitle: 'Zgodovina se bo prikazala tukaj',
+                        subtitle: 'Tapnite za dodajanje zdravil',
+                        onTap: () => context.push('/add-medication'),
                       ),
                     )
                   : ListView.builder(

@@ -505,6 +505,7 @@ class DashboardScreenState extends State<DashboardScreen>
                           icon: Symbols.event_available,
                           title: 'Ni načrtovanih zdravil za danes',
                           subtitle: 'Dodajte zdravila za opomnike',
+                          onTap: () => context.push('/add-medication'),
                         ),
                       )
                     : ListView.builder(

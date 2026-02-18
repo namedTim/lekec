@@ -10,6 +10,7 @@ class EmptyStateCard extends StatelessWidget {
   final bool showCard;
   final double iconSize;
   final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
 
   const EmptyStateCard({
     super.key,
@@ -20,6 +21,7 @@ class EmptyStateCard extends StatelessWidget {
     this.showCard = true,
     this.iconSize = 56,
     this.padding = const EdgeInsets.all(32),
+    this.onTap,
   });
 
   @override
@@ -81,10 +83,13 @@ class EmptyStateCard extends StatelessWidget {
     );
 
     if (!showCard) {
-      return Padding(padding: padding, child: content);
+      final child = Padding(padding: padding, child: content);
+      return onTap != null ? GestureDetector(onTap: onTap, child: child) : child;
     }
 
-    return Padding(
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
         padding: padding,
@@ -105,6 +110,7 @@ class EmptyStateCard extends StatelessWidget {
         ),
         child: content,
       ),
+    ),
     );
   }
 }

@@ -13,6 +13,7 @@ import '../components/label_scanner_screen.dart';
 import '../../services/gemini_medication_service.dart';
 import '../../utils/gender_guesser.dart';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
   final String? presetName;
@@ -227,6 +228,39 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   }
 
   Future<void> _openCameraDialog() async {
+    // Check for internet connectivity — AI feature requires it
+    try {
+      final lookup = await InternetAddress.lookup('google.com');
+      if (lookup.isEmpty || lookup.first.rawAddress.isEmpty) {
+        throw SocketException('No internet');
+      }
+    } on SocketException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Symbols.wifi_off, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'AI zajem potrebuje internetno povezavo',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     final result = await showDialog<MedicationExtractionResult>(
       context: context,
       barrierColor: Colors.black87,

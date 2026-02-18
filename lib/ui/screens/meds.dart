@@ -256,6 +256,7 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                         icon: Symbols.medication,
                         title: 'Ni dodanih zdravil',
                         subtitle: 'Izberite zdravilo spodaj ali dodajte novo',
+                        onTap: () => context.push('/add-medication'),
                       ),
                     ),
                   )
