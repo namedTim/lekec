@@ -43,7 +43,7 @@ class _SimpleMedicationPlanningScreenState
     extends ConsumerState<SimpleMedicationPlanningScreen> {
   DateTime? _startDate;
   TimeOfDay? _firstIntakeTime;
-  int _quantity = 1;
+  double _quantity = 1;
   int _initialQuantity = 0;
   bool _isSaving = false;
   bool _isTimeAiSuggested = false;
@@ -146,13 +146,14 @@ class _SimpleMedicationPlanningScreenState
   Future<void> _selectInitialQuantity() async {
     final quantity = await showQuantitySelector(
       context,
-      initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+      initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
       minValue: 0,
       maxValue: 999,
+      step: 1,
       label: 'Začetna zaloga',
     );
     if (quantity != null) {
-      setState(() => _initialQuantity = quantity);
+      setState(() => _initialQuantity = quantity.toInt());
     }
   }
 
@@ -230,7 +231,7 @@ class _SimpleMedicationPlanningScreenState
         userId: widget.userId,
         medicationId: medicationId,
         startDate: _startDate ?? DateTime.now(),
-        dosageAmount: _quantity.toDouble(),
+        dosageAmount: _quantity,
         initialQuantity: _initialQuantity.toDouble(),
         ruleType: ruleType,
         times: times,
@@ -382,7 +383,7 @@ class _SimpleMedicationPlanningScreenState
                 _PlanningCard(
                   icon: Symbols.pill,
                   label: 'Količina na vnos',
-                  value: '$_quantity',
+                  value: '${_quantity == _quantity.roundToDouble() ? _quantity.toInt().toString() : _quantity.toString()}',
                   onTap: _selectQuantity,
                 ),
                 const SizedBox(height: 16),

@@ -37,7 +37,7 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
 class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
   final List<TimeOfDay> _times = [];
   int _initialQuantity = 0;
-  int _dosageAmount = 1;
+  double _dosageAmount = 1;
   bool _isSaving = false;
   bool _criticalReminder = false;
 
@@ -216,7 +216,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$_dosageAmount',
+                              '${_dosageAmount == _dosageAmount.roundToDouble() ? _dosageAmount.toInt().toString() : _dosageAmount.toString()}',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -240,13 +240,14 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                 onTap: () async {
                   final quantity = await showQuantitySelector(
                     context,
-                    initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+                    initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
                     minValue: 0,
                     maxValue: 999,
+                    step: 1,
                     label: 'Začetna zaloga',
                   );
                   if (quantity != null) {
-                    setState(() => _initialQuantity = quantity);
+                    setState(() => _initialQuantity = quantity.toInt());
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -372,7 +373,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
         userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: _dosageAmount.toDouble(),
+        dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         cycleDaysOn: widget.takingDays,
         cycleDaysOff: widget.pauseDays,

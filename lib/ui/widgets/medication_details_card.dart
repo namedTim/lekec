@@ -25,7 +25,7 @@ class MedicationDetailsCard extends StatelessWidget {
   final String frequency;
   final List<String> times;
   final MedicationType medType;
-  final Function(int)? onAddMedication;
+  final Function(double)? onAddMedication;
   final VoidCallback? onDelete;
   final bool isAsNeeded;
   final VoidCallback? onLogIntake;
@@ -66,8 +66,9 @@ class MedicationDetailsCard extends StatelessWidget {
     final quantity = await showQuantitySelector(
       context,
       initialValue: 1,
-      minValue: -pillsRemaining, // Allow negative to zero out
+      minValue: -pillsRemaining.toDouble(),
       maxValue: 999,
+      step: 1,
       label: 'Število ${getMedicationUnitShort(medType, 5)}',
     );
     if (quantity != null) {

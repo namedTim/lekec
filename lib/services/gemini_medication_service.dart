@@ -12,8 +12,8 @@ class DosageFrequency {
   /// How many times per day (e.g., 1, 2, 3)
   final int? timesPerDay;
 
-  /// Amount per dose (e.g., 1, 2 tablets)
-  final int? amountPerDose;
+  /// Amount per dose (e.g., 0.5, 1, 2 tablets)
+  final double? amountPerDose;
 
   /// Interval in hours between doses (e.g., 12 for "na 12 ur")
   final int? intervalHours;
@@ -52,16 +52,32 @@ class DosageFrequency {
     this.suggestedTimes,
   });
 
+  static int? _safeInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static double? _safeDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   factory DosageFrequency.fromJson(Map<String, dynamic> json) {
     return DosageFrequency(
-      timesPerDay: json['timesPerDay'] as int?,
-      amountPerDose: json['amountPerDose'] as int?,
-      intervalHours: json['intervalHours'] as int?,
+      timesPerDay: _safeInt(json['timesPerDay']),
+      amountPerDose: _safeDouble(json['amountPerDose']),
+      intervalHours: _safeInt(json['intervalHours']),
       isAsNeeded: json['isAsNeeded'] == true || json['isAsNeeded'] == 'true',
       isCyclic: json['isCyclic'] == true || json['isCyclic'] == 'true',
-      cyclicDaysOn: json['cyclicDaysOn'] as int?,
-      cyclicDaysOff: json['cyclicDaysOff'] as int?,
-      specificDays: (json['specificDays'] as List<dynamic>?)?.cast<int>(),
+      cyclicDaysOn: _safeInt(json['cyclicDaysOn']),
+      cyclicDaysOff: _safeInt(json['cyclicDaysOff']),
+      specificDays: (json['specificDays'] as List<dynamic>?)?.map((e) => _safeInt(e) ?? 0).toList(),
       rawText: json['rawText'] as String?,
       suggestedTimes: (json['suggestedTimes'] as List<dynamic>?)
           ?.cast<String>(),
@@ -279,7 +295,7 @@ Izvleci:
    - "na X ur" / "every X hours" = interval (izvleci X)
    - "ciklično" npr. "10 dni jemanja, 20 dni pavze" = ciklično
    - omenjeni specifični dnevi = specifični dnevi
-8. Količina na odmerek (npr. "2 tableti", "1 kapsula" = koliko vzeti vsak odmerek)
+8. Količina na odmerek (npr. "2 tableti", "1 kapsula", "polovica tablete" = 0.5 = koliko vzeti vsak odmerek, podpiraj decimalna števila kot 0.5 za polovico)
 9. Nasveti za jemanje - ZDRUŽI VSE nasvete v eno polje, vključno z:
    - Čas jemanja: "pred obrokom", "z obrokom", "po jedi", "na tešče", "pred spanjem"
    - Opozorila in omejitve: "NE SKUPAJ Z ...", "brez alkohola", "ne z mlekom"
@@ -304,7 +320,7 @@ Odgovori IZKLJUČNO v veljavnem JSON formatu:
   "intakeAdvice": "vsi nasveti za jemanje v slovenščini ali null",
   "dosageFrequency": {
     "timesPerDay": število ali null,
-    "amountPerDose": število ali null,
+    "amountPerDose": število (decimalno, npr. 0.5 za polovico, 1, 2) ali null,
     "intervalHours": število ali null,
     "isAsNeeded": boolean,
     "isCyclic": boolean,

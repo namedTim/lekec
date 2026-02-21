@@ -72,13 +72,14 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     final quantity = await showQuantitySelector(
       context,
       initialValue: 0,
-      minValue: -_pillsRemaining,
+      minValue: -_pillsRemaining.toDouble(),
       maxValue: 9999,
+      step: 1,
       label: 'Dodaj/odstrani zalogo',
     );
     if (quantity != null && quantity != 0 && mounted) {
       try {
-        final newRemaining = (_pillsRemaining + quantity).clamp(0, 99999);
+        final newRemaining = (_pillsRemaining + quantity.toInt()).clamp(0, 99999);
         await (db.update(
           db.medications,
         )..where((t) => t.id.equals(widget.medicationId))).write(
@@ -94,13 +95,13 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
         widget.onRefresh();
 
         if (mounted) {
-          final absQuantity = quantity.abs();
+          final absQuantity = quantity.abs().toInt();
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 quantity >= 0
-                    ? 'Dodal $quantity ${getMedicationUnitShort(widget.medType, quantity)}'
+                    ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(widget.medType, quantity.toInt())}'
                     : 'Odstranil $absQuantity ${getMedicationUnitShort(widget.medType, absQuantity)}',
               ),
               backgroundColor: quantity >= 0 ? Colors.green : Colors.orange,
@@ -120,8 +121,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   Future<void> _editDosage() async {
     final quantity = await showQuantitySelector(
       context,
-      initialValue: _dosageAmount.toInt(),
-      minValue: 1,
+      initialValue: _dosageAmount,
+      minValue: 0.5,
       maxValue: 99,
       label: 'Odmerek (${getMedicationUnitShort(widget.medType, 2)})',
     );
@@ -133,23 +134,24 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             db.medicationPlans,
           )..where((t) => t.id.equals(widget.planId!))).write(
             MedicationPlansCompanion(
-              dosageAmount: drift.Value(quantity.toDouble()),
+              dosageAmount: drift.Value(quantity),
             ),
           );
         }
 
         setState(() {
-          _dosageAmount = quantity.toDouble();
+          _dosageAmount = quantity;
         });
 
         widget.onRefresh();
 
         if (mounted) {
+          final displayQty = quantity == quantity.roundToDouble() ? quantity.toInt().toString() : quantity.toString();
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Odmerek posodobljen na $quantity ${getMedicationUnitShort(widget.medType, quantity)}',
+                'Odmerek posodobljen na $displayQty ${getMedicationUnitShort(widget.medType, quantity.ceil())}',
               ),
               backgroundColor: Colors.green,
             ),

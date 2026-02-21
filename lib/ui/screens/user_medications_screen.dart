@@ -896,7 +896,7 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                           onAddMedication: (quantity) async {
                             try {
                               final currentRemaining = med['remaining'] as int;
-                              final newRemaining = (currentRemaining + quantity)
+                              final newRemaining = (currentRemaining + quantity.toInt())
                                   .clamp(0, 9999);
 
                               await (db.update(db.medications)..where(
@@ -911,13 +911,13 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                                   );
 
                               if (mounted) {
-                                final absQuantity = quantity.abs();
+                                final absQuantity = quantity.abs().toInt();
                                 ScaffoldMessenger.of(context).clearSnackBars();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       quantity >= 0
-                                          ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
+                                          ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(med['medType'] as MedicationType, quantity.toInt())}'
                                           : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
                                     ),
                                     backgroundColor: quantity >= 0
