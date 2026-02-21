@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -13,9 +14,11 @@ import '../../ui/components/confirmation_dialog.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../ui/widgets/time_island.dart';
+import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
+import 'add_appointment_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -129,9 +132,36 @@ class DashboardScreenState extends State<DashboardScreen>
 
   Future<void> loadTodaysIntakes({bool autoScroll = true}) async {
     final grouped = await _intakeService.loadTodaysIntakes();
+    
+    // Also load today's appointments
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    // Filter to today's appointments (upcoming service only returns future, so also fetch past-today)
+    final allAppts = await (db.select(db.appointments)
+      ..where((t) => t.appointmentTime.isBiggerOrEqualValue(startOfDay))
+      ..where((t) => t.appointmentTime.isSmallerThanValue(endOfDay))
+      ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)]))
+      .get();
+
+    // Merge appointments into grouped map
+    for (final appt in allAppts) {
+      final timeKey =
+          '${appt.appointmentTime.hour.toString().padLeft(2, '0')}:${appt.appointmentTime.minute.toString().padLeft(2, '0')}';
+      grouped.putIfAbsent(timeKey, () => []);
+      grouped[timeKey]!.add({
+        'isAppointment': true,
+        'appointment': appt,
+      });
+    }
+
+    // Re-sort the grouped map by time key
+    final sortedGrouped = Map.fromEntries(
+      grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
 
     setState(() {
-      _groupedIntakes = grouped;
+      _groupedIntakes = sortedGrouped;
     });
 
     // Update time island after loading intakes
@@ -359,6 +389,8 @@ class DashboardScreenState extends State<DashboardScreen>
     if (userId == null || !mounted) return;
     await context.push('/add-appointment', extra: {'userId': userId});
     _ensureSpeedDialClosed();
+    // Refresh to show new appointment in daily view
+    await loadTodaysIntakes(autoScroll: false);
   }
 
   /// Pick a user if multiple users exist, or auto-select the only user
@@ -472,6 +504,9 @@ class DashboardScreenState extends State<DashboardScreen>
       final Map<int, double> medRunning = {}; // medicationId → running count
       for (final timeKey in _groupedIntakes.keys) {
         for (final intakeData in _groupedIntakes[timeKey]!) {
+          // Skip appointment items
+          if (intakeData['isAppointment'] == true) continue;
+
           final medication = intakeData['medication'] as Medication;
           final plan = intakeData['plan'] as MedicationPlan?;
           final intake = intakeData['intake'] as MedicationIntakeLog;
@@ -524,8 +559,8 @@ class DashboardScreenState extends State<DashboardScreen>
                     ? Center(
                         child: EmptyStateCard(
                           icon: Symbols.event_available,
-                          title: 'Ni načrtovanih zdravil za danes',
-                          subtitle: 'Dodajte zdravila za opomnike',
+                          title: 'Ni načrtovanih vnosov za danes',
+                          subtitle: 'Dodajte zdravila ali termine',
                           onTap: () => context.push('/add-medication'),
                         ),
                       )
@@ -568,6 +603,36 @@ class DashboardScreenState extends State<DashboardScreen>
                             children: [
                               TimeSlot(time: timeKey, isPast: isPast),
                               ...intakesAtTime.map((intakeData) {
+                                // Check if this is an appointment item
+                                if (intakeData['isAppointment'] == true) {
+                                  final appt = intakeData['appointment'] as Appointment;
+                                  final userName = _userNames[appt.userId] ?? '';
+                                  // Show green border in the 10-min window before the appointment
+                                  final isApptActive = now.isAfter(slotTime) && now.isBefore(borderWindowEnd);
+                                  return AppointmentCard(
+                                    title: appt.title,
+                                    note: appt.note,
+                                    appointmentTime: appt.appointmentTime,
+                                    userName: userName,
+                                    showName: _totalUserCount > 1,
+                                    isPast: isPast,
+                                    isActive: isApptActive,
+                                    onTap: () async {
+                                      final result = await Navigator.of(context).push<bool>(
+                                        MaterialPageRoute(
+                                          builder: (_) => AddAppointmentScreen(
+                                            userId: appt.userId,
+                                            existingAppointment: appt,
+                                          ),
+                                        ),
+                                      );
+                                      if (result == true) {
+                                        await loadTodaysIntakes(autoScroll: false);
+                                      }
+                                    },
+                                  );
+                                }
+
                                 final medication =
                                     intakeData['medication'] as Medication;
                                 final plan =

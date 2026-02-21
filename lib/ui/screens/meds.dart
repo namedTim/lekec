@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
+import '../widgets/appointment_card.dart';
 import '../components/speed_dial_fab.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/medication_presets_panel.dart';
@@ -14,15 +15,14 @@ import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/intake_log_service.dart';
+import '../../data/services/appointment_service.dart';
 import 'medication_detail_screen.dart';
-import 'user_medications_screen.dart';
-import '../widgets/user_card.dart';
-import '../widgets/add_user_dialog.dart';
+import 'add_appointment_screen.dart';
 import '../widgets/empty_state_card.dart';
 import '../components/log_intake_sheet.dart';
 import '../../main.dart' show homePageKey;
 
-enum MedsTab { medications, users, settings }
+enum MedsTab { medications, appointments, settings }
 
 class MedsScreen extends ConsumerStatefulWidget {
   const MedsScreen({super.key});
@@ -90,47 +90,6 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
     }
   }
 
-  Future<void> _showAddUserDialog() async {
-    final result = await showDialog<AddUserResult>(
-      context: context,
-      builder: (context) => const AddUserDialog(),
-    );
-
-    if (result != null && result.name.isNotEmpty) {
-      try {
-        final db = ref.read(databaseProvider);
-        await db
-            .into(db.users)
-            .insert(
-              UsersCompanion.insert(
-                name: result.name,
-                createdAt: drift.Value(DateTime.now()),
-                age: drift.Value(result.age),
-                gender: drift.Value(result.gender),
-              ),
-            );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Uporabnik ${result.name} dodan'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          setState(() {}); // Refresh users list
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
-          );
-        }
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,9 +110,9 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                           icon: Icon(Symbols.pill),
                         ),
                         ButtonSegment<MedsTab>(
-                          value: MedsTab.users,
-                          label: Text('Uporabniki'),
-                          icon: Icon(Symbols.group),
+                          value: MedsTab.appointments,
+                          label: Text('Termini'),
+                          icon: Icon(Symbols.calendar_month),
                         ),
                         ButtonSegment<MedsTab>(
                           value: MedsTab.settings,
@@ -224,9 +183,6 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   }
 
   Widget _buildContent() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
     switch (_selectedTab) {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
@@ -481,12 +437,15 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             );
           },
         );
-      case MedsTab.users:
-        final db = ref.watch(databaseProvider);
-        return FutureBuilder<List<User>>(
-          future: (db.select(
-            db.users,
-          )..where((t) => t.isActive.equals(true))).get(),
+      case MedsTab.appointments:
+        final database = ref.watch(databaseProvider);
+        final appointmentService = AppointmentService(database);
+        return FutureBuilder(
+          key: ValueKey(_refreshKey),
+          future: Future.wait([
+            appointmentService.getUpcomingAppointments(),
+            (database.select(database.users)..where((t) => t.isActive.equals(true))).get(),
+          ]),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -495,20 +454,22 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
 
-            final users = snapshot.data ?? [];
+            final results = snapshot.data as List<dynamic>;
+            final appointments = results[0] as List<Appointment>;
+            final users = results[1] as List<User>;
+            final userNames = {for (var u in users) u.id: u.name};
+            final showUserNames = users.length > 1;
 
-            if (users.isEmpty) {
+            if (appointments.isEmpty) {
               return Center(
                 child: EmptyStateCard(
-                  icon: Symbols.group,
-                  title: 'Ni dodanih uporabnikov',
-                  subtitle:
-                      'Dodajte uporabnike za upravljanje njihovih zdravil',
-                  action: FilledButton.icon(
-                    onPressed: _showAddUserDialog,
-                    icon: const Icon(Symbols.person_add),
-                    label: const Text('Dodaj uporabnika'),
-                  ),
+                  icon: Symbols.calendar_month,
+                  title: 'Ni prihajajočih terminov',
+                  subtitle: 'Dodajte termin za opomnike',
+                  onTap: () async {
+                    await context.push('/add-appointment');
+                    _refreshMedications();
+                  },
                 ),
               );
             }
@@ -520,36 +481,36 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                 right: 8,
                 bottom: 88,
               ),
-              itemCount: users.length + 1,
+              itemCount: appointments.length,
               itemBuilder: (context, index) {
-                if (index == users.length) {
-                  // Add user button at bottom
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: FilledButton.icon(
-                      onPressed: _showAddUserDialog,
-                      icon: const Icon(Symbols.person_add),
-                      label: const Text('Dodaj uporabnika'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                    ),
-                  );
-                }
-
-                final user = users[index];
-                return UserCard(
-                  userName: user.name,
-                  userAge: user.age,
-                  onTap: () {
-                    Navigator.of(context).push(
+                final appt = appointments[index];
+                return AppointmentDetailsCard(
+                  title: appt.title,
+                  note: appt.note,
+                  appointmentTime: appt.appointmentTime,
+                  userName: userNames[appt.userId],
+                  showName: showUserNames,
+                  onTap: () async {
+                    final result = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
-                        builder: (context) => UserMedicationsScreen(
-                          userId: user.id,
-                          userName: user.name,
+                        builder: (_) => AddAppointmentScreen(
+                          userId: appt.userId,
+                          existingAppointment: appt,
                         ),
                       ),
                     );
+                    if (result == true) _refreshMedications();
+                  },
+                  onDelete: () async {
+                    final confirmed = await showConfirmationDialog(
+                      context,
+                      title: 'Izbriši termin',
+                      message: 'Ali želite izbrisati termin "${appt.title}"?',
+                    );
+                    if (confirmed) {
+                      await appointmentService.deleteAppointment(appt.id);
+                      _refreshMedications();
+                    }
                   },
                 );
               },
