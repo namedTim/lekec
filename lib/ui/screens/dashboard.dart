@@ -327,9 +327,19 @@ class DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  void _ensureSpeedDialClosed() {
+    if (_isExpanded) {
+      setState(() {
+        _isExpanded = false;
+        _animationController.reverse();
+      });
+    }
+  }
+
   void _onAddSingleEntry() async {
     _toggleSpeedDial();
     await context.push('/add-single-entry');
+    _ensureSpeedDialClosed();
     // Refresh after returning from adding entry
     await loadTodaysIntakes(autoScroll: false);
   }
@@ -337,6 +347,7 @@ class DashboardScreenState extends State<DashboardScreen>
   void _onAddNewMedication() async {
     _toggleSpeedDial();
     await context.push('/add-medication');
+    _ensureSpeedDialClosed();
     // Refresh after returning — medication or new user may have been added
     await _loadUserData();
     await loadTodaysIntakes(autoScroll: false);
@@ -347,6 +358,7 @@ class DashboardScreenState extends State<DashboardScreen>
     final userId = await _pickUser();
     if (userId == null || !mounted) return;
     await context.push('/add-appointment', extra: {'userId': userId});
+    _ensureSpeedDialClosed();
   }
 
   /// Pick a user if multiple users exist, or auto-select the only user
@@ -412,6 +424,7 @@ class DashboardScreenState extends State<DashboardScreen>
     if (userId == null || !mounted) return;
 
     final result = await showMoodLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
     if (result == null || !mounted) return;
 
     try {

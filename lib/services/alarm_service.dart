@@ -5,6 +5,7 @@ import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../data/services/appointment_service.dart';
 
 /// Provider for the alarm service singleton
 final alarmServiceProvider = Provider<AlarmService>((ref) {
@@ -87,7 +88,10 @@ class AlarmService {
       final context = _navigatorKey.currentContext;
       if (context != null && _currentAlarmId != alarm.id) {
         _currentAlarmId = alarm.id;
-        context.push('/ring', extra: alarm);
+        final route = AppointmentService.isAppointmentAlarm(alarm.id)
+            ? '/appointment-ring'
+            : '/ring';
+        context.push(route, extra: alarm);
         break; // Only show one alarm at a time
       }
     }
@@ -113,7 +117,10 @@ class AlarmService {
     final context = _navigatorKey.currentContext;
     if (context != null && _currentAlarmId != alarm.id) {
       _currentAlarmId = alarm.id;
-      context.push('/ring', extra: alarm);
+      final route = AppointmentService.isAppointmentAlarm(alarm.id)
+          ? '/appointment-ring'
+          : '/ring';
+      context.push(route, extra: alarm);
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alarm/alarm.dart';
 import 'package:lekec/ui/screens/ring.dart';
+import 'package:lekec/ui/screens/appointment_ring_screen.dart';
 import 'package:lekec/services/alarm_service.dart';
 import 'package:lekec/utils/logging.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'ui/screens/dashboard.dart';
+import 'ui/screens/people_screen.dart';
 
 export 'ui/screens/dashboard.dart' show DashboardScreenState;
 import 'ui/screens/add_medication.dart';
@@ -84,6 +86,14 @@ final _router = GoRouter(
             ),
           ],
         ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/people',
+              builder: (context, state) => const PeopleScreen(),
+            ),
+          ],
+        ),
       ],
     ),
     GoRoute(
@@ -96,6 +106,20 @@ final _router = GoRouter(
           child: ExampleAlarmRingScreen(alarmSettings: alarmSettings),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             // No animation - instant appearance
+            return child;
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/appointment-ring',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) {
+        final alarmSettings = state.extra as AlarmSettings;
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: AppointmentRingScreen(alarmSettings: alarmSettings),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },
         );
@@ -300,6 +324,7 @@ final _router = GoRouter(
         final extra = state.extra as Map<String, dynamic>?;
         return AddAppointmentScreen(
           userId: extra?['userId'] as int? ?? 1,
+          existingAppointment: extra?['existingAppointment'] as Appointment?,
         );
       },
     ),
@@ -329,6 +354,10 @@ class ScaffoldWithNavBar extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Symbols.manage_search),
             label: 'Zgodovina',
+          ),
+          NavigationDestination(
+            icon: Icon(Symbols.group),
+            label: 'Osebe',
           ),
         ],
       ),

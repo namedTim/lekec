@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../data/services/appointment_service.dart';
@@ -27,6 +26,7 @@ class AddAppointmentScreen extends ConsumerStatefulWidget {
 class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final _titleController = TextEditingController();
   final _noteController = TextEditingController();
+  final _titleFocusNode = FocusNode();
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isSaving = false;
@@ -56,10 +56,15 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   void dispose() {
     _titleController.dispose();
     _noteController.dispose();
+    _titleFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _pickDate() async {
+    // Unfocus any text fields to prevent auto-focus after time picker
+    _titleFocusNode.unfocus();
+    FocusScope.of(context).unfocus();
+    
     final now = DateTime.now();
     final date = await showDatePicker(
       context: context,
@@ -69,10 +74,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     );
     if (date != null) {
       setState(() => _selectedDate = date);
+      // Automatically open time picker after date is selected
+      await _pickTime();
     }
   }
 
   Future<void> _pickTime() async {
+    // Unfocus any text fields to prevent auto-focus after picker closes
+    _titleFocusNode.unfocus();
+    FocusScope.of(context).unfocus();
+    
     final time = await showTimePicker(
       context: context,
       initialTime: _selectedTime ?? TimeOfDay.now(),
@@ -136,7 +147,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        context.pop(true); // return true to signal refresh needed
+        Navigator.of(context).pop(true); // return true to signal refresh needed
       }
     } catch (e) {
       if (mounted) {
@@ -146,6 +157,49 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Izbriši termin'),
+        content: Text('Ali želite izbrisati termin "${widget.existingAppointment!.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Prekliči'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Izbriši', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final database = ref.read(databaseProvider);
+      final service = AppointmentService(database);
+      await service.deleteAppointment(widget.existingAppointment!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Termin izbrisan'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -173,6 +227,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             // Title
             TextField(
               controller: _titleController,
+              focusNode: _titleFocusNode,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: 'Naslov',
@@ -269,6 +324,26 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                 ),
               ),
             ),
+
+            // Delete button (only when editing)
+            if (_isEditing) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _isSaving ? null : _delete,
+                icon: Icon(Symbols.delete, color: colors.error),
+                label: Text(
+                  'Izbriši termin',
+                  style: TextStyle(color: colors.error),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: colors.error),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -233,7 +233,10 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
         final medicationService = MedicationService(db);
         return FutureBuilder(
           key: ValueKey(_refreshKey),
-          future: medicationService.loadMedicationsWithDetails(),
+          future: Future.wait([
+            medicationService.loadMedicationsWithDetails(),
+            (db.select(db.users)..where((t) => t.isActive.equals(true))).get(),
+          ]),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -241,7 +244,11 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
-            final medications = snapshot.data ?? [];
+            final results = snapshot.data as List<dynamic>;
+            final medications = results[0] as List<Map<String, dynamic>>;
+            final users = results[1] as List<User>;
+            final userNames = {for (var u in users) u.id: u.name};
+            final showUserNames = users.length > 1;
             final isEmpty = medications.isEmpty;
 
             return Stack(
@@ -305,6 +312,9 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                         },
                         child: MedicationDetailsCard(
                           medName: med['name'] as String,
+                          userName: showUserNames
+                              ? userNames[(med['plan'] as MedicationPlan?)?.userId]
+                              : null,
                           dosage:
                               '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
                           pillsRemaining: med['remaining'] as int,

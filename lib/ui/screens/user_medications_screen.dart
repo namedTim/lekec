@@ -8,6 +8,7 @@ import '../../database/tables/medications.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/period_service.dart';
+import '../../data/services/appointment_service.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/empty_state_card.dart';
@@ -17,6 +18,7 @@ import '../components/period_logging_sheet.dart';
 import '../../main.dart' show db, homePageKey;
 import '../../data/services/intake_log_service.dart';
 import '../screens/medication_detail_screen.dart';
+import '../screens/add_appointment_screen.dart';
 import '../components/log_intake_sheet.dart';
 
 class UserMedicationsScreen extends ConsumerStatefulWidget {
@@ -51,6 +53,9 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
   DateTime? _nextPeriodPrediction;
   List<Map<String, dynamic>> _recentCycles = [];
 
+  // Appointments state
+  List<Appointment> _appointments = [];
+
   bool get _isFemale => _userGender == 'female';
 
   @override
@@ -59,6 +64,7 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     _loadUserGender();
     _loadUserMedications();
     _loadMoodData();
+    _loadAppointments();
   }
 
   Future<void> _loadUserGender() async {
@@ -119,6 +125,16 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
           _nextPeriodPrediction = nextPrediction;
           _recentCycles = cycles;
         });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadAppointments() async {
+    try {
+      final service = AppointmentService(db);
+      final appts = await service.getAppointmentsForUser(widget.userId);
+      if (mounted) {
+        setState(() => _appointments = appts);
       }
     } catch (_) {}
   }
@@ -268,24 +284,16 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Quick log button
         Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Text(
-                'Razpoloženje',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              // Quick log button
-              TextButton.icon(
-                onPressed: _onQuickLogMood,
-                icon: const Text('😊', style: TextStyle(fontSize: 16)),
-                label: const Text('Zabeleži'),
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _onQuickLogMood,
+              icon: const Text('😊', style: TextStyle(fontSize: 16)),
+              label: const Text('Zabeleži'),
+            ),
           ),
         ),
 
@@ -489,27 +497,20 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Quick log button
         Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Text(
-                'Menstruacija',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _onQuickLogPeriod,
+              icon: const Icon(
+                Symbols.water_drop,
+                size: 16,
+                color: Colors.red,
               ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _onQuickLogPeriod,
-                icon: const Icon(
-                  Symbols.water_drop,
-                  size: 16,
-                  color: Colors.red,
-                ),
-                label: const Text('Zabeleži'),
-              ),
-            ],
+              label: const Text('Zabeleži'),
+            ),
           ),
         ),
 
@@ -828,244 +829,92 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Zdravila Section
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      'Zdravila',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (_medications.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: EmptyStateInline(
-                        icon: Symbols.medication,
-                        message: 'Ni zdravil za tega uporabnika',
-                      ),
-                    )
-                  else
-                    ..._medications.map((med) {
-                      final dosageAmount = med['dosage'] as double;
-                      final dosageCount = dosageAmount.toInt();
-
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => MedicationDetailScreen(
-                                medicationId: med['id'] as int,
-                                medicationName: med['name'] as String,
-                                medType: med['medType'] as MedicationType,
-                                pillsRemaining: med['remaining'] as int,
-                                dosageAmount: dosageAmount,
-                                frequency: med['frequency'] as String,
-                                times: med['times'] as List<String>,
-                                intakeAdvice: med['intakeAdvice'] as String?,
-                                criticalReminder:
-                                    med['criticalReminder'] as bool,
-                                isAsNeeded:
-                                    (med['frequency'] as String) ==
-                                    'Po potrebi',
-                                planId: (med['plan'] as MedicationPlan?)?.id,
-                                userId:
-                                    (med['plan'] as MedicationPlan?)?.userId,
-                                onDelete: () => _deleteMedication(
-                                  med['id'] as int,
-                                  med['name'] as String,
-                                ),
-                                onRefresh: _loadUserMedications,
-                              ),
+                  // Zdravila
+                  _ExpandableSection(
+                    icon: Symbols.pill,
+                    title: 'Zdravila',
+                    trailing: _medications.isNotEmpty
+                        ? Text(
+                            '${_medications.length}',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.bold,
                             ),
-                          );
-                        },
-                        child: MedicationDetailsCard(
-                          medName: med['name'] as String,
-                          dosage:
-                              '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
-                          pillsRemaining: med['remaining'] as int,
-                          frequency: med['frequency'] as String,
-                          times: med['times'] as List<String>,
-                          medType: med['medType'] as MedicationType,
-                          onAddMedication: (quantity) async {
-                            try {
-                              final currentRemaining = med['remaining'] as int;
-                              final newRemaining = (currentRemaining + quantity.toInt())
-                                  .clamp(0, 9999);
+                          )
+                        : null,
+                    child: _buildMedicationsContent(theme, colors),
+                  ),
+                  const SizedBox(height: 8),
 
-                              await (db.update(db.medications)..where(
-                                    (t) => t.id.equals(med['id'] as int),
-                                  ))
-                                  .write(
-                                    MedicationsCompanion(
-                                      dosagesRemaining: drift.Value(
-                                        newRemaining.toDouble(),
-                                      ),
-                                    ),
-                                  );
+                  // Razpoloženje
+                  _ExpandableSection(
+                    icon: Symbols.mood,
+                    title: 'Razpoloženje',
+                    trailing: _todaysMood != null
+                        ? Text(
+                            MoodService.moodEmojis[_todaysMood!.moodLevel]!,
+                            style: const TextStyle(fontSize: 20),
+                          )
+                        : null,
+                    child: _buildMoodSection(theme, colors),
+                  ),
+                  const SizedBox(height: 8),
 
-                              if (mounted) {
-                                final absQuantity = quantity.abs().toInt();
-                                ScaffoldMessenger.of(context).clearSnackBars();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      quantity >= 0
-                                          ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(med['medType'] as MedicationType, quantity.toInt())}'
-                                          : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
-                                    ),
-                                    backgroundColor: quantity >= 0
-                                        ? Colors.green
-                                        : Colors.orange,
-                                  ),
-                                );
-                                _loadUserMedications();
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).clearSnackBars();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Napaka: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          onDelete: () => _deleteMedication(
-                            med['id'] as int,
-                            med['name'] as String,
-                          ),
-                          isAsNeeded:
-                              (med['frequency'] as String) == 'Po potrebi',
-                          onLogIntake:
-                              (med['frequency'] as String) == 'Po potrebi' &&
-                                  (med['plan'] as MedicationPlan?) != null
-                              ? () async {
-                                  final plan = med['plan'] as MedicationPlan;
-                                  final result = await showLogIntakeSheet(
-                                    context: context,
-                                    medicationName: med['name'] as String,
-                                    medType: med['medType'] as MedicationType,
-                                    defaultQuantity: dosageCount,
-                                  );
-                                  if (result != null && mounted) {
-                                    final time = result['time'] as TimeOfDay;
-                                    final qty = result['quantity'] as int;
-                                    final now = DateTime.now();
-                                    final takenTime = DateTime(
-                                      now.year,
-                                      now.month,
-                                      now.day,
-                                      time.hour,
-                                      time.minute,
-                                    );
-                                    try {
-                                      final intakeService = IntakeLogService(
-                                        db,
-                                      );
-                                      await intakeService.logAsNeededIntake(
-                                        planId: plan.id,
-                                        medicationId: med['id'] as int,
-                                        userId: plan.userId,
-                                        dosageAmount: qty.toDouble(),
-                                        takenTime: takenTime,
-                                      );
-                                      if (mounted) {
-                                        final colors = Theme.of(
-                                          context,
-                                        ).colorScheme;
-                                        final timeStr =
-                                            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).clearSnackBars();
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '✓ $qty ${getMedicationUnitShort(med['medType'] as MedicationType, qty)} ob $timeStr',
-                                              style: TextStyle(
-                                                color: colors.onSurface,
-                                              ),
-                                            ),
-                                            duration: const Duration(
-                                              seconds: 2,
-                                            ),
-                                            backgroundColor:
-                                                colors.surfaceContainerHighest,
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                        _loadUserMedications();
-                                        homePageKey.currentState
-                                            ?.loadTodaysIntakes(
-                                              autoScroll: false,
-                                            );
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).clearSnackBars();
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Napaka: $e'),
-                                            backgroundColor: Colors.red,
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }
-                                }
-                              : null,
-                        ),
-                      );
-                    }).toList(),
-
-                  const SizedBox(height: 32),
-
-                  // Razpoloženje (Mood) Section
-                  _buildMoodSection(theme, colors),
-
-                  // Menstruacija (Period) Section - only for female users
+                  // Menstruacija (only for female users)
                   if (_isFemale) ...[
-                    const SizedBox(height: 32),
-                    _buildPeriodSection(theme, colors),
+                    _ExpandableSection(
+                      icon: Symbols.water_drop,
+                      iconColor: Colors.red,
+                      title: 'Menstruacija',
+                      trailing: _activePeriod != null
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.errorContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'V teku',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colors.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : null,
+                      child: _buildPeriodSection(theme, colors),
+                    ),
+                    const SizedBox(height: 8),
                   ],
 
-                  const SizedBox(height: 32),
-
-                  // Uporabniški račun Section
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      'Uporabniški račun',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  // Termini
+                  _ExpandableSection(
+                    icon: Symbols.calendar_month,
+                    title: 'Termini',
+                    trailing: _appointments.where((a) => a.appointmentTime.isAfter(DateTime.now())).isNotEmpty
+                        ? Text(
+                            '${_appointments.where((a) => a.appointmentTime.isAfter(DateTime.now())).length}',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                    child: _buildAppointmentsSection(theme, colors),
                   ),
+                  const SizedBox(height: 8),
 
-                  // Izbriši račun
+                  // Uporabniški račun
                   GestureDetector(
                     onTap: _deactivateUser,
                     child: Container(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 8,
-                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 6),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
@@ -1105,9 +954,478 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildMedicationsContent(ThemeData theme, ColorScheme colors) {
+    if (_medications.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: EmptyStateInline(
+          icon: Symbols.medication,
+          message: 'Ni zdravil za tega uporabnika',
+        ),
+      );
+    }
+
+    return Column(
+      children: _medications.map((med) {
+        final dosageAmount = med['dosage'] as double;
+        final dosageCount = dosageAmount.toInt();
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => MedicationDetailScreen(
+                  medicationId: med['id'] as int,
+                  medicationName: med['name'] as String,
+                  medType: med['medType'] as MedicationType,
+                  pillsRemaining: med['remaining'] as int,
+                  dosageAmount: dosageAmount,
+                  frequency: med['frequency'] as String,
+                  times: med['times'] as List<String>,
+                  intakeAdvice: med['intakeAdvice'] as String?,
+                  criticalReminder: med['criticalReminder'] as bool,
+                  isAsNeeded: (med['frequency'] as String) == 'Po potrebi',
+                  planId: (med['plan'] as MedicationPlan?)?.id,
+                  userId: (med['plan'] as MedicationPlan?)?.userId,
+                  onDelete: () => _deleteMedication(
+                    med['id'] as int,
+                    med['name'] as String,
+                  ),
+                  onRefresh: _loadUserMedications,
+                ),
+              ),
+            );
+          },
+          child: MedicationDetailsCard(
+            medName: med['name'] as String,
+            dosage:
+                '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
+            pillsRemaining: med['remaining'] as int,
+            frequency: med['frequency'] as String,
+            times: med['times'] as List<String>,
+            medType: med['medType'] as MedicationType,
+            onAddMedication: (quantity) async {
+              try {
+                final currentRemaining = med['remaining'] as int;
+                final newRemaining =
+                    (currentRemaining + quantity.toInt()).clamp(0, 9999);
+
+                await (db.update(db.medications)
+                      ..where(
+                        (t) => t.id.equals(med['id'] as int),
+                      ))
+                    .write(
+                  MedicationsCompanion(
+                    dosagesRemaining: drift.Value(newRemaining.toDouble()),
+                  ),
+                );
+
+                if (mounted) {
+                  final absQuantity = quantity.abs().toInt();
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        quantity >= 0
+                            ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(med['medType'] as MedicationType, quantity.toInt())}'
+                            : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
+                      ),
+                      backgroundColor:
+                          quantity >= 0 ? Colors.green : Colors.orange,
+                    ),
+                  );
+                  _loadUserMedications();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Napaka: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            onDelete: () => _deleteMedication(
+              med['id'] as int,
+              med['name'] as String,
+            ),
+            isAsNeeded: (med['frequency'] as String) == 'Po potrebi',
+            onLogIntake: (med['frequency'] as String) == 'Po potrebi' &&
+                    (med['plan'] as MedicationPlan?) != null
+                ? () async {
+                    final plan = med['plan'] as MedicationPlan;
+                    final result = await showLogIntakeSheet(
+                      context: context,
+                      medicationName: med['name'] as String,
+                      medType: med['medType'] as MedicationType,
+                      defaultQuantity: dosageCount,
+                    );
+                    if (result != null && mounted) {
+                      final time = result['time'] as TimeOfDay;
+                      final qty = result['quantity'] as int;
+                      final now = DateTime.now();
+                      final takenTime = DateTime(
+                        now.year,
+                        now.month,
+                        now.day,
+                        time.hour,
+                        time.minute,
+                      );
+                      try {
+                        final intakeService = IntakeLogService(db);
+                        await intakeService.logAsNeededIntake(
+                          planId: plan.id,
+                          medicationId: med['id'] as int,
+                          userId: plan.userId,
+                          dosageAmount: qty.toDouble(),
+                          takenTime: takenTime,
+                        );
+                        if (mounted) {
+                          final timeStr =
+                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '✓ $qty ${getMedicationUnitShort(med['medType'] as MedicationType, qty)} ob $timeStr',
+                                style: TextStyle(color: colors.onSurface),
+                              ),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor:
+                                  colors.surfaceContainerHighest,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          _loadUserMedications();
+                          homePageKey.currentState
+                              ?.loadTodaysIntakes(autoScroll: false);
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Napaka: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  }
+                : null,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAppointmentsSection(ThemeData theme, ColorScheme colors) {
+    if (_appointments.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: EmptyStateInline(
+          icon: Symbols.calendar_month,
+          message: 'Ni terminov za tega uporabnika',
+        ),
+      );
+    }
+
+    final now = DateTime.now();
+    final upcoming = _appointments.where((a) => a.appointmentTime.isAfter(now)).toList();
+    final past = _appointments.where((a) => !a.appointmentTime.isAfter(now)).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (upcoming.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              'Prihajajoči',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ...upcoming.map((appt) => _buildAppointmentTile(appt, theme, colors, isUpcoming: true)),
+        ],
+        if (past.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              'Pretekli',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ...past.reversed.take(5).map((appt) => _buildAppointmentTile(appt, theme, colors, isUpcoming: false)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAppointmentTile(
+    Appointment appt,
+    ThemeData theme,
+    ColorScheme colors, {
+    required bool isUpcoming,
+  }) {
+    final dt = appt.appointmentTime;
+    final dateStr = '${dt.day}. ${dt.month}. ${dt.year}';
+    final timeStr =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+    return Dismissible(
+      key: ValueKey(appt.id),
+      direction: DismissDirection.endToStart,
+      background: const SizedBox.shrink(),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              'Izbriši',
+              style: TextStyle(
+                color: colors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Symbols.delete, color: colors.error),
+          ],
+        ),
+      ),
+      confirmDismiss: (_) async {
+        return showConfirmationDialog(
+          context,
+          title: 'Izbriši termin',
+          message: 'Ali želite izbrisati termin "${appt.title}"?',
+        );
+      },
+      onDismissed: (_) async {
+        final service = AppointmentService(db);
+        await service.deleteAppointment(appt.id);
+        _loadAppointments();
+      },
+      child: GestureDetector(
+        onTap: () async {
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => AddAppointmentScreen(
+                userId: widget.userId,
+                existingAppointment: appt,
+              ),
+            ),
+          );
+          if (result == true) {
+            _loadAppointments();
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isUpcoming
+                ? colors.primaryContainer.withOpacity(0.3)
+                : colors.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Symbols.calendar_today,
+                color: isUpcoming ? colors.primary : colors.onSurfaceVariant,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appt.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isUpcoming ? null : colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$dateStr ob $timeStr',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    if (appt.note != null && appt.note!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        appt.note!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Symbols.chevron_right,
+                color: colors.onSurfaceVariant.withOpacity(0.5),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Expandable card section used on the user detail screen.
+class _ExpandableSection extends StatefulWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final Widget? trailing;
+  final Widget child;
+
+  const _ExpandableSection({
+    required this.icon,
+    this.iconColor,
+    required this.title,
+    this.trailing,
+    required this.child,
+  });
+
+  @override
+  State<_ExpandableSection> createState() => _ExpandableSectionState();
+}
+
+class _ExpandableSectionState extends State<_ExpandableSection>
+    with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+  late AnimationController _controller;
+  late Animation<double> _expandAnimation;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _expandAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+    _rotationAnimation = Tween<double>(begin: 0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: colors.outlineVariant.withOpacity(0.5),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: _toggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.icon,
+                    color: widget.iconColor ?? colors.primary,
+                    size: 26,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (widget.trailing != null) ...[
+                    widget.trailing!,
+                    const SizedBox(width: 8),
+                  ],
+                  RotationTransition(
+                    turns: _rotationAnimation,
+                    child: Icon(
+                      Symbols.expand_more,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizeTransition(
+            sizeFactor: _expandAnimation,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -13,6 +13,7 @@ class MedicationDetailsCard extends StatelessWidget {
     required this.frequency,
     required this.times,
     required this.medType,
+    this.userName,
     this.onAddMedication,
     this.onDelete,
     this.isAsNeeded = false,
@@ -20,6 +21,7 @@ class MedicationDetailsCard extends StatelessWidget {
   });
 
   final String medName;
+  final String? userName;
   final String dosage;
   final int pillsRemaining;
   final String frequency;
@@ -163,23 +165,43 @@ class MedicationDetailsCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Remaining pills chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getPillCountColor(pillsRemaining),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$pillsRemaining preostalo',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                  // Remaining pills chip + user name
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getPillCountColor(pillsRemaining),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$pillsRemaining preostalo',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      if (userName != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Symbols.person, size: 14, color: colors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              userName!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
                 ],
               ),

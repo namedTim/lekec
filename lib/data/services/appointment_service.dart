@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'package:alarm/alarm.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -15,7 +16,17 @@ class AppointmentService {
   // Notification ID offset to avoid collisions with medication notifications.
   // Medication intake IDs are typically small (auto-increment from 1).
   // We offset appointment notification IDs by 900000 to avoid any overlap.
-  static const int _notifIdOffset = 900000;
+  static const int notifIdOffset = 900000;
+
+  /// Check if an alarm ID belongs to an appointment (2h-before alarm).
+  static bool isAppointmentAlarm(int alarmId) {
+    return alarmId >= notifIdOffset;
+  }
+
+  /// Extract the appointment ID from an alarm ID.
+  static int appointmentIdFromAlarm(int alarmId) {
+    return (alarmId - notifIdOffset - 1) ~/ 2;
+  }
 
   /// Create a new appointment and schedule its notifications.
   Future<int> createAppointment({
@@ -120,7 +131,7 @@ class AppointmentService {
     final oneDayBefore = appointmentTime.subtract(const Duration(days: 1));
     if (oneDayBefore.isAfter(now)) {
       await _scheduleRegularNotification(
-        id: _notifIdOffset + appointmentId * 2,
+        id: notifIdOffset + appointmentId * 2,
         title: 'Termin jutri: $title',
         body: _formatBody(appointmentTime),
         scheduledTime: oneDayBefore,
@@ -128,15 +139,14 @@ class AppointmentService {
       );
     }
 
-    // --- 2 hours before: full-screen / silent notification ---
+    // --- 2 hours before: full-screen alarm (silent, no vibration) ---
     final twoHoursBefore = appointmentTime.subtract(const Duration(hours: 2));
     if (twoHoursBefore.isAfter(now)) {
-      await _scheduleFullScreenSilentNotification(
-        id: _notifIdOffset + appointmentId * 2 + 1,
-        title: 'Termin čez 2 uri: $title',
-        body: _formatBody(appointmentTime),
+      await _scheduleFullScreenAlarm(
+        appointmentId: appointmentId,
+        title: title,
+        appointmentTime: appointmentTime,
         scheduledTime: twoHoursBefore,
-        payload: 'appointment_$appointmentId',
       );
     }
   }
@@ -196,61 +206,43 @@ class AppointmentService {
     }
   }
 
-  /// Full-screen intent notification with **no sound and no vibration**.
-  /// The user will see a persistent heads-up card when they unlock / look at
-  /// their phone — no noise, no buzz.
-  Future<void> _scheduleFullScreenSilentNotification({
-    required int id,
+  /// Full-screen alarm using the Alarm package — silent, no vibration.
+  /// This shows a full-screen intent (the AppointmentRingScreen) via the
+  /// alarm service listener, just like medication critical alarms.
+  Future<void> _scheduleFullScreenAlarm({
+    required int appointmentId,
     required String title,
-    required String body,
+    required DateTime appointmentTime,
     required DateTime scheduledTime,
-    required String payload,
   }) async {
-    final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
+    final alarmId = notifIdOffset + appointmentId * 2 + 1;
 
-    const androidDetails = AndroidNotificationDetails(
-      'appointment_fullscreen',
-      'Termini – tiho opozorilo',
-      channelDescription: 'Tiho celozaslonsko opozorilo 2 uri pred terminom',
-      importance: Importance.max,
-      priority: Priority.max,
-      icon: '@mipmap/ic_launcher',
-      fullScreenIntent: true,
-      playSound: false,
-      enableVibration: false,
-      ongoing: true,
-      autoCancel: true,
-      category: AndroidNotificationCategory.reminder,
-      visibility: NotificationVisibility.public,
+    final alarmSettings = AlarmSettings(
+      id: alarmId,
+      dateTime: scheduledTime,
+      assetAudioPath: 'assets/nokia.mp3', // required by Alarm package, but volume is 0
+      loopAudio: false,
+      vibrate: false,
+      androidFullScreenIntent: true,
+      warningNotificationOnKill: false,
+      volumeSettings: VolumeSettings.fixed(volume: 0.0),
+      notificationSettings: NotificationSettings(
+        title: 'Termin čez 2 uri: $title',
+        body: _formatBody(appointmentTime),
+        stopButton: 'Opusti',
+        icon: 'notification_icon',
+      ),
     );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: false,
-    );
-
-    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     try {
-      await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        tzTime,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payload,
-      );
+      await Alarm.set(alarmSettings: alarmSettings);
       developer.log(
-        'Scheduled full-screen silent notification $id at $scheduledTime',
+        'Scheduled full-screen alarm $alarmId for appointment $appointmentId at $scheduledTime',
         name: 'AppointmentService',
       );
     } catch (e, st) {
       developer.log(
-        'Failed to schedule full-screen notification',
+        'Failed to schedule full-screen alarm for appointment',
         error: e,
         stackTrace: st,
         name: 'AppointmentService',
@@ -260,8 +252,17 @@ class AppointmentService {
 
   /// Cancel both notifications for a given appointment.
   Future<void> _cancelNotifications(int appointmentId) async {
-    await _notifications.cancel(_notifIdOffset + appointmentId * 2);
-    await _notifications.cancel(_notifIdOffset + appointmentId * 2 + 1);
+    // Cancel the day-before push notification
+    await _notifications.cancel(notifIdOffset + appointmentId * 2);
+
+    // Cancel the 2h-before full-screen alarm
+    final alarmId = notifIdOffset + appointmentId * 2 + 1;
+    try {
+      await Alarm.stop(alarmId);
+    } catch (_) {
+      // Alarm may not exist if it already fired or wasn't scheduled
+    }
+
     developer.log(
       'Cancelled notifications for appointment $appointmentId',
       name: 'AppointmentService',
