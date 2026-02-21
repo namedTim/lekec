@@ -337,8 +337,16 @@ class DashboardScreenState extends State<DashboardScreen>
   void _onAddNewMedication() async {
     _toggleSpeedDial();
     await context.push('/add-medication');
-    // Refresh after returning from adding medication
+    // Refresh after returning — medication or new user may have been added
+    await _loadUserData();
     await loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddAppointment() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    await context.push('/add-appointment', extra: {'userId': userId});
   }
 
   /// Pick a user if multiple users exist, or auto-select the only user
@@ -811,6 +819,47 @@ class DashboardScreenState extends State<DashboardScreen>
                                 '😊',
                                 style: TextStyle(fontSize: 20),
                               ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Option: Add appointment
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj termin',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'add_appointment',
+                              mini: true,
+                              onPressed: _onAddAppointment,
+                              child: const Icon(Symbols.calendar_add_on),
                             ),
                           ],
                         ),

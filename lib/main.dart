@@ -31,6 +31,7 @@ import 'ui/screens/specific_days_planning.dart';
 import 'ui/screens/specific_days_select_times.dart';
 import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
+import 'ui/screens/add_appointment_screen.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'features/core/providers/onboarding_provider.dart';
@@ -290,6 +291,15 @@ final _router = GoRouter(
           medicationName: extra['name'] as String,
           medType: MedicationType.values[medTypeIndex],
           userId: extra['userId'] as int,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/add-appointment',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AddAppointmentScreen(
+          userId: extra?['userId'] as int? ?? 1,
         );
       },
     ),

@@ -14,6 +14,7 @@ import 'tables/app_settings.dart';
 import 'tables/onboarding_settings.dart';
 import 'tables/mood_entries.dart';
 import 'tables/period_entries.dart';
+import 'tables/appointments.dart';
 
 part 'drift_database.g.dart';
 
@@ -28,13 +29,14 @@ part 'drift_database.g.dart';
     OnboardingSettings,
     MoodEntries,
     PeriodEntries,
+    Appointments,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -86,6 +88,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 11) {
           // Add gender column to users table
           await m.addColumn(users, users.gender);
+        }
+        if (from < 12) {
+          // Add appointments table
+          await m.createTable(appointments);
         }
       },
     );
