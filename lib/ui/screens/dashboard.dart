@@ -18,6 +18,8 @@ import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
+import '../../ui/components/missed_reminders_sheet.dart';
+import '../../data/services/missed_reminder_service.dart';
 import 'add_appointment_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -29,7 +31,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class DashboardScreenState extends State<DashboardScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final controller = TimeIslandController();
   late AnimationController _animationController;
   late Animation<double> _animation;
@@ -38,8 +40,10 @@ class DashboardScreenState extends State<DashboardScreen>
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
   late IntakeLogService _intakeService;
+  late MissedReminderService _missedReminderService;
   int _totalUserCount = 0;
   Map<int, String> _userNames = {};
+  bool _missedRemindersShown = false;
 
   // Time Island state
   Map<String, dynamic>? _nextMedication;
@@ -51,7 +55,9 @@ class DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _intakeService = IntakeLogService(db);
+    _missedReminderService = MissedReminderService(db);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 250),
       vsync: this,
@@ -61,7 +67,7 @@ class DashboardScreenState extends State<DashboardScreen>
       curve: Curves.easeInOut,
     );
     _loadUserData();
-    loadTodaysIntakes();
+    loadTodaysIntakes().then((_) => _checkMissedReminders());
     _updateTimeIsland();
     _startIslandUpdateTimer();
     _startDayChangeTimer();
@@ -89,12 +95,67 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // When app returns to foreground, refresh and check for missed reminders
+      _missedRemindersShown = false;
+      loadTodaysIntakes(autoScroll: false).then((_) => _checkMissedReminders());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     _scrollController.dispose();
     _islandUpdateTimer?.cancel();
     _dayChangeTimer?.cancel();
     super.dispose();
+  }
+
+  /// Check for missed critical reminders and display a bottom sheet if any exist.
+  Future<void> _checkMissedReminders() async {
+    if (_missedRemindersShown || !mounted) return;
+
+    try {
+      final missedMeds =
+          await _missedReminderService.getMissedMedicationReminders();
+      final missedAppts =
+          await _missedReminderService.getMissedAppointmentReminders();
+
+      if (missedMeds.isEmpty && missedAppts.isEmpty) return;
+      if (!mounted) return;
+
+      _missedRemindersShown = true;
+
+      // Small delay to ensure the dashboard is fully rendered
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+
+      await showMissedRemindersSheet(
+        context: context,
+        missedMedications: missedMeds,
+        missedAppointments: missedAppts,
+        onMarkTaken: (intakeId) async {
+          await _missedReminderService.markIntakeAsTaken(intakeId);
+          // Refresh dashboard in background
+          loadTodaysIntakes(autoScroll: false);
+        },
+        onDismiss: (intakeId) async {
+          await _missedReminderService.dismissIntake(intakeId);
+          // Refresh dashboard in background
+          loadTodaysIntakes(autoScroll: false);
+        },
+        onAllHandled: () {
+          // Final refresh after all items handled
+          loadTodaysIntakes(autoScroll: false);
+        },
+      );
+    } catch (e) {
+      // Silently handle errors — don't break the dashboard
+      debugPrint('Error checking missed reminders: $e');
+    }
   }
 
   void _startDayChangeTimer() {
