@@ -125,8 +125,14 @@ class IntakeLogService {
         db.medications,
       )..where((t) => t.id.equals(plan.medicationId))).getSingleOrNull();
 
-      if (medication == null || medication.status == MedicationStatus.deleted)
+      if (medication == null) continue;
+
+      // For deleted medications, only show past intakes (already scheduled)
+      // so the user can still see what they took today
+      if (medication.status == MedicationStatus.deleted &&
+          intake.scheduledTime.isAfter(now)) {
         continue;
+      }
 
       // Check if it's a one-time entry
       final rule = await (db.select(
