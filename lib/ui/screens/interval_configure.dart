@@ -57,7 +57,7 @@ class _IntervalConfigureScreenState
         title: const Text('Čas začetka'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -274,7 +274,7 @@ class _IntervalConfigureScreenState
                 onChanged: (value) => setState(() => _criticalReminder = value),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 24),
 
               FilledButton(
                 onPressed: _startTime != null && !_isSaving

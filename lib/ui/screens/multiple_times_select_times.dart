@@ -114,7 +114,7 @@ class _MultipleTimesSelectTimesScreenState
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -170,8 +170,50 @@ class _MultipleTimesSelectTimesScreenState
               ),
               const SizedBox(height: 32),
 
-              Expanded(
+              // Progress indicator: X / Y times selected
+              Builder(
+                builder: (context) {
+                  final filledCount = _times.where((t) => t != null).length;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: filledCount == widget.timesPerDay
+                          ? colors.primaryContainer.withOpacity(0.5)
+                          : colors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          filledCount == widget.timesPerDay
+                              ? Symbols.check_circle
+                              : Symbols.schedule,
+                          color: filledCount == widget.timesPerDay
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '$filledCount / ${widget.timesPerDay} časov nastavljenih',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: filledCount == widget.timesPerDay
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
                 child: ListView.builder(
+                  shrinkWrap: true,
                   itemCount: widget.timesPerDay,
                   itemBuilder: (context, index) {
                     final isAiTime = _aiSuggestedTimes[index];
@@ -301,6 +343,7 @@ class _MultipleTimesSelectTimesScreenState
                   },
                 ),
               ),
+              const SizedBox(height: 16),
 
               // Količina na vnos card
               InkWell(

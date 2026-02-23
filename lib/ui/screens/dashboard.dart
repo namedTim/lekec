@@ -893,10 +893,7 @@ class DashboardScreenState extends State<DashboardScreen>
                               heroTag: 'log_mood',
                               mini: true,
                               onPressed: _onLogMood,
-                              child: const Text(
-                                '😊',
-                                style: TextStyle(fontSize: 20),
-                              ),
+                              child: const Icon(Symbols.mood),
                             ),
                           ],
                         ),

@@ -49,7 +49,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
         title: const Text('Ciklično jemanje'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,7 +150,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 32),
 
               FilledButton(
                 onPressed: _handleContinue,

@@ -64,7 +64,7 @@ class _SpecificDaysSelectTimesScreenState
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -102,7 +102,8 @@ class _SpecificDaysSelectTimesScreenState
               const SizedBox(height: 32),
 
               // Times list
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
                 child: _times.isEmpty
                     ? Center(
                         child: Text(
@@ -113,6 +114,7 @@ class _SpecificDaysSelectTimesScreenState
                         ),
                       )
                     : ListView.builder(
+                        shrinkWrap: true,
                         itemCount: _times.length,
                         itemBuilder: (context, index) {
                           return Padding(
