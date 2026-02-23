@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
-import '../../main.dart' show db, rootNavigatorKey;
-import '../../services/alarm_service.dart';
+import '../../main.dart' show db;
 import '../../helpers/medication_unit_helper.dart';
 import '../../ui/widgets/medication_card.dart';
 import '../../ui/widgets/medication_detail_dialog.dart';
@@ -68,7 +67,7 @@ class DashboardScreenState extends State<DashboardScreen>
       curve: Curves.easeInOut,
     );
     _loadUserData();
-    loadTodaysIntakes().then((_) => _checkRingingThenMissed());
+    loadTodaysIntakes().then((_) => _checkMissedReminders());
     _updateTimeIsland();
     _startIslandUpdateTimer();
     _startDayChangeTimer();
@@ -99,10 +98,9 @@ class DashboardScreenState extends State<DashboardScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // When app returns to foreground, refresh and check for ringing alarms first,
-      // then missed reminders
+      // When app returns to foreground, refresh and check for missed reminders
       _missedRemindersShown = false;
-      loadTodaysIntakes(autoScroll: false).then((_) => _checkRingingThenMissed());
+      loadTodaysIntakes(autoScroll: false).then((_) => _checkMissedReminders());
     }
   }
 
@@ -114,34 +112,6 @@ class DashboardScreenState extends State<DashboardScreen>
     _islandUpdateTimer?.cancel();
     _dayChangeTimer?.cancel();
     super.dispose();
-  }
-
-  /// First check if any alarm is actively ringing and re-show the ring screen.
-  /// If no alarm is ringing, fall through to check for missed reminders.
-  Future<void> _checkRingingThenMissed() async {
-    if (!mounted) return;
-
-    try {
-      // Use a small delay to let the UI settle
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) return;
-
-      final alarmService = AlarmService(rootNavigatorKey);
-      // Borrow the global alarm service's navigator key — we just need
-      // forceShowRingingAlarm which is stateless other than the navigatorKey
-      // that is already set via the provider.
-      // But we can't easily access Riverpod here, so we use the global key.
-      final hasRinging = await alarmService.forceShowRingingAlarm();
-      if (hasRinging) {
-        // An alarm is ringing and we navigated to it — don't show missed sheet
-        return;
-      }
-    } catch (e) {
-      debugPrint('Error checking ringing alarms: $e');
-    }
-
-    // No alarm ringing — check for missed reminders
-    await _checkMissedReminders();
   }
 
   /// Check for missed critical reminders and display a bottom sheet if any exist.

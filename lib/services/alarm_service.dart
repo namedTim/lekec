@@ -97,38 +97,6 @@ class AlarmService {
     }
   }
 
-  /// Re-check for actively ringing alarms and force-navigate to the ring screen.
-  ///
-  /// Unlike [checkInitialRingingAlarms], this ignores [_currentAlarmId] so it
-  /// will re-show the ring screen even if the alarm was already shown once
-  /// (e.g. the user accidentally dismissed it or navigated away while it was
-  /// still ringing).
-  ///
-  /// Returns `true` if a ringing alarm was found and navigation was triggered.
-  Future<bool> forceShowRingingAlarm() async {
-    final ringingAlarms = Alarm.ringing.value.alarms;
-    if (ringingAlarms.isEmpty) return false;
-
-    for (final alarm in ringingAlarms) {
-      if (_isAlarmTooOld(alarm)) {
-        await Alarm.stop(alarm.id);
-        continue;
-      }
-
-      // Force navigate — reset _currentAlarmId to allow re-navigation
-      final context = _navigatorKey.currentContext;
-      if (context != null) {
-        _currentAlarmId = alarm.id;
-        final route = AppointmentService.isAppointmentAlarm(alarm.id)
-            ? '/appointment-ring'
-            : '/ring';
-        context.push(route, extra: alarm);
-        return true;
-      }
-    }
-    return false;
-  }
-
   /// Handle when an alarm starts ringing
   void _onAlarmRinging(AlarmSet alarmSet) {
     if (alarmSet.alarms.isEmpty) {
