@@ -83,17 +83,28 @@ class AlarmService {
         continue;
       }
 
-      // Alarm is within grace period, show it
-      await Future.delayed(const Duration(milliseconds: 100));
-      final context = _navigatorKey.currentContext;
-      if (context != null && _currentAlarmId != alarm.id) {
-        _currentAlarmId = alarm.id;
-        final route = AppointmentService.isAppointmentAlarm(alarm.id)
-            ? '/appointment-ring'
-            : '/ring';
-        context.push(route, extra: alarm);
-        break; // Only show one alarm at a time
-      }
+      // Alarm is within grace period, try to show it (with retries for cold-start)
+      await _showAlarmWithRetry(alarm, retries: 10);
+      break; // Only show one alarm at a time
+    }
+  }
+
+  Future<void> _showAlarmWithRetry(
+    AlarmSettings alarm, {
+    int retries = 10,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    final context = _navigatorKey.currentContext;
+    if (context != null && _currentAlarmId != alarm.id) {
+      _currentAlarmId = alarm.id;
+      final route = AppointmentService.isAppointmentAlarm(alarm.id)
+          ? '/appointment-ring'
+          : '/ring';
+      context.push(route, extra: alarm);
+    } else if (retries > 0 && _currentAlarmId != alarm.id) {
+      // Router might not be ready yet on cold start, retry
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _showAlarmWithRetry(alarm, retries: retries - 1);
     }
   }
 

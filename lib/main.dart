@@ -355,20 +355,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
             icon: Icon(Symbols.manage_search),
             label: 'Zgodovina',
           ),
-          NavigationDestination(
-            icon: Icon(Symbols.group),
-            label: 'Osebe',
-          ),
+          NavigationDestination(icon: Icon(Symbols.group), label: 'Osebe'),
         ],
       ),
     );
   }
 
   void _onTap(BuildContext context, int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: true,
-    );
+    navigationShell.goBranch(index, initialLocation: true);
   }
 }
 
@@ -377,21 +371,25 @@ Future<void> main() async {
 
   setupLogging(showDebugLogs: true);
 
-  // PRIORITY: Initialize alarm service FIRST for fastest response
-  await Alarm.init();
-
-  // Create alarm service immediately and initialize listeners
-  final alarmService = AlarmService(rootNavigatorKey);
-  alarmService.initialize();
-
-  // Initialize database (quick, no heavy operations)
+  // Initialize database early — constructor is cheap (lazy open)
   db = AppDatabase();
+  AlarmService alarmService = AlarmService(rootNavigatorKey);
 
-  // Set alarm warning notification
-  await Alarm.setWarningNotificationOnKill(
-    "Aktivnost opozoril",
-    "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-  );
+  try {
+    // PRIORITY: Initialize alarm service FIRST for fastest response
+    await Alarm.init();
+
+    // Initialize listeners
+    alarmService.initialize();
+
+    // Set alarm warning notification
+    await Alarm.setWarningNotificationOnKill(
+      "Aktivnost opozoril",
+      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+    );
+  } catch (e, st) {
+    Logger('main').severe('Critical startup error', e, st);
+  }
 
   // Start the app immediately so alarm can show
   runApp(
@@ -409,8 +407,11 @@ Future<void> main() async {
     alarmService.checkInitialRingingAlarms();
   });
 
-  // Defer heavy initialization to background after app is running
-  _initializeServicesInBackground();
+  // Defer heavy initialization — give providers time to resolve first
+  // so the app renders before background DB-heavy tasks start
+  Future.delayed(const Duration(seconds: 2), () {
+    _initializeServicesInBackground();
+  });
 }
 
 // Run heavy initialization in background after app starts
@@ -426,13 +427,33 @@ Future<void> _initializeServicesInBackground() async {
     // Generate upcoming intake schedules
     final scheduleGenerator = IntakeScheduleGenerator(db);
 
-    // Clean up any duplicate entries first
-    await scheduleGenerator.removeDuplicateEntries();
+    // Clean up duplicates with a safety timeout so it can't block forever
+    try {
+      await scheduleGenerator.removeDuplicateEntries().timeout(
+        const Duration(seconds: 15),
+      );
+    } catch (e) {
+      Logger('main').warning('removeDuplicateEntries timed out or failed: $e');
+    }
 
-    await scheduleGenerator.generateScheduledIntakes();
+    try {
+      await scheduleGenerator.generateScheduledIntakes().timeout(
+        const Duration(seconds: 30),
+      );
+    } catch (e) {
+      Logger(
+        'main',
+      ).warning('generateScheduledIntakes timed out or failed: $e');
+    }
 
     // Schedule notifications for upcoming intakes
-    await notificationService.scheduleAllUpcomingNotifications(db);
+    try {
+      await notificationService
+          .scheduleAllUpcomingNotifications(db)
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      Logger('main').warning('scheduleAllUpcomingNotifications failed: $e');
+    }
 
     // Initialize and schedule background tasks
     final backgroundService = BackgroundTaskService();

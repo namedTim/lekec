@@ -46,21 +46,31 @@ class MedicationService {
   Future<void> deleteMedication(int medicationId) async {
     final now = DateTime.now();
 
-    // Get all future intake logs for this medication before deleting
-    final futureIntakes =
+    // Get ALL intake logs for this medication (not just future ones)
+    // to ensure we cancel any currently-ringing or recently-scheduled alarms
+    final allIntakes =
         await (db.select(db.medicationIntakeLogs)
-              ..where((log) => log.medicationId.equals(medicationId))
-              ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+              ..where((log) => log.medicationId.equals(medicationId)))
             .get();
 
-    // Cancel all alarms and notifications for these intakes
+    // Cancel all alarms and notifications for ALL intakes of this medication
     final notificationService = NotificationService();
-    for (final intake in futureIntakes) {
-      // Cancel alarm (for critical reminders)
+    for (final intake in allIntakes) {
+      // Cancel alarm (for critical reminders) - safe to call even if not set
       await Alarm.stop(intake.id);
 
       // Cancel notification (for regular reminders)
       await notificationService.cancelNotification(intake.id);
+    }
+
+    // Also stop any alarms that the Alarm package still has registered
+    // in case IDs got out of sync
+    final activeAlarms = await Alarm.getAlarms();
+    for (final alarm in activeAlarms) {
+      // Check if this alarm belongs to an intake of this medication
+      if (allIntakes.any((intake) => intake.id == alarm.id)) {
+        await Alarm.stop(alarm.id);
+      }
     }
 
     // Mark medication as deleted

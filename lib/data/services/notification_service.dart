@@ -122,22 +122,28 @@ class NotificationService {
     // Parse intake ID from payload
     final intakeId = int.tryParse(response.payload ?? '');
     if (intakeId != null) {
-      // Navigate to home page (index 1 in bottom nav)
-      final context = rootNavigatorKey.currentContext;
-      if (context != null) {
-        // Navigate to home page
-        context.go('/');
+      // Retry navigation with a delay in case the router isn't built yet
+      // (e.g., cold-start from notification)
+      _navigateToIntake(intakeId, retries: 5);
+    }
+  }
 
-        // Wait for navigation to complete, then scroll to the intake
-        Future.delayed(const Duration(milliseconds: 300), () {
-          homePageKey.currentState?.scrollToIntake(intakeId);
-        });
-
-        developer.log(
-          'Navigated to home and scrolling to intake $intakeId',
-          name: 'NotificationService',
-        );
-      }
+  void _navigateToIntake(int intakeId, {int retries = 5}) {
+    final context = rootNavigatorKey.currentContext;
+    if (context != null) {
+      context.go('/');
+      Future.delayed(const Duration(milliseconds: 300), () {
+        homePageKey.currentState?.scrollToIntake(intakeId);
+      });
+      developer.log(
+        'Navigated to home and scrolling to intake $intakeId',
+        name: 'NotificationService',
+      );
+    } else if (retries > 0) {
+      // Router not ready yet, retry after a short delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _navigateToIntake(intakeId, retries: retries - 1);
+      });
     }
   }
 
