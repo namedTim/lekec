@@ -504,11 +504,7 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _onQuickLogPeriod,
-              icon: const Icon(
-                Symbols.water_drop,
-                size: 16,
-                color: Colors.red,
-              ),
+              icon: const Icon(Symbols.water_drop, size: 16, color: Colors.red),
               label: const Text('Zabeleži'),
             ),
           ),
@@ -820,60 +816,70 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Icon(Symbols.person, color: colors.primary),
-            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: colors.primaryContainer,
+              child: Text(
+                widget.userName.isNotEmpty
+                    ? widget.userName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  color: colors.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             Text(widget.userName),
           ],
         ),
+        scrolledUnderElevation: 1,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.only(top: 12, bottom: 40),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Zdravila
+                  // ── Zdravila ────────────────────────────────────────────
                   _ExpandableSection(
                     icon: Symbols.pill,
                     title: 'Zdravila',
                     trailing: _medications.isNotEmpty
-                        ? Text(
-                            '${_medications.length}',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: colors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ? _SectionBadge(
+                            label: '${_medications.length}',
+                            color: colors.primary,
                           )
                         : null,
                     child: _buildMedicationsContent(theme, colors),
                   ),
-                  const SizedBox(height: 8),
 
-                  // Razpoloženje
+                  // ── Razpoloženje ─────────────────────────────────────────
                   _ExpandableSection(
                     icon: Symbols.mood,
                     title: 'Razpoloženje',
                     trailing: _todaysMood != null
                         ? Text(
                             MoodService.moodEmojis[_todaysMood!.moodLevel]!,
-                            style: const TextStyle(fontSize: 20),
+                            style: const TextStyle(fontSize: 22),
                           )
                         : null,
                     child: _buildMoodSection(theme, colors),
                   ),
-                  const SizedBox(height: 8),
 
-                  // Menstruacija (only for female users)
-                  if (_isFemale) ...[
+                  // ── Menstruacija (female only) ────────────────────────────
+                  if (_isFemale)
                     _ExpandableSection(
                       icon: Symbols.water_drop,
-                      iconColor: Colors.red,
+                      iconColor: colors.error,
                       title: 'Menstruacija',
                       trailing: _activePeriod != null
                           ? Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
+                                horizontal: 10,
+                                vertical: 3,
                               ),
                               decoration: BoxDecoration(
                                 color: colors.errorContainer,
@@ -890,68 +896,58 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                           : null,
                       child: _buildPeriodSection(theme, colors),
                     ),
-                    const SizedBox(height: 8),
-                  ],
 
-                  // Termini
+                  // ── Termini ──────────────────────────────────────────────
                   _ExpandableSection(
                     icon: Symbols.calendar_month,
                     title: 'Termini',
-                    trailing: _appointments.where((a) => a.appointmentTime.isAfter(DateTime.now())).isNotEmpty
-                        ? Text(
-                            '${_appointments.where((a) => a.appointmentTime.isAfter(DateTime.now())).length}',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: colors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    trailing: () {
+                      final upcomingCount = _appointments
+                          .where(
+                            (a) => a.appointmentTime.isAfter(DateTime.now()),
                           )
-                        : null,
+                          .length;
+                      return upcomingCount > 0
+                          ? _SectionBadge(
+                              label: '$upcomingCount',
+                              color: colors.primary,
+                            )
+                          : null;
+                    }(),
                     child: _buildAppointmentsSection(theme, colors),
                   ),
-                  const SizedBox(height: 8),
 
-                  // Uporabniški račun
-                  GestureDetector(
-                    onTap: _deactivateUser,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: colors.error, width: 2),
+                  // ── Izbriši račun ────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: OutlinedButton.icon(
+                      onPressed: _deactivateUser,
+                      icon: Icon(Symbols.delete, color: colors.error),
+                      label: Text(
+                        'Izbriši račun',
+                        style: TextStyle(color: colors.error),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(Symbols.delete, color: colors.error, size: 28),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Izbriši račun',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.error,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Deaktiviraj ta uporabniški račun',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Symbols.chevron_right,
-                            color: colors.error,
-                            size: 24,
-                          ),
-                        ],
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: colors.error),
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Deaktivacija bo ohranila zgodovino, a onemogočila dostop do računa.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
 
@@ -1015,14 +1011,12 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
             onAddMedication: (quantity) async {
               try {
                 final currentRemaining = med['remaining'] as int;
-                final newRemaining =
-                    (currentRemaining + quantity.toInt()).clamp(0, 9999);
+                final newRemaining = (currentRemaining + quantity.toInt())
+                    .clamp(0, 9999);
 
-                await (db.update(db.medications)
-                      ..where(
-                        (t) => t.id.equals(med['id'] as int),
-                      ))
-                    .write(
+                await (db.update(
+                  db.medications,
+                )..where((t) => t.id.equals(med['id'] as int))).write(
                   MedicationsCompanion(
                     dosagesRemaining: drift.Value(newRemaining.toDouble()),
                   ),
@@ -1038,8 +1032,9 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                             ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(med['medType'] as MedicationType, quantity.toInt())}'
                             : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
                       ),
-                      backgroundColor:
-                          quantity >= 0 ? Colors.green : Colors.orange,
+                      backgroundColor: quantity >= 0
+                          ? Colors.green
+                          : Colors.orange,
                     ),
                   );
                   _loadUserMedications();
@@ -1056,12 +1051,11 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                 }
               }
             },
-            onDelete: () => _deleteMedication(
-              med['id'] as int,
-              med['name'] as String,
-            ),
+            onDelete: () =>
+                _deleteMedication(med['id'] as int, med['name'] as String),
             isAsNeeded: (med['frequency'] as String) == 'Po potrebi',
-            onLogIntake: (med['frequency'] as String) == 'Po potrebi' &&
+            onLogIntake:
+                (med['frequency'] as String) == 'Po potrebi' &&
                     (med['plan'] as MedicationPlan?) != null
                 ? () async {
                     final plan = med['plan'] as MedicationPlan;
@@ -1102,14 +1096,14 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                                 style: TextStyle(color: colors.onSurface),
                               ),
                               duration: const Duration(seconds: 2),
-                              backgroundColor:
-                                  colors.surfaceContainerHighest,
+                              backgroundColor: colors.surfaceContainerHighest,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
                           _loadUserMedications();
-                          homePageKey.currentState
-                              ?.loadTodaysIntakes(autoScroll: false);
+                          homePageKey.currentState?.loadTodaysIntakes(
+                            autoScroll: false,
+                          );
                         }
                       } catch (e) {
                         if (mounted) {
@@ -1144,8 +1138,12 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     }
 
     final now = DateTime.now();
-    final upcoming = _appointments.where((a) => a.appointmentTime.isAfter(now)).toList();
-    final past = _appointments.where((a) => !a.appointmentTime.isAfter(now)).toList();
+    final upcoming = _appointments
+        .where((a) => a.appointmentTime.isAfter(now))
+        .toList();
+    final past = _appointments
+        .where((a) => !a.appointmentTime.isAfter(now))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1161,7 +1159,10 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
               ),
             ),
           ),
-          ...upcoming.map((appt) => _buildAppointmentTile(appt, theme, colors, isUpcoming: true)),
+          ...upcoming.map(
+            (appt) =>
+                _buildAppointmentTile(appt, theme, colors, isUpcoming: true),
+          ),
         ],
         if (past.isNotEmpty) ...[
           Padding(
@@ -1174,7 +1175,16 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
               ),
             ),
           ),
-          ...past.reversed.take(5).map((appt) => _buildAppointmentTile(appt, theme, colors, isUpcoming: false)),
+          ...past.reversed
+              .take(5)
+              .map(
+                (appt) => _buildAppointmentTile(
+                  appt,
+                  theme,
+                  colors,
+                  isUpcoming: false,
+                ),
+              ),
         ],
       ],
     );
@@ -1306,7 +1316,7 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
   }
 }
 
-/// Expandable card section used on the user detail screen.
+/// Expandable section with animated show/hide of its child.
 class _ExpandableSection extends StatefulWidget {
   final IconData icon;
   final Color? iconColor;
@@ -1329,24 +1339,22 @@ class _ExpandableSection extends StatefulWidget {
 class _ExpandableSectionState extends State<_ExpandableSection>
     with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
-  late AnimationController _controller;
-  late Animation<double> _expandAnimation;
-  late Animation<double> _rotationAnimation;
+  late final AnimationController _controller;
+  late final Animation<double> _expandAnim;
+  late final Animation<double> _rotateAnim;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 280),
       vsync: this,
     );
-    _expandAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-    _rotationAnimation = Tween<double>(begin: 0, end: 0.5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _expandAnim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _rotateAnim = Tween<double>(
+      begin: 0,
+      end: 0.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -1358,11 +1366,7 @@ class _ExpandableSectionState extends State<_ExpandableSection>
   void _toggle() {
     setState(() {
       _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
+      _isExpanded ? _controller.forward() : _controller.reverse();
     });
   }
 
@@ -1370,61 +1374,85 @@ class _ExpandableSectionState extends State<_ExpandableSection>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final accent = widget.iconColor ?? colors.primary;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: colors.outlineVariant.withOpacity(0.5),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          InkWell(
-            onTap: _toggle,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.icon,
-                    color: widget.iconColor ?? colors.primary,
-                    size: 26,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _toggle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  child: Icon(widget.icon, color: accent, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.1,
                     ),
                   ),
-                  if (widget.trailing != null) ...[
-                    widget.trailing!,
-                    const SizedBox(width: 8),
-                  ],
-                  RotationTransition(
-                    turns: _rotationAnimation,
-                    child: Icon(
-                      Symbols.expand_more,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
+                ),
+                if (widget.trailing != null) ...[
+                  widget.trailing!,
+                  const SizedBox(width: 8),
                 ],
-              ),
+                RotationTransition(
+                  turns: _rotateAnim,
+                  child: Icon(
+                    Symbols.expand_more,
+                    color: colors.onSurfaceVariant,
+                    size: 22,
+                  ),
+                ),
+              ],
             ),
           ),
-          SizeTransition(
-            sizeFactor: _expandAnimation,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: widget.child,
-            ),
+        ),
+        SizeTransition(
+          sizeFactor: _expandAnim,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: widget.child,
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Small rounded badge used next to section headers.
+class _SectionBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SectionBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
       ),
     );
   }

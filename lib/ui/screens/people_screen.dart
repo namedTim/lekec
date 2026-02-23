@@ -28,9 +28,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
   Future<void> _loadUsers() async {
     final db = ref.read(databaseProvider);
-    final users = await (db.select(db.users)
-          ..where((t) => t.isActive.equals(true)))
-        .get();
+    final users = await (db.select(
+      db.users,
+    )..where((t) => t.isActive.equals(true))).get();
     if (mounted) {
       setState(() {
         _users = users;
@@ -48,7 +48,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     if (result != null && result.name.isNotEmpty) {
       try {
         final db = ref.read(databaseProvider);
-        await db.into(db.users).insert(
+        await db
+            .into(db.users)
+            .insert(
               UsersCompanion.insert(
                 name: result.name,
                 createdAt: drift.Value(DateTime.now()),
@@ -80,84 +82,108 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    'Osebe',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Osebe',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (!_isLoading && _users.isNotEmpty)
+                          Text(
+                            '${_users.length} ${_users.length == 1
+                                ? 'oseba'
+                                : _users.length < 5
+                                ? 'osebe'
+                                : 'oseb'}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                  if (!_isLoading && _users.isNotEmpty)
+                    FilledButton.icon(
+                      onPressed: _showAddUserDialog,
+                      icon: const Icon(Symbols.person_add, size: 18),
+                      label: const Text('Dodaj'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            Expanded(child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _users.isEmpty
-              ? Center(
-                  child: EmptyStateCard(
-                    icon: Symbols.group,
-                    title: 'Ni dodanih uporabnikov',
-                    subtitle:
-                        'Dodajte uporabnike za upravljanje njihovih zdravil',
-                    action: FilledButton.icon(
-                      onPressed: _showAddUserDialog,
-                      icon: const Icon(Symbols.person_add),
-                      label: const Text('Dodaj uporabnika'),
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadUsers,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(
-                      top: 8,
-                      left: 8,
-                      right: 8,
-                      bottom: 88,
-                    ),
-                    itemCount: _users.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == _users.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: FilledButton.icon(
-                            onPressed: _showAddUserDialog,
-                            icon: const Icon(Symbols.person_add),
-                            label: const Text('Dodaj uporabnika'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 48),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final user = _users[index];
-                      return UserCard(
-                        userName: user.name,
-                        userAge: user.age,
-                        onTap: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => UserMedicationsScreen(
-                                userId: user.id,
-                                userName: user.name,
-                              ),
-                            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _users.isEmpty
+                  ? Center(
+                      child: EmptyStateCard(
+                        icon: Symbols.group,
+                        title: 'Ni dodanih uporabnikov',
+                        subtitle:
+                            'Dodajte uporabnike za upravljanje njihovih zdravil',
+                        action: FilledButton.icon(
+                          onPressed: _showAddUserDialog,
+                          icon: const Icon(Symbols.person_add),
+                          label: const Text('Dodaj uporabnika'),
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadUsers,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(
+                          top: 4,
+                          left: 12,
+                          right: 12,
+                          bottom: 88,
+                        ),
+                        itemCount: _users.length,
+                        itemBuilder: (context, index) {
+                          final user = _users[index];
+                          return UserCard(
+                            userName: user.name,
+                            userAge: user.age,
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => UserMedicationsScreen(
+                                    userId: user.id,
+                                    userName: user.name,
+                                  ),
+                                ),
+                              );
+                              // Refresh in case user was deactivated
+                              _loadUsers();
+                            },
                           );
-                          // Refresh in case user was deactivated
-                          _loadUsers();
                         },
-                      );
-                    },
-                  ),
-                )),
+                      ),
+                    ),
+            ),
           ],
         ),
       ),

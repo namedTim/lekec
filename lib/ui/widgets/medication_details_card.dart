@@ -87,7 +87,7 @@ class MedicationDetailsCard extends StatelessWidget {
       key: Key('medication_$medName${DateTime.now().millisecondsSinceEpoch}'),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: colors.error,
           borderRadius: BorderRadius.circular(20),
@@ -103,15 +103,19 @@ class MedicationDetailsCard extends StatelessWidget {
         return false; // Don't actually dismiss, let parent handle it
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: colors.outlineVariant.withOpacity(0.5),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 80,
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],

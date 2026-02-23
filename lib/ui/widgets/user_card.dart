@@ -18,68 +18,64 @@ class UserCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: const Color(0xFF22C55E),
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Symbols.person,
-                color: colors.primary,
-                size: 32,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userName,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+    final initial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: colors.primaryContainer,
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    color: colors.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
                   ),
-                  if (userAge != null) ...[
-                    const SizedBox(height: 4),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      '$userAge let',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
+                      userName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (userAge != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '$userAge let',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            Icon(
-              Symbols.chevron_right,
-              color: colors.onSurfaceVariant,
-              size: 24,
-            ),
-          ],
+              Icon(
+                Symbols.chevron_right,
+                color: colors.onSurfaceVariant.withOpacity(0.6),
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );

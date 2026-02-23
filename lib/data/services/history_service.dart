@@ -108,6 +108,39 @@ class HistoryService {
     }).toList();
   }
 
+  /// Load appointment history with pagination and optional user filter
+  Future<List<Map<String, dynamic>>> loadAppointmentHistory({
+    required int limit,
+    required int offset,
+    int? userId,
+  }) async {
+    final now = DateTime.now();
+
+    var query = db.select(db.appointments)
+      ..where((t) => t.appointmentTime.isSmallerOrEqualValue(now))
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.appointmentTime)])
+      ..limit(limit, offset: offset);
+
+    if (userId != null) {
+      query = query..where((t) => t.userId.equals(userId));
+    }
+
+    final results = await query.get();
+
+    return results.map((appt) {
+      return {
+        'type': 'appointment',
+        'appointment': appt,
+        'date': DateTime(
+          appt.appointmentTime.year,
+          appt.appointmentTime.month,
+          appt.appointmentTime.day,
+        ),
+        'sortTime': appt.appointmentTime,
+      };
+    }).toList();
+  }
+
   /// Get all active users
   Future<List<User>> getActiveUsers() async {
     return (db.select(db.users)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -20,6 +21,7 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
   bool _isInitialized = false;
   _CapturePhase _phase = _CapturePhase.camera;
   String? _errorMessage;
+  String _processingStep = '';
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -81,15 +83,75 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
       // Brief flash to confirm capture
       await Future.delayed(const Duration(milliseconds: 600));
 
-      // Phase 2: Processing
+      // Phase 2: Check internet
       setState(() {
         _phase = _CapturePhase.processing;
+        _processingStep = 'Preverjam internetno povezavo...';
       });
       _pulseController.repeat(reverse: true);
 
+      try {
+        final lookup = await InternetAddress.lookup('google.com')
+            .timeout(const Duration(seconds: 5));
+        if (lookup.isEmpty || lookup.first.rawAddress.isEmpty) {
+          throw const SocketException('No internet');
+        }
+      } on SocketException {
+        _pulseController.stop();
+        setState(() {
+          _phase = _CapturePhase.error;
+          _errorMessage = 'Ni internetne povezave.\nAI zajem potrebuje internet.';
+        });
+        await Future.delayed(const Duration(seconds: 3));
+        if (mounted) {
+          setState(() {
+            _phase = _CapturePhase.camera;
+            _errorMessage = null;
+          });
+        }
+        return;
+      } on TimeoutException {
+        _pulseController.stop();
+        setState(() {
+          _phase = _CapturePhase.error;
+          _errorMessage = 'Ni internetne povezave.\nAI zajem potrebuje internet.';
+        });
+        await Future.delayed(const Duration(seconds: 3));
+        if (mounted) {
+          setState(() {
+            _phase = _CapturePhase.camera;
+            _errorMessage = null;
+          });
+        }
+        return;
+      }
+
+      // Phase 3: Prepare image
+      if (mounted) {
+        setState(() => _processingStep = 'Pripravljam sliko...');
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
+
       final File imageFile = File(image.path);
+
+      // Phase 4: AI analysis
+      if (mounted) {
+        setState(() => _processingStep = 'Pošiljam AI-ju za analizo...');
+      }
+      await Future.delayed(const Duration(milliseconds: 200));
+
       final geminiService = GeminiMedicationService();
+
+      if (mounted) {
+        setState(() => _processingStep = 'AI analizira zdravilo...');
+      }
+
       final result = await geminiService.extractMedicationInfo(imageFile);
+
+      if (mounted) {
+        setState(() => _processingStep = 'Izpolnjujem podatke...');
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
 
       _pulseController.stop();
 
@@ -197,6 +259,15 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
                                 ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _processingStep,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 12),
                               SizedBox(

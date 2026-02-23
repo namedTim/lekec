@@ -12,7 +12,7 @@ import '../../data/services/mood_service.dart';
 
 enum HistoryFilter { all, taken, missed }
 
-enum EntryType { medications, mood }
+enum EntryType { medications, mood, appointments }
 
 class MedsHistoryScreen extends ConsumerStatefulWidget {
   const MedsHistoryScreen({super.key});
@@ -27,6 +27,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   final Set<EntryType> _selectedEntryTypes = {
     EntryType.medications,
     EntryType.mood,
+    EntryType.appointments,
   };
   int? _selectedUserId; // null = all users
   List<User> _users = [];
@@ -36,6 +37,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   bool _hasMore = true;
   int _medOffset = 0;
   int _moodOffset = 0;
+  int _appointmentOffset = 0;
   final int _limit = 50;
   final ScrollController _scrollController = ScrollController();
   late HistoryService _historyService;
@@ -84,6 +86,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       _allEntries.clear();
       _medOffset = 0;
       _moodOffset = 0;
+      _appointmentOffset = 0;
       _hasMore = true;
     });
     await _loadMoreHistory();
@@ -97,6 +100,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     final List<Map<String, dynamic>> newEntries = [];
     bool medHasMore = false;
     bool moodHasMore = false;
+    bool appointmentHasMore = false;
 
     // Load medication entries
     if (_selectedEntryTypes.contains(EntryType.medications)) {
@@ -124,6 +128,18 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       moodHasMore = moodEntries.length == _limit;
     }
 
+    // Load appointment entries
+    if (_selectedEntryTypes.contains(EntryType.appointments)) {
+      final apptEntries = await _historyService.loadAppointmentHistory(
+        limit: _limit,
+        offset: _appointmentOffset,
+        userId: _selectedUserId,
+      );
+      newEntries.addAll(apptEntries);
+      _appointmentOffset += _limit;
+      appointmentHasMore = apptEntries.length == _limit;
+    }
+
     // Sort all entries by time descending
     newEntries.sort((a, b) {
       final timeA = a['sortTime'] as DateTime;
@@ -133,7 +149,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
 
     setState(() {
       _allEntries.addAll(newEntries);
-      _hasMore = medHasMore || moodHasMore;
+      _hasMore = medHasMore || moodHasMore || appointmentHasMore;
       _isLoading = false;
     });
   }
@@ -316,6 +332,25 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                     },
                     colors: colors,
                   ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Termini',
+                    icon: Symbols.calendar_month,
+                    selected: _selectedEntryTypes.contains(
+                      EntryType.appointments,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedEntryTypes.add(EntryType.appointments);
+                        } else if (_selectedEntryTypes.length > 1) {
+                          _selectedEntryTypes.remove(EntryType.appointments);
+                        }
+                      });
+                      _refreshHistory();
+                    },
+                    colors: colors,
+                  ),
                 ],
               ),
             ),
@@ -371,6 +406,13 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                             ...entries.map((entry) {
                               if (entry['type'] == 'mood') {
                                 return _buildMoodCard(
+                                  entry,
+                                  theme,
+                                  colors,
+                                  showUserNames,
+                                );
+                              } else if (entry['type'] == 'appointment') {
+                                return _buildAppointmentCard(
                                   entry,
                                   theme,
                                   colors,
@@ -510,6 +552,91 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
             textColor: intake.wasTaken
                 ? Colors.green.shade700
                 : Colors.red.shade700,
+            fontSize: 13,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppointmentCard(
+    Map<String, dynamic> entry,
+    ThemeData theme,
+    ColorScheme colors,
+    bool showUserNames,
+  ) {
+    final appt = entry['appointment'] as Appointment;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Symbols.calendar_today,
+              color: colors.onSecondaryContainer,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appt.title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (appt.note != null && appt.note!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    appt.note!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (showUserNames) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.person,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getUserName(appt.userId) ?? '',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          HistoryTimeSlot(
+            text: _formatTime(appt.appointmentTime),
+            backgroundColor: colors.secondaryContainer,
+            textColor: colors.onSecondaryContainer,
             fontSize: 13,
           ),
         ],
