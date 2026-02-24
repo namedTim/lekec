@@ -131,6 +131,10 @@ class _TimeIslandState extends State<TimeIsland> {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

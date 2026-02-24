@@ -280,6 +280,9 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   void _showMedicationDetail({
+    required int intakeId,
+    required bool isOneTimeEntry,
+    required MedicationStatus currentStatus,
     required String medName,
     required String dosage,
     required DateTime scheduledTime,
@@ -288,9 +291,12 @@ class DashboardScreenState extends State<DashboardScreen>
     required String userName,
     String? intakeAdvice,
   }) {
+    // Only offer take/not-take for non-one-time scheduled entries
+    final canAct = !isOneTimeEntry;
+
     showDialog(
       context: context,
-      builder: (context) => MedicationDetailDialog(
+      builder: (ctx) => MedicationDetailDialog(
         medName: medName,
         dosage: dosage,
         scheduledTime: scheduledTime,
@@ -298,6 +304,18 @@ class DashboardScreenState extends State<DashboardScreen>
         pillsRemaining: pillsRemaining,
         userName: userName,
         intakeAdvice: intakeAdvice,
+        onTake: canAct
+            ? () {
+                Navigator.of(ctx).pop();
+                _updateIntakeStatus(intakeId, MedicationStatus.taken);
+              }
+            : null,
+        onNotTake: canAct
+            ? () {
+                Navigator.of(ctx).pop();
+                _updateIntakeStatus(intakeId, MedicationStatus.notTaken);
+              }
+            : null,
       ),
     );
   }
@@ -719,6 +737,9 @@ class DashboardScreenState extends State<DashboardScreen>
                                   isNextMedication: isNextMed,
                                   onTap: () {
                                     _showMedicationDetail(
+                                      intakeId: intake.id,
+                                      isOneTimeEntry: isOneTime,
+                                      currentStatus: status,
                                       medName: medication.name,
                                       dosage:
                                           '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
