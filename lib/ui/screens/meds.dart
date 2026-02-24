@@ -792,6 +792,12 @@ class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvid
           future: Future.wait([
             appointmentService.getUpcomingAppointments(),
             (database.select(database.users)..where((t) => t.isActive.equals(true))).get(),
+            // Last 2 past appointments, newest first
+            (database.select(database.appointments)
+                  ..where((t) => t.appointmentTime.isSmallerOrEqualValue(DateTime.now()))
+                  ..orderBy([(t) => drift.OrderingTerm.desc(t.appointmentTime)])
+                  ..limit(2))
+                .get(),
           ]),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -804,63 +810,139 @@ class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvid
             final results = snapshot.data as List<dynamic>;
             final appointments = results[0] as List<Appointment>;
             final users = results[1] as List<User>;
+            final pastAppointments = results[2] as List<Appointment>;
             final userNames = {for (var u in users) u.id: u.name};
             final showUserNames = users.length > 1;
 
-            if (appointments.isEmpty) {
-              return Center(
-                child: EmptyStateCard(
-                  icon: Symbols.calendar_month,
-                  title: 'Ni prihajajočih terminov',
-                  subtitle: 'Dodajte termin za opomnike',
-                  onTap: () async {
-                    await context.push('/add-appointment');
-                    _refreshMedications();
-                  },
-                ),
-              );
-            }
-
-            return ListView.builder(
+            // Build items list: upcoming + section header + past 2
+            return ListView(
               padding: const EdgeInsets.only(
                 top: 8,
                 left: 8,
                 right: 8,
                 bottom: 88,
               ),
-              itemCount: appointments.length,
-              itemBuilder: (context, index) {
-                final appt = appointments[index];
-                return AppointmentDetailsCard(
-                  title: appt.title,
-                  note: appt.note,
-                  appointmentTime: appt.appointmentTime,
-                  userName: userNames[appt.userId],
-                  showName: showUserNames,
-                  onTap: () async {
-                    final result = await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => AddAppointmentScreen(
-                          userId: appt.userId,
-                          existingAppointment: appt,
-                        ),
+              children: [
+                // Upcoming appointments
+                if (appointments.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: EmptyStateCard(
+                        icon: Symbols.calendar_month,
+                        title: 'Ni prihajajočih terminov',
+                        subtitle: 'Dodajte termin za opomnike',
+                        onTap: () async {
+                          await context.push('/add-appointment');
+                          _refreshMedications();
+                        },
                       ),
-                    );
-                    if (result == true) _refreshMedications();
-                  },
-                  onDelete: () async {
-                    final confirmed = await showConfirmationDialog(
-                      context,
-                      title: 'Izbriši termin',
-                      message: 'Ali želite izbrisati termin "${appt.title}"?',
-                    );
-                    if (confirmed) {
-                      await appointmentService.deleteAppointment(appt.id);
-                      _refreshMedications();
-                    }
-                  },
-                );
-              },
+                    ),
+                  )
+                else
+                  ...appointments.map((appt) => AppointmentDetailsCard(
+                    title: appt.title,
+                    note: appt.note,
+                    appointmentTime: appt.appointmentTime,
+                    userName: userNames[appt.userId],
+                    showName: showUserNames,
+                    onTap: () async {
+                      final result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => AddAppointmentScreen(
+                            userId: appt.userId,
+                            existingAppointment: appt,
+                          ),
+                        ),
+                      );
+                      if (result == true) _refreshMedications();
+                    },
+                    onDelete: () async {
+                      final confirmed = await showConfirmationDialog(
+                        context,
+                        title: 'Izbriši termin',
+                        message: 'Ali želite izbrisati termin "${appt.title}"?',
+                      );
+                      if (confirmed) {
+                        await appointmentService.deleteAppointment(appt.id);
+                        _refreshMedications();
+                      }
+                    },
+                  )),
+
+                // ── Zadnja dva termina section ──
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Text(
+                    'Zadnja dva termina',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (pastAppointments.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Symbols.calendar_month,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ni preteklih terminov',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...pastAppointments.map((appt) => AppointmentDetailsCard(
+                    title: appt.title,
+                    note: appt.note,
+                    appointmentTime: appt.appointmentTime,
+                    userName: userNames[appt.userId],
+                    showName: showUserNames,
+                    onTap: () async {
+                      final result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => AddAppointmentScreen(
+                            userId: appt.userId,
+                            existingAppointment: appt,
+                          ),
+                        ),
+                      );
+                      if (result == true) _refreshMedications();
+                    },
+                    onDelete: () async {
+                      final confirmed = await showConfirmationDialog(
+                        context,
+                        title: 'Izbriši termin',
+                        message: 'Ali želite izbrisati termin "${appt.title}"?',
+                      );
+                      if (confirmed) {
+                        await appointmentService.deleteAppointment(appt.id);
+                        _refreshMedications();
+                      }
+                    },
+                  )),
+              ],
             );
           },
         );

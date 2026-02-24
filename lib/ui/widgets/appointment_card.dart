@@ -45,7 +45,10 @@ class AppointmentCard extends StatelessWidget {
                   color: const Color(0xFF22C55E),
                   width: 3,
                 )
-              : null,
+              : Border.all(
+                  color: colors.outlineVariant.withOpacity(0.5),
+                  width: 1,
+                ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -254,6 +257,10 @@ class AppointmentDetailsCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: colors.outlineVariant.withOpacity(0.5),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),

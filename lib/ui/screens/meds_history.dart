@@ -295,7 +295,9 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
             // Entry type toggle chips
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
                   _buildFilterChip(
                     label: 'Zdravila',
@@ -315,7 +317,6 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                     },
                     colors: colors,
                   ),
-                  const SizedBox(width: 8),
                   _buildFilterChip(
                     label: 'Razpoloženje',
                     icon: Symbols.mood,
@@ -332,7 +333,6 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                     },
                     colors: colors,
                   ),
-                  const SizedBox(width: 8),
                   _buildFilterChip(
                     label: 'Termini',
                     icon: Symbols.calendar_month,
@@ -501,6 +501,10 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -573,6 +577,10 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -660,6 +668,10 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [

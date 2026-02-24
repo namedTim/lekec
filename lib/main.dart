@@ -376,8 +376,14 @@ Future<void> main() async {
   AlarmService alarmService = AlarmService(rootNavigatorKey);
 
   try {
-    // PRIORITY: Initialize alarm service FIRST for fastest response
-    await Alarm.init();
+    // PRIORITY: Initialize alarm service FIRST for fastest response.
+    // Use a timeout so a stuck alarm can never freeze the splash screen.
+    await Alarm.init().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        Logger('main').warning('Alarm.init() timed out — continuing without it');
+      },
+    );
 
     // Initialize listeners
     alarmService.initialize();
@@ -386,7 +392,7 @@ Future<void> main() async {
     await Alarm.setWarningNotificationOnKill(
       "Aktivnost opozoril",
       "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
-    );
+    ).timeout(const Duration(seconds: 3), onTimeout: () {});
   } catch (e, st) {
     Logger('main').severe('Critical startup error', e, st);
   }

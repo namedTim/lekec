@@ -124,7 +124,10 @@ class _MedicationCardState extends State<MedicationCard> {
                     color: const Color(0xFF22C55E), // Green color
                     width: 3,
                   )
-                : null,
+                : Border.all(
+                    color: colors.outlineVariant.withOpacity(0.5),
+                    width: 1,
+                  ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),

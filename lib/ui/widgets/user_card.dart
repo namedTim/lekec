@@ -31,6 +31,10 @@ class UserCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: colors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colors.outlineVariant.withOpacity(0.5),
+              width: 1,
+            ),
           ),
           child: Row(
             children: [
