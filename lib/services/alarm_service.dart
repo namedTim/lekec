@@ -83,8 +83,9 @@ class AlarmService {
         continue;
       }
 
-      // Alarm is within grace period, try to show it (with retries for cold-start)
-      await _showAlarmWithRetry(alarm, retries: 10);
+      // Alarm is within grace period, try to show it (with retries for cold-start).
+      // 20 retries × 300 ms ≈ 6 s — enough headroom for slow devices.
+      await _showAlarmWithRetry(alarm, retries: 20);
       break; // Only show one alarm at a time
     }
   }

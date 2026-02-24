@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
-import '../../main.dart' show db;
+import '../../main.dart' show db, alarmService;
 import '../../helpers/medication_unit_helper.dart';
 import '../../ui/widgets/medication_card.dart';
 import '../../ui/widgets/medication_detail_dialog.dart';
@@ -66,6 +66,12 @@ class DashboardScreenState extends State<DashboardScreen>
     _startIslandUpdateTimer();
     _startDayChangeTimer();
     loadAlarms();
+    // When dashboard first builds, the router is fully mounted.
+    // Re-check for any ringing alarm that was missed during cold start
+    // (e.g. app opened from notification while router context wasn't ready yet).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      alarmService.checkInitialRingingAlarms();
+    });
   }
 
   Future<void> loadAlarms() async {

@@ -19,6 +19,7 @@ import 'ui/screens/dashboard.dart';
 import 'ui/screens/people_screen.dart';
 
 export 'ui/screens/dashboard.dart' show DashboardScreenState;
+export 'services/alarm_service.dart' show AlarmService;
 import 'ui/screens/add_medication.dart';
 import 'ui/screens/add_single_entry.dart';
 import 'ui/screens/add_single_entry_quantity.dart';
@@ -48,6 +49,7 @@ import 'ui/screens/onboarding/onboarding_flow.dart';
 export 'ui/widgets/medication_card.dart' show MedicationStatus;
 
 late final AppDatabase db;
+late final AlarmService alarmService;
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<DashboardScreenState> homePageKey =
     GlobalKey<DashboardScreenState>();
@@ -373,7 +375,7 @@ Future<void> main() async {
 
   // Initialize database early — constructor is cheap (lazy open)
   db = AppDatabase();
-  AlarmService alarmService = AlarmService(rootNavigatorKey);
+  alarmService = AlarmService(rootNavigatorKey);
 
   try {
     // PRIORITY: Initialize alarm service FIRST for fastest response
