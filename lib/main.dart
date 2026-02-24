@@ -64,6 +64,14 @@ final _router = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
+              path: '/history',
+              builder: (context, state) => const MedsHistoryScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
               path: '/meds',
               builder: (context, state) => const MedsScreen(),
             ),
@@ -75,14 +83,6 @@ final _router = GoRouter(
               path: '/',
               builder: (context, state) =>
                   DashboardScreen(key: homePageKey, title: 'Lekec'),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/history',
-              builder: (context, state) => const MedsHistoryScreen(),
             ),
           ],
         ),
@@ -346,14 +346,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
         destinations: const <NavigationDestination>[
+          NavigationDestination(
+            icon: Icon(Symbols.manage_search),
+            label: 'Zgodovina',
+          ),
           NavigationDestination(icon: Icon(Symbols.pill), label: 'Zdravila'),
           NavigationDestination(
             icon: Icon(Symbols.home),
             label: 'Tekoči pregled',
-          ),
-          NavigationDestination(
-            icon: Icon(Symbols.manage_search),
-            label: 'Zgodovina',
           ),
           NavigationDestination(icon: Icon(Symbols.group), label: 'Osebe'),
         ],

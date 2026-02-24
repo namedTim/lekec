@@ -93,6 +93,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
         });
 
         widget.onRefresh();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
 
         if (mounted) {
           final absQuantity = quantity.abs().toInt();
@@ -144,6 +145,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
         });
 
         widget.onRefresh();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
 
         if (mounted) {
           final displayQty = quantity == quantity.roundToDouble() ? quantity.toInt().toString() : quantity.toString();
@@ -298,6 +300,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
         });
 
         widget.onRefresh();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
 
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
@@ -422,6 +425,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
           ),
         );
         widget.onRefresh();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
       }
     } catch (e) {
       if (mounted) {

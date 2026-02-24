@@ -162,6 +162,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                     if (widget.userType == UserType.family) ...[
                       TextField(
                         controller: _familyNameController,
+                        textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
                           labelText: 'Priimek družine (neobvezno)',
                           hintText: 'npr. Novak',
@@ -178,6 +179,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                     TextField(
                       controller: _userNameController,
                       focusNode: _userNameFocusNode,
+                      textCapitalization: TextCapitalization.words,
                       decoration: InputDecoration(
                         labelText: _getInputLabel(),
                         hintText: widget.userType == UserType.personal

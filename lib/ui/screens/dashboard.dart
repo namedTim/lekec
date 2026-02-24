@@ -286,6 +286,7 @@ class DashboardScreenState extends State<DashboardScreen>
     required double dosageAmount,
     required int? pillsRemaining,
     required String userName,
+    String? intakeAdvice,
   }) {
     showDialog(
       context: context,
@@ -296,6 +297,7 @@ class DashboardScreenState extends State<DashboardScreen>
         dosageAmount: dosageAmount,
         pillsRemaining: pillsRemaining,
         userName: userName,
+        intakeAdvice: intakeAdvice,
       ),
     );
   }
@@ -700,9 +702,11 @@ class DashboardScreenState extends State<DashboardScreen>
                                   medName: medication.name,
                                   dosage:
                                       '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                  medicineRemaining: remainingAfterDose > 0
-                                      ? 'še ${remainingAfterDose} ${getMedicationUnitShort(medication.medType, remainingAfterDose)}'
-                                      : '',
+                                  medicineRemaining: remainingAfterDose == 0
+                                      ? 'Zadnja ${getMedicationUnit(medication.medType, 1)}'
+                                      : remainingAfterDose > 1
+                                          ? 'še ${remainingAfterDose} ${getMedicationUnit(medication.medType, remainingAfterDose)}'
+                                          : '',
                                   pillCount: remainingAfterDose,
                                   showName: _totalUserCount > 1,
                                   username: userName,
@@ -724,6 +728,7 @@ class DashboardScreenState extends State<DashboardScreen>
                                           ? remainingAfterDose
                                           : null,
                                       userName: userName,
+                                      intakeAdvice: medication.intakeAdvice,
                                     );
                                   },
                                   onStatusChanged: isOneTime

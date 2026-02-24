@@ -102,6 +102,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
             TextFormField(
               controller: _nameController,
               autofocus: true,
+              textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 labelText: 'Ime uporabnika',
                 hintText: 'Vnesite ime',

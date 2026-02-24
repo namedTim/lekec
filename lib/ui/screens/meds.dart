@@ -7,8 +7,9 @@ import '../../database/drift_database.dart';
 import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/appointment_card.dart';
-import '../components/speed_dial_fab.dart';
 import '../components/confirmation_dialog.dart';
+import '../../data/services/mood_service.dart';
+import '../components/mood_logging_sheet.dart';
 import '../components/medication_presets_panel.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
@@ -31,14 +32,32 @@ class MedsScreen extends ConsumerStatefulWidget {
   ConsumerState<MedsScreen> createState() => _MedsScreenState();
 }
 
-class _MedsScreenState extends ConsumerState<MedsScreen> {
+class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProviderStateMixin {
   MedsTab _selectedTab = MedsTab.medications;
   int _refreshKey = 0;
-  final ValueNotifier<bool> _fabExpandedNotifier = ValueNotifier(false);
+  // ValueNotifier instead of plain bool so toggling the FAB never calls
+  // setState on the parent — this prevents FutureBuilder from re-running.
+  final ValueNotifier<bool> _fabExpanded = ValueNotifier(false);
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+  }
 
   @override
   void dispose() {
-    _fabExpandedNotifier.dispose();
+    _fabExpanded.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -46,6 +65,145 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
     setState(() {
       _refreshKey++;
     });
+  }
+
+  void _toggleSpeedDial() {
+    _fabExpanded.value = !_fabExpanded.value;
+    if (_fabExpanded.value) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
+  void _ensureSpeedDialClosed() {
+    if (_fabExpanded.value) {
+      _fabExpanded.value = false;
+      _animationController.reverse();
+    }
+  }
+
+  void _onAddSingleEntry() async {
+    _toggleSpeedDial();
+    await context.push('/add-single-entry');
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddNewMedication() async {
+    _toggleSpeedDial();
+    await context.push('/add-medication');
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddAppointment() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    await context.push('/add-appointment', extra: {'userId': userId});
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onLogMood() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    final result = await showMoodLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+    try {
+      final database = ref.read(databaseProvider);
+      final moodService = MoodService(database);
+      await moodService.logMood(
+        userId: userId,
+        moodLevel: result['moodLevel'] as int,
+        note: result['note'] as String?,
+      );
+      if (mounted) {
+        final emoji = MoodService.moodEmojis[result['moodLevel'] as int]!;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$emoji Razpoloženje zabeleženo'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<int?> _pickUser() async {
+    final database = ref.read(databaseProvider);
+    final users = await (database.select(database.users)
+          ..where((t) => t.isActive.equals(true)))
+        .get();
+    if (users.length == 1) return users.first.id;
+    if (!mounted) return null;
+    return showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final colors = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Izberite uporabnika',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...users.map(
+                (user) => ListTile(
+                  leading: Icon(Symbols.person, color: colors.primary),
+                  title: Text(user.name),
+                  onTap: () => Navigator.of(ctx).pop(user.id),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _deleteMedication(
@@ -136,16 +294,15 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               ],
             ),
           ),
-          // Full-screen barrier when FAB is expanded
+          // Full-screen barrier when FAB is expanded — ValueListenableBuilder
+          // rebuilds only this subtree, never the parent.
           ValueListenableBuilder<bool>(
-            valueListenable: _fabExpandedNotifier,
-            builder: (context, isExpanded, child) {
+            valueListenable: _fabExpanded,
+            builder: (context, isExpanded, _) {
               if (!isExpanded) return const SizedBox.shrink();
               return Positioned.fill(
                 child: GestureDetector(
-                  onTap: () {
-                    _fabExpandedNotifier.value = false;
-                  },
+                  onTap: _toggleSpeedDial,
                   child: Container(color: Colors.black.withOpacity(0.01)),
                 ),
               );
@@ -153,28 +310,212 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           ),
         ],
       ),
-      floatingActionButton: SpeedDialFab(
-        onExpandedChanged: (expanded) {
-          _fabExpandedNotifier.value = expanded;
-        },
-        options: [
-          SpeedDialOption(
-            label: 'Dodaj enkraten vnos',
-            icon: Symbols.add,
-            heroTag: 'add_entry_meds',
-            onPressed: () async {
-              await context.push('/add-single-entry');
-              _refreshMedications();
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              if (_animation.value == 0) {
+                return const SizedBox.shrink();
+              }
+              final theme = Theme.of(context);
+              final colors = theme.colorScheme;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Add new medication
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj novo zdravilo',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'meds_add_medication',
+                              mini: true,
+                              onPressed: _onAddNewMedication,
+                              child: const Icon(Symbols.pill),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Add single entry
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj enkraten vnos zdravila',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'meds_add_entry',
+                              mini: true,
+                              onPressed: _onAddSingleEntry,
+                              child: const Icon(Symbols.add),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Log mood
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Zabeleži razpoloženje',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'meds_log_mood',
+                              mini: true,
+                              onPressed: _onLogMood,
+                              child: const Icon(Symbols.mood),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Add appointment
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Dodaj termin',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'meds_add_appointment',
+                              mini: true,
+                              onPressed: _onAddAppointment,
+                              child: const Icon(Symbols.calendar_add_on),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
             },
           ),
-          SpeedDialOption(
-            label: 'Dodaj novo zdravilo',
-            icon: Symbols.pill,
-            heroTag: 'add_medication_meds',
-            onPressed: () async {
-              await context.push('/add-medication');
-              _refreshMedications();
-            },
+          // Main FAB — ValueListenableBuilder keeps the rotation in sync
+          // without triggering a parent setState.
+          ValueListenableBuilder<bool>(
+            valueListenable: _fabExpanded,
+            builder: (context, isExpanded, _) => FloatingActionButton(
+              heroTag: 'meds_main_fab',
+              onPressed: _toggleSpeedDial,
+              tooltip: 'Dodaj',
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  bottomLeft: Radius.circular(32),
+                  topRight: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: AnimatedRotation(
+                turns: isExpanded ? 0.125 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: const Icon(Symbols.add),
+              ),
+            ),
           ),
         ],
       ),
@@ -237,8 +578,8 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                       final dosageAmount = med['dosage'] as double;
                       final dosageCount = dosageAmount.toInt();
                       return GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
+                        onTap: () async {
+                          await Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => MedicationDetailScreen(
                                 medicationId: med['id'] as int,
@@ -265,6 +606,11 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                               ),
                             ),
                           );
+                          if (mounted) {
+                            homePageKey.currentState?.loadTodaysIntakes(
+                              autoScroll: false,
+                            );
+                          }
                         },
                         child: MedicationDetailsCard(
                           medName: med['name'] as String,
@@ -310,8 +656,9 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                                         : Colors.orange,
                                   ),
                                 );
-                                _refreshMedications();
-                              }
+                                _refreshMedications();                                  homePageKey.currentState?.loadTodaysIntakes(
+                                    autoScroll: false,
+                                  );                              }
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).clearSnackBars();

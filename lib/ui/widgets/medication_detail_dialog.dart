@@ -8,6 +8,7 @@ class MedicationDetailDialog extends StatelessWidget {
   final double dosageAmount;
   final int? pillsRemaining;
   final String userName;
+  final String? intakeAdvice;
 
   const MedicationDetailDialog({
     super.key,
@@ -17,6 +18,7 @@ class MedicationDetailDialog extends StatelessWidget {
     required this.dosageAmount,
     required this.pillsRemaining,
     required this.userName,
+    this.intakeAdvice,
   });
 
   @override
@@ -79,6 +81,17 @@ class MedicationDetailDialog extends StatelessWidget {
             label: 'Uporabnik',
             value: userName,
           ),
+          if (intakeAdvice != null && intakeAdvice!.isNotEmpty) ...[  
+            const SizedBox(height: 24),
+            _buildDetailRow(
+              context: context,
+              icon: Symbols.info,
+              label: 'Opomba',
+              value: intakeAdvice!.length > 60
+                  ? '${intakeAdvice!.substring(0, 60)}…'
+                  : intakeAdvice!,
+            ),
+          ],
         ],
       ),
       actions: [
