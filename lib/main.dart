@@ -168,6 +168,7 @@ final _router = GoRouter(
           medType: MedicationType.values[medTypeIndex],
           frequency: FrequencyOption.values[frequencyIndex],
           userId: extra['userId'] as int,
+          intakeAdvice: extra['intakeAdvice'] as String,
           extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },

@@ -23,6 +23,7 @@ class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final FrequencyOption frequency;
   final int userId;
+  final String intakeAdvice;
   final MedicationExtractionResult? extractedData;
 
   const SimpleMedicationPlanningScreen({
@@ -31,6 +32,7 @@ class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.frequency,
     required this.userId,
+    required this.intakeAdvice,
     this.extractedData,
   });
 
@@ -190,6 +192,7 @@ class _SimpleMedicationPlanningScreenState
         MedicationsCompanion(
           name: drift.Value(widget.medicationName),
           medType: drift.Value(widget.medType),
+          intakeAdvice: drift.Value(widget.intakeAdvice),
           criticalReminder: drift.Value(_criticalReminder),
         ),
       );
