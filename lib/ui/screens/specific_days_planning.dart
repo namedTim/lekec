@@ -98,8 +98,8 @@ class _SpecificDaysPlanningScreenState
                             border: Border.all(
                               color: isSelected
                                   ? colors.primary
-                                  : Colors.transparent,
-                              width: 2,
+                                  : colors.outlineVariant.withOpacity(0.5),
+                              width: isSelected ? 2 : 1,
                             ),
                           ),
                           child: Row(

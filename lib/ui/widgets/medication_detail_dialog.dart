@@ -11,7 +11,7 @@ class MedicationDetailDialog extends StatelessWidget {
   final String? intakeAdvice;
   /// Called when user taps "Sem vzel". If null the action row is hidden.
   final VoidCallback? onTake;
-  /// Called when user taps "Ne bom vzel".
+  /// Called when user taps "Nisem vzel".
   final VoidCallback? onNotTake;
 
   const MedicationDetailDialog({
@@ -136,7 +136,7 @@ class MedicationDetailDialog extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: onNotTake,
                         icon: const Icon(Symbols.close, size: 18),
-                        label: const Text('Ne bom vzel'),
+                        label: const Text('Nisem vzel'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.error,
                           side: BorderSide(color: colors.error.withOpacity(0.4)),

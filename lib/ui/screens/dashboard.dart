@@ -291,8 +291,9 @@ class DashboardScreenState extends State<DashboardScreen>
     required String userName,
     String? intakeAdvice,
   }) {
-    // Only offer take/not-take for non-one-time scheduled entries
-    final canAct = !isOneTimeEntry;
+    // Only offer take/not-take for non-one-time scheduled entries that are not in the future
+    final isFuture = scheduledTime.isAfter(DateTime.now());
+    final canAct = !isOneTimeEntry && !isFuture;
 
     showDialog(
       context: context,

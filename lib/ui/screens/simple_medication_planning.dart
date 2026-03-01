@@ -487,7 +487,10 @@ class _PlanningCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: isAiSuggested
               ? Border.all(color: colors.onSurface, width: 2)
-              : null,
+              : Border.all(
+                  color: colors.outlineVariant.withOpacity(0.5),
+                  width: 1,
+                ),
         ),
         child: Row(
           children: [

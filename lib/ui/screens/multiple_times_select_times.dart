@@ -246,8 +246,8 @@ class _MultipleTimesSelectTimesScreenState
                                   ? (isAiTime
                                         ? colors.onSurface
                                         : colors.primary)
-                                  : Colors.transparent,
-                              width: 2,
+                                    : colors.outlineVariant.withOpacity(0.5),
+                                width: _times[index] != null ? 2 : 1,
                             ),
                           ),
                           child: Row(
