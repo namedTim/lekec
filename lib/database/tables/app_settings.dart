@@ -19,4 +19,12 @@ class AppSettings extends Table {
   // Notification settings
   BoolColumn get showKillWarning =>
       boolean().withDefault(const Constant(true))();
+
+  // Appointment reminder settings
+  RealColumn get appointmentVolume =>
+      real().withDefault(const Constant(0.5))();
+  TextColumn get appointmentSound =>
+      text().withDefault(const Constant('nokia.mp3'))();
+  BoolColumn get appointmentVibration =>
+      boolean().withDefault(const Constant(true))();
 }

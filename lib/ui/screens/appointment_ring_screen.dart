@@ -10,7 +10,7 @@ import '../../data/services/appointment_service.dart';
 import '../../main.dart' show db;
 
 /// Full-screen silent reminder shown ~2 hours before an appointment.
-/// No sound, no vibration — the user sees it when they open the phone.
+/// No sound, but vibrates to alert the user when they open the phone.
 class AppointmentRingScreen extends StatefulWidget {
   const AppointmentRingScreen({required this.alarmSettings, super.key});
 

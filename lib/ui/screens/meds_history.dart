@@ -9,6 +9,7 @@ import '../components/history_time_slot.dart';
 import '../widgets/empty_state_card.dart';
 import '../../data/services/history_service.dart';
 import '../../data/services/mood_service.dart';
+import '../widgets/history_detail_dialogs.dart';
 
 enum HistoryFilter { all, taken, missed }
 
@@ -495,7 +496,17 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     final dosageAmount = plan?.dosageAmount ?? 1.0;
     final dosageCount = dosageAmount.toInt();
 
-    return Container(
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => HistoryIntakeDetailDialog(
+          intake: intake,
+          medication: medication,
+          plan: plan,
+          userName: _getUserName(intake.userId),
+        ),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -560,6 +571,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -571,7 +583,15 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   ) {
     final appt = entry['appointment'] as Appointment;
 
-    return Container(
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => HistoryAppointmentDetailDialog(
+          appointment: appt,
+          userName: _getUserName(appt.userId),
+        ),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -649,6 +669,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -662,7 +683,15 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     final emoji = MoodService.moodEmojis[mood.moodLevel] ?? '😐';
     final label = MoodService.moodLabels[mood.moodLevel] ?? '';
 
-    return Container(
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => HistoryMoodDetailDialog(
+          mood: mood,
+          userName: _getUserName(mood.userId),
+        ),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -728,6 +757,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
             fontSize: 13,
           ),
         ],
+      ),
       ),
     );
   }

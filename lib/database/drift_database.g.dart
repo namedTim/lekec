@@ -2721,6 +2721,45 @@ class $AppSettingsTable extends AppSettings
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _appointmentVolumeMeta = const VerificationMeta(
+    'appointmentVolume',
+  );
+  @override
+  late final GeneratedColumn<double> appointmentVolume =
+      GeneratedColumn<double>(
+        'appointment_volume',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.5),
+      );
+  static const VerificationMeta _appointmentSoundMeta = const VerificationMeta(
+    'appointmentSound',
+  );
+  @override
+  late final GeneratedColumn<String> appointmentSound = GeneratedColumn<String>(
+    'appointment_sound',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('nokia.mp3'),
+  );
+  static const VerificationMeta _appointmentVibrationMeta =
+      const VerificationMeta('appointmentVibration');
+  @override
+  late final GeneratedColumn<bool> appointmentVibration = GeneratedColumn<bool>(
+    'appointment_vibration',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("appointment_vibration" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2730,6 +2769,9 @@ class $AppSettingsTable extends AppSettings
     alarmSound,
     alarmVibration,
     showKillWarning,
+    appointmentVolume,
+    appointmentSound,
+    appointmentVibration,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2794,6 +2836,33 @@ class $AppSettingsTable extends AppSettings
         ),
       );
     }
+    if (data.containsKey('appointment_volume')) {
+      context.handle(
+        _appointmentVolumeMeta,
+        appointmentVolume.isAcceptableOrUnknown(
+          data['appointment_volume']!,
+          _appointmentVolumeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('appointment_sound')) {
+      context.handle(
+        _appointmentSoundMeta,
+        appointmentSound.isAcceptableOrUnknown(
+          data['appointment_sound']!,
+          _appointmentSoundMeta,
+        ),
+      );
+    }
+    if (data.containsKey('appointment_vibration')) {
+      context.handle(
+        _appointmentVibrationMeta,
+        appointmentVibration.isAcceptableOrUnknown(
+          data['appointment_vibration']!,
+          _appointmentVibrationMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2831,6 +2900,18 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.bool,
         data['${effectivePrefix}show_kill_warning'],
       )!,
+      appointmentVolume: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}appointment_volume'],
+      )!,
+      appointmentSound: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}appointment_sound'],
+      )!,
+      appointmentVibration: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}appointment_vibration'],
+      )!,
     );
   }
 
@@ -2848,6 +2929,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   final String alarmSound;
   final bool alarmVibration;
   final bool showKillWarning;
+  final double appointmentVolume;
+  final String appointmentSound;
+  final bool appointmentVibration;
   const AppSetting({
     required this.id,
     required this.themeMode,
@@ -2856,6 +2940,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     required this.alarmSound,
     required this.alarmVibration,
     required this.showKillWarning,
+    required this.appointmentVolume,
+    required this.appointmentSound,
+    required this.appointmentVibration,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2869,6 +2956,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     map['alarm_sound'] = Variable<String>(alarmSound);
     map['alarm_vibration'] = Variable<bool>(alarmVibration);
     map['show_kill_warning'] = Variable<bool>(showKillWarning);
+    map['appointment_volume'] = Variable<double>(appointmentVolume);
+    map['appointment_sound'] = Variable<String>(appointmentSound);
+    map['appointment_vibration'] = Variable<bool>(appointmentVibration);
     return map;
   }
 
@@ -2883,6 +2973,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       alarmSound: Value(alarmSound),
       alarmVibration: Value(alarmVibration),
       showKillWarning: Value(showKillWarning),
+      appointmentVolume: Value(appointmentVolume),
+      appointmentSound: Value(appointmentSound),
+      appointmentVibration: Value(appointmentVibration),
     );
   }
 
@@ -2899,6 +2992,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       alarmSound: serializer.fromJson<String>(json['alarmSound']),
       alarmVibration: serializer.fromJson<bool>(json['alarmVibration']),
       showKillWarning: serializer.fromJson<bool>(json['showKillWarning']),
+      appointmentVolume: serializer.fromJson<double>(json['appointmentVolume']),
+      appointmentSound: serializer.fromJson<String>(json['appointmentSound']),
+      appointmentVibration: serializer.fromJson<bool>(
+        json['appointmentVibration'],
+      ),
     );
   }
   @override
@@ -2912,6 +3010,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'alarmSound': serializer.toJson<String>(alarmSound),
       'alarmVibration': serializer.toJson<bool>(alarmVibration),
       'showKillWarning': serializer.toJson<bool>(showKillWarning),
+      'appointmentVolume': serializer.toJson<double>(appointmentVolume),
+      'appointmentSound': serializer.toJson<String>(appointmentSound),
+      'appointmentVibration': serializer.toJson<bool>(appointmentVibration),
     };
   }
 
@@ -2923,6 +3024,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     String? alarmSound,
     bool? alarmVibration,
     bool? showKillWarning,
+    double? appointmentVolume,
+    String? appointmentSound,
+    bool? appointmentVibration,
   }) => AppSetting(
     id: id ?? this.id,
     themeMode: themeMode ?? this.themeMode,
@@ -2933,6 +3037,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     alarmSound: alarmSound ?? this.alarmSound,
     alarmVibration: alarmVibration ?? this.alarmVibration,
     showKillWarning: showKillWarning ?? this.showKillWarning,
+    appointmentVolume: appointmentVolume ?? this.appointmentVolume,
+    appointmentSound: appointmentSound ?? this.appointmentSound,
+    appointmentVibration: appointmentVibration ?? this.appointmentVibration,
   );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
@@ -2953,6 +3060,15 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       showKillWarning: data.showKillWarning.present
           ? data.showKillWarning.value
           : this.showKillWarning,
+      appointmentVolume: data.appointmentVolume.present
+          ? data.appointmentVolume.value
+          : this.appointmentVolume,
+      appointmentSound: data.appointmentSound.present
+          ? data.appointmentSound.value
+          : this.appointmentSound,
+      appointmentVibration: data.appointmentVibration.present
+          ? data.appointmentVibration.value
+          : this.appointmentVibration,
     );
   }
 
@@ -2965,7 +3081,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ..write('alarmVolume: $alarmVolume, ')
           ..write('alarmSound: $alarmSound, ')
           ..write('alarmVibration: $alarmVibration, ')
-          ..write('showKillWarning: $showKillWarning')
+          ..write('showKillWarning: $showKillWarning, ')
+          ..write('appointmentVolume: $appointmentVolume, ')
+          ..write('appointmentSound: $appointmentSound, ')
+          ..write('appointmentVibration: $appointmentVibration')
           ..write(')'))
         .toString();
   }
@@ -2979,6 +3098,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     alarmSound,
     alarmVibration,
     showKillWarning,
+    appointmentVolume,
+    appointmentSound,
+    appointmentVibration,
   );
   @override
   bool operator ==(Object other) =>
@@ -2990,7 +3112,10 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           other.alarmVolume == this.alarmVolume &&
           other.alarmSound == this.alarmSound &&
           other.alarmVibration == this.alarmVibration &&
-          other.showKillWarning == this.showKillWarning);
+          other.showKillWarning == this.showKillWarning &&
+          other.appointmentVolume == this.appointmentVolume &&
+          other.appointmentSound == this.appointmentSound &&
+          other.appointmentVibration == this.appointmentVibration);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
@@ -3001,6 +3126,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<String> alarmSound;
   final Value<bool> alarmVibration;
   final Value<bool> showKillWarning;
+  final Value<double> appointmentVolume;
+  final Value<String> appointmentSound;
+  final Value<bool> appointmentVibration;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.themeMode = const Value.absent(),
@@ -3009,6 +3137,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.alarmSound = const Value.absent(),
     this.alarmVibration = const Value.absent(),
     this.showKillWarning = const Value.absent(),
+    this.appointmentVolume = const Value.absent(),
+    this.appointmentSound = const Value.absent(),
+    this.appointmentVibration = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -3018,6 +3149,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.alarmSound = const Value.absent(),
     this.alarmVibration = const Value.absent(),
     this.showKillWarning = const Value.absent(),
+    this.appointmentVolume = const Value.absent(),
+    this.appointmentSound = const Value.absent(),
+    this.appointmentVibration = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<int>? id,
@@ -3027,6 +3161,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Expression<String>? alarmSound,
     Expression<bool>? alarmVibration,
     Expression<bool>? showKillWarning,
+    Expression<double>? appointmentVolume,
+    Expression<String>? appointmentSound,
+    Expression<bool>? appointmentVibration,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3036,6 +3173,10 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       if (alarmSound != null) 'alarm_sound': alarmSound,
       if (alarmVibration != null) 'alarm_vibration': alarmVibration,
       if (showKillWarning != null) 'show_kill_warning': showKillWarning,
+      if (appointmentVolume != null) 'appointment_volume': appointmentVolume,
+      if (appointmentSound != null) 'appointment_sound': appointmentSound,
+      if (appointmentVibration != null)
+        'appointment_vibration': appointmentVibration,
     });
   }
 
@@ -3047,6 +3188,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<String>? alarmSound,
     Value<bool>? alarmVibration,
     Value<bool>? showKillWarning,
+    Value<double>? appointmentVolume,
+    Value<String>? appointmentSound,
+    Value<bool>? appointmentVibration,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
@@ -3056,6 +3200,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       alarmSound: alarmSound ?? this.alarmSound,
       alarmVibration: alarmVibration ?? this.alarmVibration,
       showKillWarning: showKillWarning ?? this.showKillWarning,
+      appointmentVolume: appointmentVolume ?? this.appointmentVolume,
+      appointmentSound: appointmentSound ?? this.appointmentSound,
+      appointmentVibration: appointmentVibration ?? this.appointmentVibration,
     );
   }
 
@@ -3083,6 +3230,15 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (showKillWarning.present) {
       map['show_kill_warning'] = Variable<bool>(showKillWarning.value);
     }
+    if (appointmentVolume.present) {
+      map['appointment_volume'] = Variable<double>(appointmentVolume.value);
+    }
+    if (appointmentSound.present) {
+      map['appointment_sound'] = Variable<String>(appointmentSound.value);
+    }
+    if (appointmentVibration.present) {
+      map['appointment_vibration'] = Variable<bool>(appointmentVibration.value);
+    }
     return map;
   }
 
@@ -3095,7 +3251,10 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
           ..write('alarmVolume: $alarmVolume, ')
           ..write('alarmSound: $alarmSound, ')
           ..write('alarmVibration: $alarmVibration, ')
-          ..write('showKillWarning: $showKillWarning')
+          ..write('showKillWarning: $showKillWarning, ')
+          ..write('appointmentVolume: $appointmentVolume, ')
+          ..write('appointmentSound: $appointmentSound, ')
+          ..write('appointmentVibration: $appointmentVibration')
           ..write(')'))
         .toString();
   }
@@ -7736,6 +7895,9 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<String> alarmSound,
       Value<bool> alarmVibration,
       Value<bool> showKillWarning,
+      Value<double> appointmentVolume,
+      Value<String> appointmentSound,
+      Value<bool> appointmentVibration,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -7746,6 +7908,9 @@ typedef $$AppSettingsTableUpdateCompanionBuilder =
       Value<String> alarmSound,
       Value<bool> alarmVibration,
       Value<bool> showKillWarning,
+      Value<double> appointmentVolume,
+      Value<String> appointmentSound,
+      Value<bool> appointmentVibration,
     });
 
 final class $$AppSettingsTableReferences
@@ -7808,6 +7973,21 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<bool> get showKillWarning => $composableBuilder(
     column: $table.showKillWarning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get appointmentVolume => $composableBuilder(
+    column: $table.appointmentVolume,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appointmentSound => $composableBuilder(
+    column: $table.appointmentSound,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get appointmentVibration => $composableBuilder(
+    column: $table.appointmentVibration,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7874,6 +8054,21 @@ class $$AppSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get appointmentVolume => $composableBuilder(
+    column: $table.appointmentVolume,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appointmentSound => $composableBuilder(
+    column: $table.appointmentSound,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get appointmentVibration => $composableBuilder(
+    column: $table.appointmentVibration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$UsersTableOrderingComposer get defaultUserId {
     final $$UsersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -7930,6 +8125,21 @@ class $$AppSettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showKillWarning => $composableBuilder(
     column: $table.showKillWarning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get appointmentVolume => $composableBuilder(
+    column: $table.appointmentVolume,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appointmentSound => $composableBuilder(
+    column: $table.appointmentSound,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get appointmentVibration => $composableBuilder(
+    column: $table.appointmentVibration,
     builder: (column) => column,
   );
 
@@ -7992,6 +8202,9 @@ class $$AppSettingsTableTableManager
                 Value<String> alarmSound = const Value.absent(),
                 Value<bool> alarmVibration = const Value.absent(),
                 Value<bool> showKillWarning = const Value.absent(),
+                Value<double> appointmentVolume = const Value.absent(),
+                Value<String> appointmentSound = const Value.absent(),
+                Value<bool> appointmentVibration = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 themeMode: themeMode,
@@ -8000,6 +8213,9 @@ class $$AppSettingsTableTableManager
                 alarmSound: alarmSound,
                 alarmVibration: alarmVibration,
                 showKillWarning: showKillWarning,
+                appointmentVolume: appointmentVolume,
+                appointmentSound: appointmentSound,
+                appointmentVibration: appointmentVibration,
               ),
           createCompanionCallback:
               ({
@@ -8010,6 +8226,9 @@ class $$AppSettingsTableTableManager
                 Value<String> alarmSound = const Value.absent(),
                 Value<bool> alarmVibration = const Value.absent(),
                 Value<bool> showKillWarning = const Value.absent(),
+                Value<double> appointmentVolume = const Value.absent(),
+                Value<String> appointmentSound = const Value.absent(),
+                Value<bool> appointmentVibration = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 themeMode: themeMode,
@@ -8018,6 +8237,9 @@ class $$AppSettingsTableTableManager
                 alarmSound: alarmSound,
                 alarmVibration: alarmVibration,
                 showKillWarning: showKillWarning,
+                appointmentVolume: appointmentVolume,
+                appointmentSound: appointmentSound,
+                appointmentVibration: appointmentVibration,
               ),
           withReferenceMapper: (p0) => p0
               .map(

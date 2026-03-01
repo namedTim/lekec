@@ -206,7 +206,7 @@ class AppointmentService {
     }
   }
 
-  /// Full-screen alarm using the Alarm package — silent, no vibration.
+  /// Full-screen alarm using the Alarm package — uses appointment reminder settings.
   /// This shows a full-screen intent (the AppointmentRingScreen) via the
   /// alarm service listener, just like medication critical alarms.
   Future<void> _scheduleFullScreenAlarm({
@@ -217,15 +217,21 @@ class AppointmentService {
   }) async {
     final alarmId = notifIdOffset + appointmentId * 2 + 1;
 
+    // Load appointment reminder settings from DB
+    final settings = await (db.select(db.appSettings)..limit(1)).getSingleOrNull();
+    final sound = settings?.appointmentSound ?? 'nokia.mp3';
+    final volume = settings?.appointmentVolume ?? 0.5;
+    final vibrate = settings?.appointmentVibration ?? true;
+
     final alarmSettings = AlarmSettings(
       id: alarmId,
       dateTime: scheduledTime,
-      assetAudioPath: 'assets/nokia.mp3', // required by Alarm package, but volume is 0
+      assetAudioPath: 'assets/$sound',
       loopAudio: false,
-      vibrate: false,
+      vibrate: vibrate,
       androidFullScreenIntent: true,
       warningNotificationOnKill: false,
-      volumeSettings: VolumeSettings.fixed(volume: 0.0),
+      volumeSettings: VolumeSettings.fixed(volume: volume),
       notificationSettings: NotificationSettings(
         title: 'Termin čez 2 uri: $title',
         body: _formatBody(appointmentTime),

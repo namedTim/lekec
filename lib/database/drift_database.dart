@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -92,6 +92,12 @@ class AppDatabase extends _$AppDatabase {
         if (from < 12) {
           // Add appointments table
           await m.createTable(appointments);
+        }
+        if (from < 13) {
+          // Add appointment reminder settings columns to app_settings table
+          await m.addColumn(appSettings, appSettings.appointmentVolume);
+          await m.addColumn(appSettings, appSettings.appointmentSound);
+          await m.addColumn(appSettings, appSettings.appointmentVibration);
         }
       },
     );

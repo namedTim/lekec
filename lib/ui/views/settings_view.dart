@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:alarm/alarm.dart';
 import '../../features/core/providers/theme_provider.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
-import '../../services/alarm_service.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
@@ -174,6 +172,38 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     }
   }
 
+  Future<void> _testAppointmentAlarm() async {
+    final alarmSettings = AlarmSettings(
+      id: 999998,
+      dateTime: DateTime.now().add(const Duration(seconds: 2)),
+      assetAudioPath: 'assets/${_settings?.appointmentSound ?? 'nokia.mp3'}',
+      loopAudio: false,
+      warningNotificationOnKill: false,
+      vibrate: _settings?.appointmentVibration ?? true,
+      androidFullScreenIntent: false,
+      volumeSettings: VolumeSettings.fixed(
+        volume: _settings?.appointmentVolume ?? 0.5,
+      ),
+      notificationSettings: const NotificationSettings(
+        title: 'Test — Opomnik za termin',
+        body: 'To je testni opomnik za termin',
+        stopButton: 'Zapri',
+        icon: 'notification_icon',
+      ),
+    );
+
+    await Alarm.set(alarmSettings: alarmSettings);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Testni opomnik se bo sprožil čez 2 sekundi'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
@@ -186,11 +216,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
     final alarmSounds = ref.watch(alarmSoundsProvider);
 
+    final cardShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: colors.outlineVariant.withOpacity(0.5),
+        width: 1,
+      ),
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Theme Settings
+        // ── Theme Settings ─────────────────────────────────────────────
         Card(
+          shape: cardShape,
           child: Column(
             children: [
               ListTile(
@@ -238,8 +277,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
         const SizedBox(height: 16),
 
-        // Critical Alarms Settings
+        // ── Kritični opomniki ───────────────────────────────────────────
         Card(
+          shape: cardShape,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -289,8 +329,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       onChanged: (value) {
                         _updateSetting(
                           (_) => value,
-                          (v) =>
-                              AppSettingsCompanion(alarmVolume: drift.Value(v)),
+                          (v) => AppSettingsCompanion(alarmVolume: drift.Value(v)),
                           isAlarmSetting: true,
                         );
                       },
@@ -376,8 +415,8 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     label: const Text('Testiraj alarm'),
                     style: FilledButton.styleFrom(
                       backgroundColor: colors.primary,
-                      foregroundColor: theme.brightness == Brightness.dark 
-                          ? Colors.black 
+                      foregroundColor: theme.brightness == Brightness.dark
+                          ? Colors.black
                           : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -390,8 +429,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
         const SizedBox(height: 16),
 
-        // Notification Settings
+        // ── Opomniki za termine ─────────────────────────────────────────
         Card(
+          shape: cardShape,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -399,10 +439,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    Icon(Symbols.notifications, color: colors.primary),
+                    Icon(Symbols.calendar_month, color: colors.primary),
                     const SizedBox(width: 12),
                     Text(
-                      'Obvestila',
+                      'Opomniki za termine',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -411,38 +451,132 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 ),
               ),
               const Divider(height: 1),
-              SwitchListTile(
-                secondary: const Icon(Symbols.warning),
-                title: const Text('Opozorilo za zaprtje'),
-                subtitle: const Text('Pokaži obvestilo za zaprtje aplikacije'),
-                value: _settings?.showKillWarning ?? true,
-                onChanged: (value) async {
-                  await _updateSetting(
-                    (_) => value,
-                    (v) =>
-                        AppSettingsCompanion(showKillWarning: drift.Value(v)),
-                  );
 
-                  // Reload all alarms in background
-                  final alarmService = ref.read(alarmServiceProvider);
-                  alarmService.reloadAllAlarms();
+              // Volume Slider
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Symbols.volume_up, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Glasnost', style: theme.textTheme.bodyLarge),
+                        const Spacer(),
+                        Text(
+                          '${((_settings?.appointmentVolume ?? 0.5) * 100).round()}%',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: _settings?.appointmentVolume ?? 0.5,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 10,
+                      onChanged: (value) {
+                        _updateSetting(
+                          (_) => value,
+                          (v) => AppSettingsCompanion(
+                            appointmentVolume: drift.Value(v),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Sound Dropdown
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Symbols.music_note, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Melodija', style: theme.textTheme.bodyLarge),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _settings?.appointmentSound ?? 'nokia.mp3',
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items: alarmSounds.map((sound) {
+                        return DropdownMenuItem<String>(
+                          value: sound['file'],
+                          child: Text(sound['name']!),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          _updateSetting(
+                            (_) => value,
+                            (v) => AppSettingsCompanion(
+                              appointmentSound: drift.Value(v),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Vibration Toggle
+              SwitchListTile(
+                secondary: const Icon(Symbols.vibration),
+                title: const Text('Vibracije'),
+                subtitle: const Text('Vibriraj ob opomniku'),
+                value: _settings?.appointmentVibration ?? true,
+                onChanged: (value) {
+                  _updateSetting(
+                    (_) => value,
+                    (v) => AppSettingsCompanion(
+                      appointmentVibration: drift.Value(v),
+                    ),
+                  );
                 },
               ),
+
+              const Divider(height: 1),
+
+              // Test Button
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _testAppointmentAlarm,
+                    icon: const Icon(Symbols.play_arrow),
+                    label: const Text('Testiraj opomnik'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.secondary,
+                      foregroundColor: theme.brightness == Brightness.dark
+                          ? Colors.black
+                          : Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
             ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Developer Settings
-        Card(
-          child: ListTile(
-            leading: const Icon(Symbols.developer_mode),
-            title: const Text('Developer Settings'),
-            trailing: const Icon(Symbols.chevron_right),
-            onTap: () {
-              context.push('/dev');
-            },
           ),
         ),
       ],
