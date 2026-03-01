@@ -19,6 +19,7 @@ class PeopleScreen extends ConsumerStatefulWidget {
 class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   List<User> _users = [];
   bool _isLoading = true;
+  bool _showingUserDetails = false;
 
   @override
   void initState() {
@@ -36,7 +37,30 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         _users = users;
         _isLoading = false;
       });
+
+      // If there's exactly one user, auto-open their details
+      if (users.length == 1 && !_showingUserDetails) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _openUserDetails(users.first);
+        });
+      }
     }
+  }
+
+  Future<void> _openUserDetails(User user) async {
+    _showingUserDetails = true;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserMedicationsScreen(
+          userId: user.id,
+          userName: user.name,
+        ),
+      ),
+    );
+    // Reset flag when returning from details
+    _showingUserDetails = false;
+    // Refresh in case user was deactivated
+    _loadUsers();
   }
 
   Future<void> _showAddUserDialog() async {
@@ -167,18 +191,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                           return UserCard(
                             userName: user.name,
                             userAge: user.age,
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => UserMedicationsScreen(
-                                    userId: user.id,
-                                    userName: user.name,
-                                  ),
-                                ),
-                              );
-                              // Refresh in case user was deactivated
-                              _loadUsers();
-                            },
+                            onTap: () => _openUserDetails(user),
                           );
                         },
                       ),
