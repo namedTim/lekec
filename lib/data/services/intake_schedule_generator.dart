@@ -80,24 +80,40 @@ class IntakeScheduleGenerator {
       return 0;
     }
 
-    // Check if entries already exist in this range to avoid duplicates
-    final existingCount = await _countExistingEntries(
-      plan.id,
-      fromDate,
-      toDate,
-    );
+    // Instead of skipping the whole plan when entries exist,
+    // find the last existing future entry and generate from there onward.
+    // This ensures the schedule is always extended to the full horizon.
+    var effectiveFrom = fromDate;
 
-    if (existingCount > 0) {
+    final latestEntry = await (db.select(db.medicationIntakeLogs)
+          ..where((log) => log.planId.equals(plan.id))
+          ..where((log) => log.scheduledTime.isBiggerOrEqualValue(fromDate))
+          ..orderBy([(log) => drift.OrderingTerm.desc(log.scheduledTime)])
+          ..limit(1))
+        .getSingleOrNull();
+
+    if (latestEntry != null) {
+      // Start generating from one minute after the last existing entry
+      // so the per-entry duplicate check handles any overlap
+      effectiveFrom = latestEntry.scheduledTime.add(const Duration(minutes: 1));
+
+      if (!effectiveFrom.isBefore(toDate)) {
+        developer.log(
+          'Plan ${plan.id}: schedule already covers horizon (last entry: ${latestEntry.scheduledTime})',
+          name: 'IntakeScheduler',
+        );
+        return 0;
+      }
+
       developer.log(
-        'Plan ${plan.id}: $existingCount entries already exist, skipping',
+        'Plan ${plan.id}: extending schedule from $effectiveFrom to $toDate',
         name: 'IntakeScheduler',
       );
-      return 0;
     }
 
     int count = 0;
     for (final rule in rules) {
-      count += await _generateFromRule(plan, rule, fromDate, toDate);
+      count += await _generateFromRule(plan, rule, effectiveFrom, toDate);
     }
 
     return count;
@@ -405,21 +421,6 @@ class IntakeScheduleGenerator {
     }
 
     return times;
-  }
-
-  /// Count existing entries to avoid duplicates
-  Future<int> _countExistingEntries(
-    int planId,
-    DateTime fromDate,
-    DateTime toDate,
-  ) async {
-    final query = db.select(db.medicationIntakeLogs)
-      ..where((log) => log.planId.equals(planId))
-      ..where((log) => log.scheduledTime.isBiggerOrEqualValue(fromDate))
-      ..where((log) => log.scheduledTime.isSmallerOrEqualValue(toDate));
-
-    final results = await query.get();
-    return results.length;
   }
 
   /// Regenerate schedule for a specific plan (call after plan update)

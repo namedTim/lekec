@@ -95,6 +95,9 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
       ),
     );
 
+    // Reschedule upcoming notifications/alarms so the next one is set immediately
+    await NotificationService().scheduleAllUpcomingNotifications(db);
+
     // Navigate to home page and scroll to intake
     if (mounted) {
       // Navigate to home page using go_router
@@ -152,6 +155,9 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   Future<void> _dismissAlarm() async {
     // Just stop the alarm
     await Alarm.stop(widget.alarmSettings.id);
+
+    // Reschedule upcoming notifications/alarms so the next one is set immediately
+    await NotificationService().scheduleAllUpcomingNotifications(db);
 
     // Close the alarm screen
     if (mounted) {

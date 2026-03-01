@@ -332,10 +332,25 @@ class NotificationService {
     developer.log('Cancelled notification $id', name: 'NotificationService');
   }
 
-  /// Cancel all notifications
+  /// Cancel all notifications and medication alarms.
+  /// Appointment alarms (IDs >= 900000) are preserved.
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
-    developer.log('Cancelled all notifications', name: 'NotificationService');
+
+    // Also stop all medication-related Alarm alarms (IDs < 900000)
+    final activeAlarms = await Alarm.getAlarms();
+    int stoppedCount = 0;
+    for (final alarm in activeAlarms) {
+      if (alarm.id < 900000) {
+        await Alarm.stop(alarm.id);
+        stoppedCount++;
+      }
+    }
+
+    developer.log(
+      'Cancelled all notifications and $stoppedCount medication alarms',
+      name: 'NotificationService',
+    );
   }
 
   /// Get pending notifications count
