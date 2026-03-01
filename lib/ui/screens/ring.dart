@@ -401,6 +401,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                                       'Čez 10 min',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
+                                            color: colors.onError,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
@@ -436,6 +437,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                                       'Opusti',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
+                                            color: colors.onError,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),

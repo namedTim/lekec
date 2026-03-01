@@ -213,7 +213,7 @@ class DashboardScreenState extends State<DashboardScreen>
     for (int i = 0; i < _groupedIntakes.keys.length; i++) {
       final timeKey = _groupedIntakes.keys.elementAt(i);
       final intakes = _groupedIntakes[timeKey] ?? [];
-      if (intakes.any((intake) => intake['intake'].id == intakeId)) {
+      if (intakes.any((intake) => intake['isAppointment'] != true && intake['intake']?.id == intakeId)) {
         targetIndex = i;
         break;
       }

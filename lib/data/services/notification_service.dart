@@ -338,17 +338,19 @@ class NotificationService {
     await _notifications.cancelAll();
 
     // Also stop all medication-related Alarm alarms (IDs < 900000)
+    // but never stop an alarm that is currently ringing
     final activeAlarms = await Alarm.getAlarms();
+    final ringingIds = Alarm.ringing.value.alarms.map((a) => a.id).toSet();
     int stoppedCount = 0;
     for (final alarm in activeAlarms) {
-      if (alarm.id < 900000) {
+      if (alarm.id < 900000 && !ringingIds.contains(alarm.id)) {
         await Alarm.stop(alarm.id);
         stoppedCount++;
       }
     }
 
     developer.log(
-      'Cancelled all notifications and $stoppedCount medication alarms',
+      'Cancelled all notifications and $stoppedCount medication alarms (skipped ${ringingIds.length} ringing)',
       name: 'NotificationService',
     );
   }
