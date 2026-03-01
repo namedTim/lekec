@@ -34,6 +34,7 @@ class AppointmentService {
     required String title,
     String? note,
     required DateTime appointmentTime,
+    bool criticalReminder = false,
   }) async {
     final id = await db.into(db.appointments).insert(
       AppointmentsCompanion(
@@ -41,15 +42,16 @@ class AppointmentService {
         title: Value(title),
         note: Value(note),
         appointmentTime: Value(appointmentTime),
+        criticalReminder: Value(criticalReminder),
       ),
     );
 
     developer.log(
-      'Created appointment $id: "$title" at $appointmentTime',
+      'Created appointment $id: "$title" at $appointmentTime (critical: $criticalReminder)',
       name: 'AppointmentService',
     );
 
-    await _scheduleNotifications(id, title, appointmentTime);
+    await _scheduleNotifications(id, title, appointmentTime, criticalReminder);
     return id;
   }
 
@@ -59,23 +61,25 @@ class AppointmentService {
     required String title,
     String? note,
     required DateTime appointmentTime,
+    bool criticalReminder = false,
   }) async {
     await (db.update(db.appointments)..where((t) => t.id.equals(id))).write(
       AppointmentsCompanion(
         title: Value(title),
         note: Value(note),
         appointmentTime: Value(appointmentTime),
+        criticalReminder: Value(criticalReminder),
       ),
     );
 
     developer.log(
-      'Updated appointment $id: "$title" at $appointmentTime',
+      'Updated appointment $id: "$title" at $appointmentTime (critical: $criticalReminder)',
       name: 'AppointmentService',
     );
 
     // Cancel old notifications and schedule new ones
     await _cancelNotifications(id);
-    await _scheduleNotifications(id, title, appointmentTime);
+    await _scheduleNotifications(id, title, appointmentTime, criticalReminder);
   }
 
   /// Delete an appointment and cancel its notifications.
@@ -118,12 +122,14 @@ class AppointmentService {
 
   /// Schedules two notifications for an appointment:
   ///   1. A regular push notification **1 day before**.
-  ///   2. A silent full-screen notification **2 hours before** (no sound,
-  ///      no vibration — the user sees it when they open the phone).
+  ///   2. A full-screen alarm **2 hours before**. When [criticalReminder] is
+  ///      true the alarm uses the critical alarm settings (sound + vibration);
+  ///      otherwise it is silent.
   Future<void> _scheduleNotifications(
     int appointmentId,
     String title,
     DateTime appointmentTime,
+    bool criticalReminder,
   ) async {
     final now = DateTime.now();
 
@@ -139,7 +145,7 @@ class AppointmentService {
       );
     }
 
-    // --- 2 hours before: full-screen alarm (silent, no vibration) ---
+    // --- 2 hours before: full-screen alarm ---
     final twoHoursBefore = appointmentTime.subtract(const Duration(hours: 2));
     if (twoHoursBefore.isAfter(now)) {
       await _scheduleFullScreenAlarm(
@@ -147,6 +153,7 @@ class AppointmentService {
         title: title,
         appointmentTime: appointmentTime,
         scheduledTime: twoHoursBefore,
+        criticalReminder: criticalReminder,
       );
     }
   }
@@ -206,28 +213,37 @@ class AppointmentService {
     }
   }
 
-  /// Full-screen alarm using the Alarm package — uses appointment reminder settings.
-  /// This shows a full-screen intent (the AppointmentRingScreen) via the
-  /// alarm service listener, just like medication critical alarms.
+  /// Full-screen alarm using the Alarm package.
+  /// When [criticalReminder] is true, the alarm uses the same sound / vibration
+  /// / volume settings as medication critical alarms. Otherwise it is silent.
   Future<void> _scheduleFullScreenAlarm({
     required int appointmentId,
     required String title,
     required DateTime appointmentTime,
     required DateTime scheduledTime,
+    required bool criticalReminder,
   }) async {
     final alarmId = notifIdOffset + appointmentId * 2 + 1;
 
-    // Load appointment reminder settings from DB
-    final settings = await (db.select(db.appSettings)..limit(1)).getSingleOrNull();
-    final sound = settings?.appointmentSound ?? 'nokia.mp3';
-    final volume = settings?.appointmentVolume ?? 0.5;
-    final vibrate = settings?.appointmentVibration ?? true;
+    String sound = 'nokia.mp3';
+    double volume = 0.0;
+    bool vibrate = true;
+    bool loop = false;
+
+    if (criticalReminder) {
+      // Use the shared critical alarm settings
+      final settings = await (db.select(db.appSettings)..limit(1)).getSingleOrNull();
+      sound = settings?.alarmSound ?? 'nokia.mp3';
+      volume = settings?.alarmVolume ?? 0.8;
+      vibrate = settings?.alarmVibration ?? true;
+      loop = true;
+    }
 
     final alarmSettings = AlarmSettings(
       id: alarmId,
       dateTime: scheduledTime,
       assetAudioPath: 'assets/$sound',
-      loopAudio: false,
+      loopAudio: loop,
       vibrate: vibrate,
       androidFullScreenIntent: true,
       warningNotificationOnKill: false,
@@ -281,7 +297,7 @@ class AppointmentService {
     final upcoming = await getUpcomingAppointments();
     for (final appt in upcoming) {
       await _cancelNotifications(appt.id);
-      await _scheduleNotifications(appt.id, appt.title, appt.appointmentTime);
+      await _scheduleNotifications(appt.id, appt.title, appt.appointmentTime, appt.criticalReminder);
     }
     developer.log(
       'Rescheduled notifications for ${upcoming.length} appointments',

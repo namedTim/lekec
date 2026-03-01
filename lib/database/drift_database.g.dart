@@ -4506,6 +4506,21 @@ class $AppointmentsTable extends Appointments
         type: DriftSqlType.dateTime,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _criticalReminderMeta = const VerificationMeta(
+    'criticalReminder',
+  );
+  @override
+  late final GeneratedColumn<bool> criticalReminder = GeneratedColumn<bool>(
+    'critical_reminder',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("critical_reminder" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4525,6 +4540,7 @@ class $AppointmentsTable extends Appointments
     title,
     note,
     appointmentTime,
+    criticalReminder,
     createdAt,
   ];
   @override
@@ -4575,6 +4591,15 @@ class $AppointmentsTable extends Appointments
     } else if (isInserting) {
       context.missing(_appointmentTimeMeta);
     }
+    if (data.containsKey('critical_reminder')) {
+      context.handle(
+        _criticalReminderMeta,
+        criticalReminder.isAcceptableOrUnknown(
+          data['critical_reminder']!,
+          _criticalReminderMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4610,6 +4635,10 @@ class $AppointmentsTable extends Appointments
         DriftSqlType.dateTime,
         data['${effectivePrefix}appointment_time'],
       )!,
+      criticalReminder: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}critical_reminder'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4636,6 +4665,9 @@ class Appointment extends DataClass implements Insertable<Appointment> {
   /// Date and time of the appointment
   final DateTime appointmentTime;
 
+  /// Whether a critical (full-screen) alarm is enabled for this appointment
+  final bool criticalReminder;
+
   /// When this record was created
   final DateTime createdAt;
   const Appointment({
@@ -4644,6 +4676,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     required this.title,
     this.note,
     required this.appointmentTime,
+    required this.criticalReminder,
     required this.createdAt,
   });
   @override
@@ -4656,6 +4689,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       map['note'] = Variable<String>(note);
     }
     map['appointment_time'] = Variable<DateTime>(appointmentTime);
+    map['critical_reminder'] = Variable<bool>(criticalReminder);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -4667,6 +4701,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       title: Value(title),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       appointmentTime: Value(appointmentTime),
+      criticalReminder: Value(criticalReminder),
       createdAt: Value(createdAt),
     );
   }
@@ -4682,6 +4717,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       title: serializer.fromJson<String>(json['title']),
       note: serializer.fromJson<String?>(json['note']),
       appointmentTime: serializer.fromJson<DateTime>(json['appointmentTime']),
+      criticalReminder: serializer.fromJson<bool>(json['criticalReminder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -4694,6 +4730,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       'title': serializer.toJson<String>(title),
       'note': serializer.toJson<String?>(note),
       'appointmentTime': serializer.toJson<DateTime>(appointmentTime),
+      'criticalReminder': serializer.toJson<bool>(criticalReminder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -4704,6 +4741,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     String? title,
     Value<String?> note = const Value.absent(),
     DateTime? appointmentTime,
+    bool? criticalReminder,
     DateTime? createdAt,
   }) => Appointment(
     id: id ?? this.id,
@@ -4711,6 +4749,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     title: title ?? this.title,
     note: note.present ? note.value : this.note,
     appointmentTime: appointmentTime ?? this.appointmentTime,
+    criticalReminder: criticalReminder ?? this.criticalReminder,
     createdAt: createdAt ?? this.createdAt,
   );
   Appointment copyWithCompanion(AppointmentsCompanion data) {
@@ -4722,6 +4761,9 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       appointmentTime: data.appointmentTime.present
           ? data.appointmentTime.value
           : this.appointmentTime,
+      criticalReminder: data.criticalReminder.present
+          ? data.criticalReminder.value
+          : this.criticalReminder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4734,14 +4776,22 @@ class Appointment extends DataClass implements Insertable<Appointment> {
           ..write('title: $title, ')
           ..write('note: $note, ')
           ..write('appointmentTime: $appointmentTime, ')
+          ..write('criticalReminder: $criticalReminder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, userId, title, note, appointmentTime, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    userId,
+    title,
+    note,
+    appointmentTime,
+    criticalReminder,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4751,6 +4801,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
           other.title == this.title &&
           other.note == this.note &&
           other.appointmentTime == this.appointmentTime &&
+          other.criticalReminder == this.criticalReminder &&
           other.createdAt == this.createdAt);
 }
 
@@ -4760,6 +4811,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
   final Value<String> title;
   final Value<String?> note;
   final Value<DateTime> appointmentTime;
+  final Value<bool> criticalReminder;
   final Value<DateTime> createdAt;
   const AppointmentsCompanion({
     this.id = const Value.absent(),
@@ -4767,6 +4819,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     this.title = const Value.absent(),
     this.note = const Value.absent(),
     this.appointmentTime = const Value.absent(),
+    this.criticalReminder = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   AppointmentsCompanion.insert({
@@ -4775,6 +4828,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     required String title,
     this.note = const Value.absent(),
     required DateTime appointmentTime,
+    this.criticalReminder = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : userId = Value(userId),
        title = Value(title),
@@ -4785,6 +4839,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     Expression<String>? title,
     Expression<String>? note,
     Expression<DateTime>? appointmentTime,
+    Expression<bool>? criticalReminder,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -4793,6 +4848,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
       if (title != null) 'title': title,
       if (note != null) 'note': note,
       if (appointmentTime != null) 'appointment_time': appointmentTime,
+      if (criticalReminder != null) 'critical_reminder': criticalReminder,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -4803,6 +4859,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     Value<String>? title,
     Value<String?>? note,
     Value<DateTime>? appointmentTime,
+    Value<bool>? criticalReminder,
     Value<DateTime>? createdAt,
   }) {
     return AppointmentsCompanion(
@@ -4811,6 +4868,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
       title: title ?? this.title,
       note: note ?? this.note,
       appointmentTime: appointmentTime ?? this.appointmentTime,
+      criticalReminder: criticalReminder ?? this.criticalReminder,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -4833,6 +4891,9 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     if (appointmentTime.present) {
       map['appointment_time'] = Variable<DateTime>(appointmentTime.value);
     }
+    if (criticalReminder.present) {
+      map['critical_reminder'] = Variable<bool>(criticalReminder.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4847,6 +4908,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
           ..write('title: $title, ')
           ..write('note: $note, ')
           ..write('appointmentTime: $appointmentTime, ')
+          ..write('criticalReminder: $criticalReminder, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -9197,6 +9259,7 @@ typedef $$AppointmentsTableCreateCompanionBuilder =
       required String title,
       Value<String?> note,
       required DateTime appointmentTime,
+      Value<bool> criticalReminder,
       Value<DateTime> createdAt,
     });
 typedef $$AppointmentsTableUpdateCompanionBuilder =
@@ -9206,6 +9269,7 @@ typedef $$AppointmentsTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String?> note,
       Value<DateTime> appointmentTime,
+      Value<bool> criticalReminder,
       Value<DateTime> createdAt,
     });
 
@@ -9258,6 +9322,11 @@ class $$AppointmentsTableFilterComposer
 
   ColumnFilters<DateTime> get appointmentTime => $composableBuilder(
     column: $table.appointmentTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9319,6 +9388,11 @@ class $$AppointmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9368,6 +9442,11 @@ class $$AppointmentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get appointmentTime => $composableBuilder(
     column: $table.appointmentTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get criticalReminder => $composableBuilder(
+    column: $table.criticalReminder,
     builder: (column) => column,
   );
 
@@ -9431,6 +9510,7 @@ class $$AppointmentsTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> appointmentTime = const Value.absent(),
+                Value<bool> criticalReminder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => AppointmentsCompanion(
                 id: id,
@@ -9438,6 +9518,7 @@ class $$AppointmentsTableTableManager
                 title: title,
                 note: note,
                 appointmentTime: appointmentTime,
+                criticalReminder: criticalReminder,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -9447,6 +9528,7 @@ class $$AppointmentsTableTableManager
                 required String title,
                 Value<String?> note = const Value.absent(),
                 required DateTime appointmentTime,
+                Value<bool> criticalReminder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => AppointmentsCompanion.insert(
                 id: id,
@@ -9454,6 +9536,7 @@ class $$AppointmentsTableTableManager
                 title: title,
                 note: note,
                 appointmentTime: appointmentTime,
+                criticalReminder: criticalReminder,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

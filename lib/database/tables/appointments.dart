@@ -14,6 +14,10 @@ class Appointments extends Table {
   /// Date and time of the appointment
   DateTimeColumn get appointmentTime => dateTime()();
 
+  /// Whether a critical (full-screen) alarm is enabled for this appointment
+  BoolColumn get criticalReminder =>
+      boolean().withDefault(const Constant(false))();
+
   /// When this record was created
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

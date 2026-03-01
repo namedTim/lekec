@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../data/services/appointment_service.dart';
 import '../../database/drift_database.dart';
+import '../../ui/components/critical_reminder_recap.dart';
 
 /// Screen for creating or editing an appointment.
 ///
@@ -29,6 +30,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final _titleFocusNode = FocusNode();
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
+  bool _criticalReminder = false;
   bool _isSaving = false;
 
   bool get _isEditing => widget.existingAppointment != null;
@@ -40,6 +42,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       final appt = widget.existingAppointment!;
       _titleController.text = appt.title;
       _noteController.text = appt.note ?? '';
+      _criticalReminder = appt.criticalReminder;
       _selectedDate = DateTime(
         appt.appointmentTime.year,
         appt.appointmentTime.month,
@@ -129,6 +132,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           title: title,
           note: note.isEmpty ? null : note,
           appointmentTime: appointmentTime,
+          criticalReminder: _criticalReminder,
         );
       } else {
         await service.createAppointment(
@@ -136,6 +140,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           title: title,
           note: note.isEmpty ? null : note,
           appointmentTime: appointmentTime,
+          criticalReminder: _criticalReminder,
         );
       }
 
@@ -287,6 +292,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
               decoration: BoxDecoration(
                 color: colors.secondaryContainer.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colors.outlineVariant.withOpacity(0.5),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [
@@ -297,12 +306,19 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     child: Text(
                       'Prejeli boste opomnik 1 dan prej in 2 uri pred terminom.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSecondaryContainer,
+                        color: colors.onSurface,
                       ),
                     ),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 16),
+
+            // Critical Reminder
+            CriticalReminderRecap(
+              enabled: _criticalReminder,
+              onChanged: (value) => setState(() => _criticalReminder = value),
             ),
             const SizedBox(height: 32),
 

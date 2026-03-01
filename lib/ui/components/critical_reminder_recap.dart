@@ -25,9 +25,12 @@ class CriticalReminderRecap extends StatelessWidget {
             ? colors.errorContainer.withOpacity(0.3)
             : colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
-        border: enabled
-            ? Border.all(color: colors.error.withOpacity(0.5), width: 1.5)
-            : null,
+        border: Border.all(
+          color: enabled
+              ? colors.error.withOpacity(0.5)
+              : colors.outlineVariant.withOpacity(0.5),
+          width: enabled ? 1.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -516,6 +516,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                 _DetailCard(
                   icon: Symbols.alarm,
                   title: 'Kritični opomniki',
+                  borderColor: colors.primary.withOpacity(0.6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -744,11 +745,13 @@ class _DetailCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final Widget child;
+  final Color? borderColor;
 
   const _DetailCard({
     required this.icon,
     required this.title,
     required this.child,
+    this.borderColor,
   });
 
   @override
@@ -757,7 +760,14 @@ class _DetailCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Card(
-      elevation: 2,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: borderColor ?? colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -804,7 +814,14 @@ class _EditableDetailCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Card(
-      elevation: 2,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

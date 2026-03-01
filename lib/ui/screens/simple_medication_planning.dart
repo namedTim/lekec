@@ -359,20 +359,24 @@ class _SimpleMedicationPlanningScreenState
                     decoration: BoxDecoration(
                       color: colors.secondaryContainer.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colors.outlineVariant.withOpacity(0.5),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Symbols.info,
                           size: 18,
-                          color: colors.onSecondaryContainer,
+                          color: colors.secondary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Drugi vnos bo čez 12 ur ob ${_formatTime(TimeOfDay(hour: (_firstIntakeTime!.hour + 12) % 24, minute: _firstIntakeTime!.minute))}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: colors.onSecondaryContainer,
+                              color: colors.onSurface,
                             ),
                           ),
                         ),
