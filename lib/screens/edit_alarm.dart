@@ -35,7 +35,7 @@ class _ExampleAlarmEditScreenState extends State<ExampleAlarmEditScreen> {
       volume = null;
       fadeDuration = null;
       staircaseFade = false;
-      assetAudio = 'assets/marimba.mp3';
+      assetAudio = 'assets/alarms/marimba.mp3';
     } else {
       selectedDateTime = widget.alarmSettings!.dateTime;
       loopAudio = widget.alarmSettings!.loopAudio;
@@ -228,24 +228,36 @@ class _ExampleAlarmEditScreenState extends State<ExampleAlarmEditScreen> {
                 value: assetAudio,
                 items: const [
                   DropdownMenuItem<String>(
-                    value: 'assets/marimba.mp3',
+                    value: 'assets/alarms/marimba.mp3',
                     child: Text('Marimba'),
                   ),
                   DropdownMenuItem<String>(
-                    value: 'assets/nokia.mp3',
+                    value: 'assets/alarms/nokia.mp3',
                     child: Text('Nokia'),
                   ),
                   DropdownMenuItem<String>(
-                    value: 'assets/mozart.mp3',
+                    value: 'assets/alarms/mozart.mp3',
                     child: Text('Mozart'),
                   ),
                   DropdownMenuItem<String>(
-                    value: 'assets/star_wars.mp3',
+                    value: 'assets/alarms/star_wars.mp3',
                     child: Text('Star Wars'),
                   ),
                   DropdownMenuItem<String>(
-                    value: 'assets/one_piece.mp3',
-                    child: Text('One Piece'),
+                    value: 'assets/alarms/alarm_clock.mp3',
+                    child: Text('Alarm Clock'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'assets/alarms/alarm_siren.mp3',
+                    child: Text('Alarm Siren'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'assets/alarms/8bit_arcade.mp3',
+                    child: Text('8-bit Arcade'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'assets/alarms/return_to_8bit.mp3',
+                    child: Text('Return to 8-bit'),
                   ),
                 ],
                 onChanged: (value) => setState(() => assetAudio = value!),

@@ -44,8 +44,5 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/mozart.mp3
-    - assets/nokia.mp3
-    - assets/one_piece.mp3
-    - assets/star_wars.mp3
-    - assets/marimba.mp3
+    - assets/icons/
+    - assets/alarms/

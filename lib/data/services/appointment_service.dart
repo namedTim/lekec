@@ -242,7 +242,7 @@ class AppointmentService {
     final alarmSettings = AlarmSettings(
       id: alarmId,
       dateTime: scheduledTime,
-      assetAudioPath: 'assets/$sound',
+      assetAudioPath: 'assets/alarms/$sound',
       loopAudio: loop,
       vibrate: vibrate,
       androidFullScreenIntent: true,

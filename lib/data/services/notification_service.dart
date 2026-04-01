@@ -243,7 +243,7 @@ class NotificationService {
       final alarmSettings = AlarmSettings(
         id: id,
         dateTime: scheduledTime,
-        assetAudioPath: 'assets/$alarmSound',
+        assetAudioPath: 'assets/alarms/$alarmSound',
         loopAudio: true,
         vibrate: alarmVibration,
         androidFullScreenIntent: true,
@@ -925,7 +925,7 @@ class NotificationService {
     final alarmSettings = AlarmSettings(
       id: DateTime.now().millisecondsSinceEpoch % 10000,
       dateTime: alarmTime,
-      assetAudioPath: 'assets/marimba.mp3',
+      assetAudioPath: 'assets/alarms/marimba.mp3',
       loopAudio: true,
       vibrate: true,
       androidFullScreenIntent: true,
