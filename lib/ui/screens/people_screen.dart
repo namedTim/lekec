@@ -19,7 +19,7 @@ class PeopleScreen extends ConsumerStatefulWidget {
 class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   List<User> _users = [];
   bool _isLoading = true;
-  bool _showingUserDetails = false;
+  bool _hasAutoNavigated = false;
 
   @override
   void initState() {
@@ -38,8 +38,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         _isLoading = false;
       });
 
-      // If there's exactly one user, auto-open their details
-      if (users.length == 1 && !_showingUserDetails) {
+      // Auto-open details only once (first load) when there's exactly one user
+      if (users.length == 1 && !_hasAutoNavigated) {
+        _hasAutoNavigated = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _openUserDetails(users.first);
         });
@@ -48,7 +49,6 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   }
 
   Future<void> _openUserDetails(User user) async {
-    _showingUserDetails = true;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => UserMedicationsScreen(
@@ -57,9 +57,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         ),
       ),
     );
-    // Reset flag when returning from details
-    _showingUserDetails = false;
-    // Refresh in case user was deactivated
+    // Refresh in case user was deactivated, but _hasAutoNavigated stays true
+    // so we never auto-open again when returning to this list
     _loadUsers();
   }
 
