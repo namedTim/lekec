@@ -23,7 +23,6 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.lekec/lockscreen');
   Map<String, dynamic>? _medicationDetails;
-  bool _isLoading = true;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -61,7 +60,6 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     if (mounted) {
       setState(() {
         _medicationDetails = details;
-        _isLoading = false;
       });
     }
   }
@@ -190,13 +188,6 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: colors.error,
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
 
     final medicationName = _medicationDetails?['medicationName'] ?? 'Zdravilo';
     final dosage = _medicationDetails?['dosage'] ?? '';

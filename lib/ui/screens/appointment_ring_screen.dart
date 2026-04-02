@@ -24,7 +24,6 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.lekec/lockscreen');
   Appointment? _appointment;
-  bool _isLoading = true;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -64,11 +63,10 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
       if (mounted) {
         setState(() {
           _appointment = appt;
-          _isLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      // ignore — fallback values are shown
     }
   }
 
@@ -96,13 +94,6 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: colors.primary,
-        body: const Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
-    }
 
     final title = _appointment?.title ?? 'Termin';
     final note = _appointment?.note;

@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration {
@@ -102,6 +102,15 @@ class AppDatabase extends _$AppDatabase {
         if (from < 14) {
           // Add criticalReminder column to appointments table
           await m.addColumn(appointments, appointments.criticalReminder);
+        }
+        if (from < 15) {
+          // Update default alarm sound from nokia.mp3 to 8bit_arcade.mp3
+          await customStatement(
+            "UPDATE app_settings SET alarm_sound = '8bit_arcade.mp3' WHERE alarm_sound = 'nokia.mp3'",
+          );
+          await customStatement(
+            "UPDATE app_settings SET appointment_sound = '8bit_arcade.mp3' WHERE appointment_sound = 'nokia.mp3'",
+          );
         }
       },
     );

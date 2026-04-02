@@ -9,14 +9,14 @@ import '../../database/drift_database.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
+    {'name': '8-bit Arkada', 'file': '8bit_arcade.mp3'},
+    {'name': 'Retro Piksel', 'file': 'return_to_8bit.mp3'},
     {'name': 'Nokia', 'file': 'nokia.mp3'},
     {'name': 'Marimba', 'file': 'marimba.mp3'},
     {'name': 'Mozart', 'file': 'mozart.mp3'},
     {'name': 'Star Wars', 'file': 'star_wars.mp3'},
-    {'name': 'Alarm Clock', 'file': 'alarm_clock.mp3'},
-    {'name': 'Alarm Siren', 'file': 'alarm_siren.mp3'},
-    {'name': '8-bit Arcade', 'file': '8bit_arcade.mp3'},
-    {'name': 'Return to 8-bit', 'file': 'return_to_8bit.mp3'},
+    {'name': 'Budilka', 'file': 'alarm_clock.mp3'},
+    {'name': 'Sirena', 'file': 'alarm_siren.mp3'},
   ];
 });
 
@@ -123,7 +123,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         final alarmSettings = AlarmSettings(
           id: intake.id,
           dateTime: intake.scheduledTime,
-          assetAudioPath: 'assets/alarms/${_settings?.alarmSound ?? 'nokia.mp3'}',
+          assetAudioPath: 'assets/alarms/${_settings?.alarmSound ?? '8bit_arcade.mp3'}',
           loopAudio: true,
           vibrate: _settings?.alarmVibration ?? true,
           androidFullScreenIntent: true,
@@ -147,7 +147,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     final alarmSettings = AlarmSettings(
       id: 999999,
       dateTime: DateTime.now().add(const Duration(seconds: 2)),
-      assetAudioPath: 'assets/alarms/${_settings?.alarmSound ?? 'nokia.mp3'}',
+      assetAudioPath: 'assets/alarms/${_settings?.alarmSound ?? '8bit_arcade.mp3'}',
       loopAudio: true,
       warningNotificationOnKill: false,
       vibrate: _settings?.alarmVibration ?? true,
@@ -324,7 +324,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _settings?.alarmSound ?? 'nokia.mp3',
+                      value: _settings?.alarmSound ?? '8bit_arcade.mp3',
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

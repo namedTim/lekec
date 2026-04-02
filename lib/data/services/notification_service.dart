@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -18,8 +19,24 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  Future<void>? _initFuture;
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    if (_initFuture != null) return _initFuture!;
+    final completer = Completer<void>();
+    _initFuture = completer.future;
+    try {
+      await _doInitialize();
+      completer.complete();
+    } catch (e, st) {
+      _initFuture = null;
+      completer.completeError(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> _doInitialize() async {
     if (_initialized) return;
 
     // Initialize timezone
@@ -236,7 +253,7 @@ class NotificationService {
           : null;
 
       final alarmVolume = settingsQuery?.alarmVolume ?? 0.8;
-      final alarmSound = settingsQuery?.alarmSound ?? 'nokia.mp3';
+      final alarmSound = settingsQuery?.alarmSound ?? '8bit_arcade.mp3';
       final alarmVibration = settingsQuery?.alarmVibration ?? true;
       final notificationOnKill = settingsQuery?.showKillWarning ?? true;
 

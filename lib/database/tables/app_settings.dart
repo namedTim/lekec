@@ -12,7 +12,7 @@ class AppSettings extends Table {
   // Critical alarm settings
   RealColumn get alarmVolume => real().withDefault(const Constant(0.8))();
   TextColumn get alarmSound =>
-      text().withDefault(const Constant('nokia.mp3'))();
+      text().withDefault(const Constant('8bit_arcade.mp3'))();
   BoolColumn get alarmVibration =>
       boolean().withDefault(const Constant(true))();
 
@@ -24,7 +24,7 @@ class AppSettings extends Table {
   RealColumn get appointmentVolume =>
       real().withDefault(const Constant(0.5))();
   TextColumn get appointmentSound =>
-      text().withDefault(const Constant('nokia.mp3'))();
+      text().withDefault(const Constant('8bit_arcade.mp3'))();
   BoolColumn get appointmentVibration =>
       boolean().withDefault(const Constant(true))();
 }

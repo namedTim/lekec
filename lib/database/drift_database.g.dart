@@ -2689,7 +2689,7 @@ class $AppSettingsTable extends AppSettings
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('nokia.mp3'),
+    defaultValue: const Constant('8bit_arcade.mp3'),
   );
   static const VerificationMeta _alarmVibrationMeta = const VerificationMeta(
     'alarmVibration',
@@ -2744,7 +2744,7 @@ class $AppSettingsTable extends AppSettings
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('nokia.mp3'),
+    defaultValue: const Constant('8bit_arcade.mp3'),
   );
   static const VerificationMeta _appointmentVibrationMeta =
       const VerificationMeta('appointmentVibration');

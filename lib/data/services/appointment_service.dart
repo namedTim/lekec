@@ -225,7 +225,7 @@ class AppointmentService {
   }) async {
     final alarmId = notifIdOffset + appointmentId * 2 + 1;
 
-    String sound = 'nokia.mp3';
+    String sound = '8bit_arcade.mp3';
     double volume = 0.0;
     bool vibrate = true;
     bool loop = false;
@@ -233,7 +233,7 @@ class AppointmentService {
     if (criticalReminder) {
       // Use the shared critical alarm settings
       final settings = await (db.select(db.appSettings)..limit(1)).getSingleOrNull();
-      sound = settings?.alarmSound ?? 'nokia.mp3';
+      sound = settings?.alarmSound ?? '8bit_arcade.mp3';
       volume = settings?.alarmVolume ?? 0.8;
       vibrate = settings?.alarmVibration ?? true;
       loop = true;

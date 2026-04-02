@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:lekec/ui/screens/ring.dart';
 import 'package:lekec/ui/screens/appointment_ring_screen.dart';
 import 'package:lekec/services/alarm_service.dart';
@@ -368,7 +369,8 @@ class ScaffoldWithNavBar extends StatelessWidget {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   setupLogging(showDebugLogs: true);
 
@@ -409,8 +411,9 @@ Future<void> main() async {
     ),
   );
 
-  // Check for ringing alarms ASAP after first frame
+  // Check for ringing alarms ASAP after first frame, then remove splash
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    FlutterNativeSplash.remove();
     alarmService.checkInitialRingingAlarms();
   });
 
@@ -420,6 +423,7 @@ Future<void> main() async {
     _initializeServicesInBackground();
   });
 }
+
 
 // Run heavy initialization in background after app starts
 Future<void> _initializeServicesInBackground() async {
