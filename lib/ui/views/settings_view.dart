@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:alarm/alarm.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../../features/core/providers/theme_provider.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
@@ -399,6 +404,70 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           ),
         ),
         const SizedBox(height: 24),
+
+        // ── Prenos podatkov ──────────────────────────────────────────
+        Card(
+          shape: cardShape,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Icon(Symbols.sync_alt, color: colors.primary),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Prenos podatkov',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _exportDatabase,
+                        icon: const Icon(Symbols.upload),
+                        label: const Text('Izvozi'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: theme.brightness == Brightness.dark
+                              ? Colors.black
+                              : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _importDatabase,
+                        icon: const Icon(Symbols.download),
+                        label: const Text('Uvozi'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: theme.brightness == Brightness.dark
+                              ? Colors.black
+                              : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
         ListTile(
           leading: const Icon(Symbols.description),
           title: const Text('Pogoji uporabe'),
@@ -414,6 +483,89 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         const SizedBox(height: 16),
       ],
     );
+  }
+
+  Future<void> _exportDatabase() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final dbFile = File(p.join(dir.path, 'app_database.sqlite'));
+
+    if (!await dbFile.exists()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Baza podatkov ni bila najdena')),
+        );
+      }
+      return;
+    }
+
+    final downloadsDir = Directory('/storage/emulated/0/Download');
+    final exportPath = p.join(downloadsDir.path, 'lekec_backup.sqlite');
+    await dbFile.copy(exportPath);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Izvoženo v Downloads/lekec_backup.sqlite')),
+      );
+    }
+  }
+
+  Future<void> _importDatabase() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Symbols.warning, size: 48),
+        title: const Text('Uvoz podatkov'),
+        content: const Text(
+          'Vsi trenutni podatki bodo prepisani z uvoženimi podatki. '
+          'Tega dejanja ni mogoče razveljaviti.\n\n'
+          'Ali želite nadaljevati?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Prekliči'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Uvozi in prepiši'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final pickedFile = File(result.files.single.path!);
+    final dir = await getApplicationDocumentsDirectory();
+    final dbPath = p.join(dir.path, 'app_database.sqlite');
+
+    // Close current database before overwriting
+    final db = ref.read(databaseProvider);
+    await db.close();
+
+    // Overwrite with imported file
+    await pickedFile.copy(dbPath);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Podatki uvoženi. Aplikacija se mora znova zagnati.'),
+        ),
+      );
+
+      // Give user time to see the message, then exit
+      await Future.delayed(const Duration(seconds: 2));
+      exit(0);
+    }
   }
 
   String _getThemeModeName(ThemeMode mode) {

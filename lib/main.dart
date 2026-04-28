@@ -380,13 +380,24 @@ Future<void> main() async {
 
   try {
     // PRIORITY: Initialize alarm service FIRST for fastest response.
-    // Use a timeout so a stuck alarm can never freeze the splash screen.
-    await Alarm.init().timeout(
-      const Duration(seconds: 5),
-      onTimeout: () {
-        Logger('main').warning('Alarm.init() timed out — continuing without it');
-      },
-    );
+    // Retry once if platform channel isn't ready (hot restart / cold start race).
+    try {
+      await Alarm.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger('main').warning('Alarm.init() timed out — continuing without it');
+        },
+      );
+    } catch (e) {
+      Logger('main').warning('Alarm.init() failed, retrying: $e');
+      await Future.delayed(const Duration(milliseconds: 500));
+      await Alarm.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger('main').warning('Alarm.init() retry timed out');
+        },
+      );
+    }
 
     // Initialize listeners
     alarmService.initialize();
