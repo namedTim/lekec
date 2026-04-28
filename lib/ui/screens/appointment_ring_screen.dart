@@ -26,6 +26,10 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
   Appointment? _appointment;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  Timer? _autoStopTimer;
+
+  /// Auto-stop ringing after 5 minutes
+  static const _autoStopDuration = Duration(minutes: 5);
 
   @override
   void initState() {
@@ -41,6 +45,12 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     _pulseAnimation = Tween<double>(begin: 0.92, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _autoStopTimer = Timer(_autoStopDuration, _onAutoStop);
+  }
+
+  Future<void> _onAutoStop() async {
+    await Alarm.stop(widget.alarmSettings.id);
   }
 
   Future<void> _showOverLockscreen(bool show) async {
@@ -72,6 +82,7 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
 
   @override
   void dispose() {
+    _autoStopTimer?.cancel();
     _showOverLockscreen(false);
     _pulseController.dispose();
     super.dispose();

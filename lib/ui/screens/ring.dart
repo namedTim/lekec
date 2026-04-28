@@ -25,6 +25,10 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   Map<String, dynamic>? _medicationDetails;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  Timer? _autoStopTimer;
+
+  /// Auto-stop ringing after 5 minutes
+  static const _autoStopDuration = Duration(minutes: 5);
 
   @override
   void initState() {
@@ -40,6 +44,13 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _autoStopTimer = Timer(_autoStopDuration, _onAutoStop);
+  }
+
+  Future<void> _onAutoStop() async {
+    // Stop the alarm sound but leave the screen open for the user to act
+    await Alarm.stop(widget.alarmSettings.id);
   }
 
   Future<void> _showOverLockscreen(bool show) async {
@@ -66,6 +77,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
 
   @override
   void dispose() {
+    _autoStopTimer?.cancel();
     _showOverLockscreen(false);
     _pulseController.dispose();
     super.dispose();
