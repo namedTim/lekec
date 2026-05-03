@@ -1,12 +1,15 @@
 // Template for API Keys configuration
-// 
+//
 // INSTRUCTIONS:
 // 1. Copy this file and rename it to 'api_keys.dart' in the same directory
-// 2. Replace the placeholder value with your actual Gemini API key
-// 3. Get your API key from: https://makersuite.google.com/app/apikey
+// 2. Set lekecApiBaseUrl to where your LekecAPI server runs:
+//      - http://10.0.2.2:8000 for Android emulator → host
+//      - http://<your-lan-ip>:8000 for a real device on the same network
+//      - https://api.your-domain.tld for a deployed server
+// 3. Set lekecApiKey to match CLIENT_API_KEY in the LekecAPI .env
 // 4. NEVER commit api_keys.dart to version control (it's in .gitignore)
 
 class ApiKeys {
-  // Gemini API Key - Get yours at: https://makersuite.google.com/app/apikey
-  static const String geminiApiKey = 'YOUR_GEMINI_API_KEY_HERE';
+  static const String lekecApiBaseUrl = 'http://10.0.2.2:8000';
+  static const String lekecApiKey = 'YOUR_CLIENT_API_KEY_HERE';
 }

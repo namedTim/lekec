@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import '../database/tables/medications.dart';
 import '../ui/screens/medication_frequency_selection.dart' show FrequencyOption;
 import '../ui/screens/advanced_medication_planning.dart'
@@ -260,160 +260,42 @@ class MedicationExtractionResult {
   }
 }
 
+/// Talks to LekecAPI's `/ai/extract-medication` endpoint.
+/// The server picks the AI provider (Gemini, OpenRouter, Ollama, …) and
+/// returns the parsed result, so the app no longer holds AI keys.
 class GeminiMedicationService {
-  late final GenerativeModel _model;
-
-  GeminiMedicationService() {
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: ApiKeys.geminiApiKey,
-    );
-  }
+  GeminiMedicationService();
 
   Future<MedicationExtractionResult> extractMedicationInfo(
     File imageFile,
   ) async {
     try {
-      final imageBytes = await imageFile.readAsBytes();
+      final uri = Uri.parse(
+        '${ApiKeys.lekecApiBaseUrl}/api/v1/ai/extract-medication',
+      );
 
-      final prompt = '''
-Analiziraj sliko embalaže/nalepke zdravila in izvleci naslednje informacije.
-Nalepka je lahko v slovenščini ali angleščini, vendar MORAŠ odgovoriti IZKLJUČNO V SLOVENŠČINI.
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['X-API-Key'] = ApiKeys.lekecApiKey
+        ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
 
-Izvleci:
-1. Ime zdravila z jakostjo (npr. "Lekadol 500 mg", "Metamizol STADA 500 mg", "Aspirin 100 mg") - VEDNO vključi mg/ml jakost v imenu, če je vidna
-2. Oblika zdravila (tablete, kapsule, kapljice, ampule, injekcije, pršila, obliži, puff, sirup, itd.)
-3. Jakost (npr. "500 mg", "10 mg", "2.5 ml", itd.) - to je ločeno polje
-4. Količina v škatli/pakiranju (število tablet, ampul, ml, itd.)
-5. Ime lekarne, če je vidno
-6. Ime pacienta, če je to receptna nalepka
-7. Priporočena pogostost jemanja - natančno razčleni:
-   - "enkrat dnevno" / "1x daily" = enkrat dnevno
-   - "dvakrat dnevno" / "2x daily" = dvakrat dnevno  
-   - "3x na dan" / "3x dnevno" = 3-krat dnevno
-   - "po potrebi" / "as needed" / "ob bolečini" = po potrebi
-   - "na X ur" / "every X hours" = interval (izvleci X)
-   - "ciklično" npr. "10 dni jemanja, 20 dni pavze" = ciklično
-   - omenjeni specifični dnevi = specifični dnevi
-8. Količina na odmerek (npr. "2 tableti", "1 kapsula", "polovica tablete" = 0.5 = koliko vzeti vsak odmerek, podpiraj decimalna števila kot 0.5 za polovico)
-9. Nasveti za jemanje - ZDRUŽI VSE nasvete v eno polje, vključno z:
-   - Čas jemanja: "pred obrokom", "z obrokom", "po jedi", "na tešče", "pred spanjem"
-   - Opozorila in omejitve: "NE SKUPAJ Z ...", "brez alkohola", "ne z mlekom"
-   - Primer: če piše "2 x 1 kapsulo po jedi, NE SKUPAJ Z ANALGINOM" naj bo intakeAdvice: "Po jedi. Ne jemati skupaj z analginom."
-   - Vse nasvete prevedi v slovenščino!
-10. Predlagani časi jemanja - na podlagi pogostosti in navodil predlagaj primerne čase v 24-urnem formatu:
-    - 1x dnevno: ["08:00"] (zjutraj) razen če piše zvečer/pred spanjem potem ["20:00"]
-    - 2x dnevno: ["08:00", "20:00"] (zjutraj in zvečer)
-    - 3x dnevno: ["08:00", "14:00", "20:00"] (zjutraj, popoldne, zvečer)
-    - 4x dnevno: ["08:00", "12:00", "16:00", "20:00"]
-    - Če so navedeni specifični časi (npr. "ob 8h in 20h"), uporabi te
-11. Morebitne druge pomembne opombe
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 120),
+      );
+      final response = await http.Response.fromStream(streamed);
 
-Odgovori IZKLJUČNO v veljavnem JSON formatu:
-{
-  "medicationName": "ime z jakostjo npr. Lekadol 500 mg ali null",
-  "medicationType": "oblika v slovenščini ali null",
-  "pillSize": "jakost ali null",
-  "quantityInBox": število ali null,
-  "pharmacyName": "ime lekarne ali null",
-  "patientName": "ime pacienta ali null",
-  "intakeAdvice": "vsi nasveti za jemanje v slovenščini ali null",
-  "dosageFrequency": {
-    "timesPerDay": število ali null,
-    "amountPerDose": število (decimalno, npr. 0.5 za polovico, 1, 2) ali null,
-    "intervalHours": število ali null,
-    "isAsNeeded": boolean,
-    "isCyclic": boolean,
-    "cyclicDaysOn": število ali null,
-    "cyclicDaysOff": število ali null,
-    "specificDays": [seznam dni 0-6] ali null,
-    "rawText": "originalno besedilo pogostosti ali null",
-    "suggestedTimes": ["HH:MM", "HH:MM", ...] predlagani časi v 24-urnem formatu ali null
-  },
-  "notes": "dodatne pomembne opombe v slovenščini ali null"
-}
-
-Uporabi null za polja, ki jih ne moreš identificirati. Ne vključi nobenega besedila izven JSON-a.
-VSE vrednosti morajo biti v SLOVENŠČINI, tudi če je nalepka v angleščini!
-''';
-
-      final content = [
-        Content.multi([TextPart(prompt), DataPart('image/jpeg', imageBytes)]),
-      ];
-
-      final response = await _model.generateContent(content);
-      final responseText = response.text;
-
-      if (responseText == null || responseText.isEmpty) {
-        return MedicationExtractionResult();
-      }
-
-      // Try to parse JSON from response
-      final jsonStart = responseText.indexOf('{');
-      final jsonEnd = responseText.lastIndexOf('}');
-
-      if (jsonStart == -1 || jsonEnd == -1) {
+      if (response.statusCode != 200) {
         return MedicationExtractionResult(
           notes:
-              'Could not extract structured data. Raw response: \$responseText',
+              'API napaka (${response.statusCode}): ${response.body}',
         );
       }
 
-      final jsonStr = responseText.substring(jsonStart, jsonEnd + 1);
-
-      try {
-        final Map<String, dynamic> jsonData = json.decode(jsonStr);
-        return MedicationExtractionResult.fromJson(jsonData);
-      } catch (e) {
-        // Fallback to simple parsing if JSON decode fails
-        return _parseSimpleJson(jsonStr);
-      }
+      final Map<String, dynamic> data = json.decode(response.body);
+      return MedicationExtractionResult.fromJson(data);
     } catch (e) {
       return MedicationExtractionResult(
-        notes: 'Error extracting medication info: \$e',
+        notes: 'Napaka pri klicu API-ja: $e',
       );
     }
-  }
-
-  /// Fallback simple JSON parsing
-  MedicationExtractionResult _parseSimpleJson(String jsonStr) {
-    final Map<String, dynamic> jsonData = {};
-
-    final lines = jsonStr.split('\n');
-    for (var line in lines) {
-      line = line.trim();
-      if (line.contains(':')) {
-        final colonIndex = line.indexOf(':');
-        var key = line
-            .substring(0, colonIndex)
-            .replaceAll('"', '')
-            .replaceAll('{', '')
-            .trim();
-        var value = line
-            .substring(colonIndex + 1)
-            .replaceAll('"', '')
-            .replaceAll(',', '')
-            .replaceAll('}', '')
-            .trim();
-
-        if (value.toLowerCase() == 'null' || value.isEmpty) {
-          continue;
-        }
-
-        // Try to parse as number
-        final intVal = int.tryParse(value);
-        if (intVal != null) {
-          jsonData[key] = intVal;
-        } else if (value == 'true') {
-          jsonData[key] = true;
-        } else if (value == 'false') {
-          jsonData[key] = false;
-        } else if (key.isNotEmpty) {
-          jsonData[key] = value;
-        }
-      }
-    }
-
-    return MedicationExtractionResult.fromJson(jsonData);
   }
 }

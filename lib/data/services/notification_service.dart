@@ -104,20 +104,36 @@ class NotificationService {
         >();
 
     if (androidPlugin != null) {
-      // Request notification permission
-      final granted = await androidPlugin.requestNotificationsPermission();
-      developer.log(
-        'Notification permission granted: $granted',
-        name: 'NotificationService',
-      );
+      // AlarmPermissions (in lib/services/permission.dart) also requests these
+      // from the dashboard screen. If both run concurrently Android throws
+      // `permissionRequestInProgress` — swallow that case so it can't crash
+      // app startup.
+      try {
+        final granted = await androidPlugin.requestNotificationsPermission();
+        developer.log(
+          'Notification permission granted: $granted',
+          name: 'NotificationService',
+        );
+      } catch (e) {
+        developer.log(
+          'Notification permission request skipped: $e',
+          name: 'NotificationService',
+        );
+      }
 
-      // Request exact alarm permission for Android 12+
-      final exactAlarmGranted = await androidPlugin
-          .requestExactAlarmsPermission();
-      developer.log(
-        'Exact alarm permission granted: $exactAlarmGranted',
-        name: 'NotificationService',
-      );
+      try {
+        final exactAlarmGranted = await androidPlugin
+            .requestExactAlarmsPermission();
+        developer.log(
+          'Exact alarm permission granted: $exactAlarmGranted',
+          name: 'NotificationService',
+        );
+      } catch (e) {
+        developer.log(
+          'Exact alarm permission request skipped: $e',
+          name: 'NotificationService',
+        );
+      }
     }
 
     final iosPlugin = _notifications
@@ -126,7 +142,18 @@ class NotificationService {
         >();
 
     if (iosPlugin != null) {
-      await iosPlugin.requestPermissions(alert: true, badge: true, sound: true);
+      try {
+        await iosPlugin.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      } catch (e) {
+        developer.log(
+          'iOS permission request skipped: $e',
+          name: 'NotificationService',
+        );
+      }
     }
   }
 

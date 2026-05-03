@@ -52,9 +52,21 @@ class AlarmService {
   StreamSubscription<AlarmSet>? _updateSubscription;
   int? _currentAlarmId; // Track currently shown alarm to prevent duplicates
 
-  /// Maximum time (in minutes) after scheduled time that an alarm should still ring
-  /// After this, the alarm is considered "too late" and will be silently stopped
-  static const int _maxLateMinutes = 45;
+  /// Maximum time (in minutes) after scheduled time that an alarm should still ring.
+  /// After this, the alarm is considered backlog (e.g. it fired while the
+  /// device was asleep / app was killed) and is silently stopped instead of
+  /// surprising the user with a stale reminder.
+  ///
+  /// Keep this small — an alarm "from 30 min ago" should not jolt the user
+  /// when they pick up their phone. Two minutes is enough headroom for normal
+  /// processing latency without letting genuine backlog through.
+  static const int _maxLateMinutes = 2;
+
+  /// Cap how long we'll wait for the navigator to be ready before giving up.
+  /// Long enough to outlast a slow cold start (DB query for onboarding state,
+  /// theme provider hydration, etc.) but bounded so we don't leak forever.
+  static const Duration _maxNavigatorWait = Duration(seconds: 30);
+  static const Duration _navigatorPollInterval = Duration(milliseconds: 200);
 
   /// Initialize alarm listeners - call this once at app startup
   void initialize() {
@@ -84,27 +96,47 @@ class AlarmService {
       }
 
       // Alarm is within grace period, try to show it (with retries for cold-start)
-      await _showAlarmWithRetry(alarm, retries: 10);
+      await _showAlarmWithRetry(alarm);
       break; // Only show one alarm at a time
     }
   }
 
-  Future<void> _showAlarmWithRetry(
-    AlarmSettings alarm, {
-    int retries = 10,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    final context = _navigatorKey.currentContext;
-    if (context != null && _currentAlarmId != alarm.id) {
-      _currentAlarmId = alarm.id;
-      final route = AppointmentService.isAppointmentAlarm(alarm.id)
-          ? '/appointment-ring'
-          : '/ring';
-      context.push(route, extra: alarm);
-    } else if (retries > 0 && _currentAlarmId != alarm.id) {
-      // Router might not be ready yet on cold start, retry
-      await Future.delayed(const Duration(milliseconds: 300));
-      await _showAlarmWithRetry(alarm, retries: retries - 1);
+  /// Push the alarm screen as soon as the navigator is ready.
+  ///
+  /// On cold start the rootNavigatorKey is attached to MaterialApp.router,
+  /// which only mounts after onboardingStatusProvider resolves — that DB
+  /// query can outlast a small fixed retry budget on slow devices, leaving
+  /// the user with a black screen. We instead poll until either:
+  ///   - the navigator becomes ready (push and bail), or
+  ///   - the alarm stops ringing (no point showing it), or
+  ///   - we exceed _maxNavigatorWait (give up).
+  Future<void> _showAlarmWithRetry(AlarmSettings alarm) async {
+    if (_currentAlarmId == alarm.id) return;
+
+    final deadline = DateTime.now().add(_maxNavigatorWait);
+
+    while (DateTime.now().isBefore(deadline)) {
+      // Bail if the alarm stopped ringing while we waited.
+      final stillRinging = Alarm.ringing.value.alarms.any((a) => a.id == alarm.id);
+      if (!stillRinging) return;
+
+      final context = _navigatorKey.currentContext;
+      if (context != null) {
+        final route = AppointmentService.isAppointmentAlarm(alarm.id)
+            ? '/appointment-ring'
+            : '/ring';
+        try {
+          // Context is fetched fresh on every iteration; no async gap before use.
+          // ignore: use_build_context_synchronously
+          context.push(route, extra: alarm);
+          _currentAlarmId = alarm.id;
+          return;
+        } catch (_) {
+          // Router not yet wired up to this context — keep polling.
+        }
+      }
+
+      await Future.delayed(_navigatorPollInterval);
     }
   }
 
@@ -125,14 +157,11 @@ class AlarmService {
       return;
     }
 
-    final context = _navigatorKey.currentContext;
-    if (context != null && _currentAlarmId != alarm.id) {
-      _currentAlarmId = alarm.id;
-      final route = AppointmentService.isAppointmentAlarm(alarm.id)
-          ? '/appointment-ring'
-          : '/ring';
-      context.push(route, extra: alarm);
-    }
+    if (_currentAlarmId == alarm.id) return;
+
+    // Use the same retry loop as cold-start: navigator may not be ready yet
+    // (e.g. listener fires before MaterialApp.router has mounted).
+    _showAlarmWithRetry(alarm);
   }
 
   /// Handle when the alarm schedule is updated
