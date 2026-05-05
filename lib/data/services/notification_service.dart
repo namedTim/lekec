@@ -219,12 +219,28 @@ class NotificationService {
           '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
     }
 
+    // Only include user name when multiple active users exist
+    String? userName;
+    if (plan != null) {
+      final allUsers = await (db.select(db.users)
+            ..where((u) => u.isActive.equals(true)))
+          .get();
+      if (allUsers.length > 1) {
+        final user = allUsers.firstWhere(
+          (u) => u.id == plan.userId,
+          orElse: () => allUsers.first,
+        );
+        userName = user.name;
+      }
+    }
+
     return {
       'intakeId': intake.id,
       'medicationName': medication.name,
       'dosage': dosageText,
       'scheduledTime': intake.scheduledTime,
       'medicationId': medication.id,
+      'userName': userName,
     };
   }
 

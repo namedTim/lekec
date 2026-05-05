@@ -24,6 +24,7 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.lekec/lockscreen');
   Appointment? _appointment;
+  String? _userName;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   Timer? _autoStopTimer;
@@ -70,9 +71,25 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     try {
       final service = AppointmentService(db);
       final appt = await service.getAppointment(appointmentId);
+
+      String? userName;
+      if (appt != null) {
+        final allUsers = await (db.select(db.users)
+              ..where((u) => u.isActive.equals(true)))
+            .get();
+        if (allUsers.length > 1) {
+          final user = allUsers.firstWhere(
+            (u) => u.id == appt.userId,
+            orElse: () => allUsers.first,
+          );
+          userName = user.name;
+        }
+      }
+
       if (mounted) {
         setState(() {
           _appointment = appt;
+          _userName = userName;
         });
       }
     } catch (_) {
@@ -109,6 +126,7 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     final title = _appointment?.title ?? 'Termin';
     final note = _appointment?.note;
     final appointmentTime = _appointment?.appointmentTime ?? DateTime.now();
+    final userName = _userName;
 
     return PopScope(
       canPop: false,
@@ -257,6 +275,47 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
                                   color: colors.onPrimary.withOpacity(0.9),
                                 ),
                                 textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+
+                          // User name pill
+                          if (userName != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.onPrimary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Symbols.person,
+                                    color: colors.onPrimary,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  RichText(
+                                    text: TextSpan(
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: colors.onPrimary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      children: [
+                                        const TextSpan(text: 'Termin za '),
+                                        TextSpan(
+                                          text: userName,
+                                          style: const TextStyle(fontWeight: FontWeight.w800),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

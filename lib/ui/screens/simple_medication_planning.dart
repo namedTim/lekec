@@ -49,7 +49,7 @@ class _SimpleMedicationPlanningScreenState
   int _initialQuantity = 0;
   bool _isSaving = false;
   bool _isTimeAiSuggested = false;
-  bool _criticalReminder = false;
+  bool _criticalReminder = true;
 
   @override
   void initState() {

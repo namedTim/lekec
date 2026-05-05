@@ -203,6 +203,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
 
     final medicationName = _medicationDetails?['medicationName'] ?? 'Zdravilo';
     final dosage = _medicationDetails?['dosage'] ?? '';
+    final userName = _medicationDetails?['userName'] as String?;
 
     return PopScope(
       canPop: false,
@@ -228,13 +229,13 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                       Text(
                         'OPOMNIK ZA ZDRAVILO',
                         style: theme.textTheme.titleSmall?.copyWith(
-                          color: colors.onError,
+                          color: Colors.white,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.2,
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Symbols.close, color: colors.onError),
+                        icon: const Icon(Symbols.close, color: Colors.white),
                         onPressed: _stopAlarm,
                       ),
                     ],
@@ -333,6 +334,47 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                                 ],
                               ),
                             ),
+
+                          // User name pill
+                          if (userName != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.onError.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Symbols.person,
+                                    color: colors.onError,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  RichText(
+                                    text: TextSpan(
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: colors.onError,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      children: [
+                                        const TextSpan(text: 'Zdravilo vzame '),
+                                        TextSpan(
+                                          text: userName,
+                                          style: const TextStyle(fontWeight: FontWeight.w800),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -386,9 +428,9 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                               child: OutlinedButton(
                                 onPressed: _snoozeAlarm,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: colors.onError,
-                                  side: BorderSide(
-                                    color: colors.onError.withOpacity(0.5),
+                                  foregroundColor: Colors.white,
+                                  side: const BorderSide(
+                                    color: Colors.white54,
                                     width: 2,
                                   ),
                                   shape: RoundedRectangleBorder(
@@ -398,13 +440,13 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Symbols.snooze, size: 20),
+                                    const Icon(Symbols.snooze, size: 20),
                                     const SizedBox(height: 2),
                                     Text(
                                       'Čez 10 min',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                            color: colors.onError,
+                                            color: Colors.white,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
@@ -422,9 +464,9 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                               child: OutlinedButton(
                                 onPressed: _dismissAlarm,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: colors.onError,
-                                  side: BorderSide(
-                                    color: colors.onError.withOpacity(0.5),
+                                  foregroundColor: Colors.white,
+                                  side: const BorderSide(
+                                    color: Colors.white54,
                                     width: 2,
                                   ),
                                   shape: RoundedRectangleBorder(
@@ -434,13 +476,13 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Symbols.close, size: 20),
+                                    const Icon(Symbols.close, size: 20),
                                     const SizedBox(height: 2),
                                     Text(
                                       'Opusti',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                            color: colors.onError,
+                                            color: Colors.white,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
