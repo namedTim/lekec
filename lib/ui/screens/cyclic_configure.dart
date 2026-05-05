@@ -39,7 +39,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
   int _initialQuantity = 0;
   double _dosageAmount = 1;
   bool _isSaving = false;
-  bool _criticalReminder = false;
+  bool _criticalReminder = true;
 
   @override
   Widget build(BuildContext context) {

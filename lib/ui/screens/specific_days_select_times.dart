@@ -38,7 +38,7 @@ class _SpecificDaysSelectTimesScreenState
   int _initialQuantity = 0;
   double _dosageAmount = 1;
   bool _isSaving = false;
-  bool _criticalReminder = false;
+  bool _criticalReminder = true;
 
   final List<String> _dayNames = [
     'Ponedeljek',

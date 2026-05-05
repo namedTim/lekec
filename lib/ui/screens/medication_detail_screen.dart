@@ -480,10 +480,24 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                 _DetailCard(
                   icon: Symbols.medication,
                   title: 'Ime zdravila',
-                  child: Text(
-                    widget.medicationName,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        widget.medicationName,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colors.onPrimaryContainer,
+                        ),
+                      ),
                     ),
                   ),
                 ),
