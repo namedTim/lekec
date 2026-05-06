@@ -352,7 +352,7 @@ class _MultipleTimesSelectTimesScreenState
                     context,
                     initialValue: _dosageAmount,
                     minValue: 1,
-                    maxValue: 99,
+                    maxValue: 9999,
                     label: 'Količina na vnos',
                   );
                   if (quantity != null) {
@@ -408,7 +408,7 @@ class _MultipleTimesSelectTimesScreenState
                     context,
                     initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
                     minValue: 0,
-                    maxValue: 999,
+                    maxValue: 99999,
                     step: 1,
                     label: 'Začetna zaloga',
                   );

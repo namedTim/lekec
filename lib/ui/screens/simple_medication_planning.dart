@@ -150,7 +150,7 @@ class _SimpleMedicationPlanningScreenState
       context,
       initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
       minValue: 0,
-      maxValue: 999,
+      maxValue: 99999,
       step: 1,
       label: 'Začetna zaloga',
     );

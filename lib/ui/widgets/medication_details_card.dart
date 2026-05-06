@@ -69,7 +69,7 @@ class MedicationDetailsCard extends StatelessWidget {
       context,
       initialValue: 1,
       minValue: -pillsRemaining.toDouble(),
-      maxValue: 999,
+      maxValue: 99999,
       step: 1,
       label: 'Število ${getMedicationUnitShort(medType, 5)}',
     );

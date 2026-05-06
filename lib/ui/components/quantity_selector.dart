@@ -166,11 +166,17 @@ class _QuantitySelectorState extends State<QuantitySelector> {
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  _formatQuantity(_value),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colors.primary,
+                // FittedBox keeps long values (e.g. "9999") inside the
+                // 60-wide box by scaling them down, so the +/- buttons
+                // never get pushed out of the dialog.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _formatQuantity(_value),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colors.primary,
+                    ),
                   ),
                 ),
               ),

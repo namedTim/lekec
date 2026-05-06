@@ -40,7 +40,7 @@ class _AddSingleEntryQuantityScreenState
     super.initState();
     _textController.addListener(() {
       final value = int.tryParse(_textController.text);
-      if (value != null && value >= 1 && value <= 99) {
+      if (value != null && value >= 1 && value <= 9999) {
         setState(() => _quantity = value);
       }
     });
@@ -54,7 +54,7 @@ class _AddSingleEntryQuantityScreenState
   }
 
   void _increment() {
-    if (_quantity < 99) {
+    if (_quantity < 999999) {
       setState(() {
         _quantity++;
         _textController.text = _quantity.toString();
@@ -192,7 +192,7 @@ class _AddSingleEntryQuantityScreenState
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(2),
+                          LengthLimitingTextInputFormatter(4),
                         ],
                         style: theme.textTheme.displayMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -206,8 +206,8 @@ class _AddSingleEntryQuantityScreenState
                           final parsed = int.tryParse(value);
                           if (parsed == null || parsed < 1) {
                             _textController.text = '1';
-                          } else if (parsed > 99) {
-                            _textController.text = '99';
+                          } else if (parsed > 9999) {
+                            _textController.text = '9999';
                           }
                           _focusNode.unfocus();
                         },
@@ -218,15 +218,15 @@ class _AddSingleEntryQuantityScreenState
                     // Increment button
                     Container(
                       decoration: BoxDecoration(
-                        color: _quantity < 99
+                        color: _quantity < 9999
                             ? colors.primary
                             : colors.surfaceContainerHigh,
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        onPressed: _quantity < 99 ? _increment : null,
+                        onPressed: _quantity < 9999 ? _increment : null,
                         icon: const Icon(Symbols.add),
-                        color: _quantity < 99
+                        color: _quantity < 9999
                             ? colors.onPrimary
                             : colors.onSurfaceVariant,
                         iconSize: 28,

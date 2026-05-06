@@ -124,7 +124,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
       context,
       initialValue: _dosageAmount,
       minValue: 0.5,
-      maxValue: 99,
+      maxValue: 9999,
       label: 'Odmerek (${getMedicationUnitShort(widget.medType, 2)})',
     );
     if (quantity != null && mounted) {
