@@ -26,9 +26,9 @@ class _ExampleAlarmHomeScreenState extends ConsumerState<ExampleAlarmHomeScreen>
   @override
   void initState() {
     super.initState();
-    AlarmPermissions.checkNotificationPermission().then(
-      (_) => AlarmPermissions.checkAndroidScheduleExactAlarmPermission(),
-    );
+    AlarmPermissions.checkNotificationPermission()
+        .then((_) => AlarmPermissions.checkAndroidScheduleExactAlarmPermission())
+        .then((_) => AlarmPermissions.checkIgnoreBatteryOptimizations());
     notifications = Notifications();
   }
 

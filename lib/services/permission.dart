@@ -39,4 +39,25 @@ class AlarmPermissions {
       );
     }
   }
+
+  /// Asks the OS to whitelist the app from battery optimisation / Doze.
+  /// Without this, OEMs (Samsung, Xiaomi, Huawei, Oppo, OnePlus) frequently
+  /// drop scheduled alarms after a reboot or kill the app's BootReceiver
+  /// before it can reschedule them.
+  ///
+  /// This handles the standard Android side. It does NOT cover OEM-specific
+  /// "autostart" toggles (e.g. MIUI Security → Autostart) — those have no
+  /// public API and the user has to enable them manually.
+  static Future<void> checkIgnoreBatteryOptimizations() async {
+    if (!Alarm.android) return;
+    final status = await Permission.ignoreBatteryOptimizations.status;
+    _log.info('Ignore battery optimizations: $status.');
+    if (status.isDenied) {
+      _log.info('Requesting ignore battery optimizations…');
+      final res = await Permission.ignoreBatteryOptimizations.request();
+      _log.info(
+        'Ignore battery optimizations ${res.isGranted ? '' : 'not '}granted',
+      );
+    }
+  }
 }
