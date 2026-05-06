@@ -198,7 +198,7 @@ class AppointmentService {
       channelDescription: 'Opomniki za prihajajoče termine',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
     );

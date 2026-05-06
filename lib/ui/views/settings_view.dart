@@ -12,6 +12,7 @@ import '../../features/core/providers/theme_provider.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
 import '../screens/terms_of_service_screen.dart';
+import '../screens/tip_screen.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
@@ -468,6 +469,17 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         ),
 
         const SizedBox(height: 24),
+        ListTile(
+          leading: Icon(Symbols.favorite, color: colors.primary, fill: 1),
+          title: const Text('Podpri razvoj'),
+          subtitle: const Text('Neobvezen prispevek prek Google Play'),
+          trailing: const Icon(Symbols.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TipScreen()),
+            );
+          },
+        ),
         ListTile(
           leading: const Icon(Symbols.description),
           title: const Text('Pogoji uporabe'),

@@ -41,7 +41,7 @@ class Notifications {
             ),
           ],
         ),
-        android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: const AndroidInitializationSettings('@mipmap/launcher_icon'),
       ),
       onDidReceiveNotificationResponse: notificationTapForeground,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,

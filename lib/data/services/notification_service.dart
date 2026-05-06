@@ -69,7 +69,7 @@ class NotificationService {
     }
 
     const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
+      '@mipmap/launcher_icon',
     );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -341,7 +341,7 @@ class NotificationService {
       channelDescription: 'Opomniki za jemanje zdravil',
       importance: Importance.max,
       priority: Priority.max,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
     );
@@ -549,7 +549,7 @@ class NotificationService {
       channelDescription: 'Opomniki za jemanje zdravil',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
     );
@@ -609,7 +609,7 @@ class NotificationService {
       channelDescription: 'Opomniki za jemanje zdravil',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
       ticker: 'Test notification',
@@ -687,7 +687,7 @@ class NotificationService {
       channelDescription: 'Opomniki za jemanje zdravil',
       importance: Importance.max,
       priority: Priority.max,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
       ticker: 'Test after 30 seconds',
@@ -805,7 +805,7 @@ class NotificationService {
         channelDescription: 'Opomniki za jemanje zdravil',
         importance: Importance.max,
         priority: Priority.max,
-        icon: '@mipmap/ic_launcher',
+        icon: '@mipmap/launcher_icon',
         playSound: true,
         enableVibration: true,
       );
@@ -930,7 +930,7 @@ class NotificationService {
       channelDescription: 'Opomniki za jemanje zdravil',
       importance: Importance.max,
       priority: Priority.max,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
       ticker: 'Test medication reminder',

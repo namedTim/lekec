@@ -1,4 +1,4 @@
-package com.gdelataillade.alarm.lekec
+package si.lekec.app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

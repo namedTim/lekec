@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace 'com.gdelataillade.alarm.lekec'
+    namespace 'si.lekec.app'
 
     compileSdkVersion 36
     ndkVersion "27.0.12077973"
@@ -45,7 +45,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.gdelataillade.alarm.lekec"
+        applicationId "si.lekec.app"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
