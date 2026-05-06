@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration {
@@ -111,6 +111,10 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             "UPDATE app_settings SET appointment_sound = '8bit_arcade.mp3' WHERE appointment_sound = 'nokia.mp3'",
           );
+        }
+        if (from < 16) {
+          // Per-appointment custom alarm offset (was hardcoded 2h before)
+          await m.addColumn(appointments, appointments.reminderMinutesBefore);
         }
       },
     );

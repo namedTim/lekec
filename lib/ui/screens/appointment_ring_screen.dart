@@ -118,6 +118,54 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     return '${dt.day}. ${dt.month}. ${dt.year}';
   }
 
+  /// "Čez X" badge text — computed from now → appointment time.
+  /// Falls back to "Termin" if the appointment hasn't loaded yet.
+  String _untilText(DateTime appt) {
+    final diff = appt.difference(DateTime.now());
+    if (diff.isNegative) return 'Zdaj';
+    final mins = diff.inMinutes;
+    if (mins < 60) {
+      return 'Čez $mins ${_minsWord(mins)}';
+    }
+    if (mins < 1440 && mins % 60 == 0) {
+      final h = mins ~/ 60;
+      return 'Čez $h ${_hoursWord(h)}';
+    }
+    if (mins < 1440) {
+      final h = mins ~/ 60;
+      final m = mins % 60;
+      return 'Čez $h ${_hoursWord(h)} $m ${_minsWord(m)}';
+    }
+    final hours = mins ~/ 60;
+    if (hours % 24 == 0) {
+      final d = hours ~/ 24;
+      return 'Čez $d ${_daysWord(d)}';
+    }
+    final h = hours;
+    return 'Čez $h ${_hoursWord(h)}';
+  }
+
+  String _minsWord(int n) {
+    if (n == 1) return 'minuto';
+    if (n == 2) return 'minuti';
+    if (n == 3 || n == 4) return 'minute';
+    return 'minut';
+  }
+
+  String _hoursWord(int n) {
+    if (n == 1) return 'uro';
+    if (n == 2) return 'uri';
+    if (n == 3 || n == 4) return 'ure';
+    return 'ur';
+  }
+
+  String _daysWord(int n) {
+    if (n == 1) return 'dan';
+    if (n == 2) return 'dneva';
+    if (n == 3 || n == 4) return 'dni';
+    return 'dni';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -193,7 +241,8 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
 
                           const SizedBox(height: 40),
 
-                          // "Čez 2 uri" badge
+                          // Dynamic "Čez X" badge — computed from the
+                          // appointment time, not the (now removed) static 2h.
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
@@ -204,7 +253,9 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              'Čez 2 uri',
+                              _appointment != null
+                                  ? _untilText(appointmentTime)
+                                  : 'Termin',
                               style: theme.textTheme.titleLarge?.copyWith(
                                 color: colors.onPrimary,
                                 fontWeight: FontWeight.w700,

@@ -35,6 +35,7 @@ class AppointmentService {
     String? note,
     required DateTime appointmentTime,
     bool criticalReminder = false,
+    int reminderMinutesBefore = 120,
   }) async {
     final id = await db.into(db.appointments).insert(
       AppointmentsCompanion(
@@ -43,15 +44,23 @@ class AppointmentService {
         note: Value(note),
         appointmentTime: Value(appointmentTime),
         criticalReminder: Value(criticalReminder),
+        reminderMinutesBefore: Value(reminderMinutesBefore),
       ),
     );
 
     developer.log(
-      'Created appointment $id: "$title" at $appointmentTime (critical: $criticalReminder)',
+      'Created appointment $id: "$title" at $appointmentTime '
+      '(critical: $criticalReminder, reminder: ${reminderMinutesBefore}m before)',
       name: 'AppointmentService',
     );
 
-    await _scheduleNotifications(id, title, appointmentTime, criticalReminder);
+    await _scheduleNotifications(
+      id,
+      title,
+      appointmentTime,
+      criticalReminder,
+      reminderMinutesBefore,
+    );
     return id;
   }
 
@@ -62,6 +71,7 @@ class AppointmentService {
     String? note,
     required DateTime appointmentTime,
     bool criticalReminder = false,
+    int reminderMinutesBefore = 120,
   }) async {
     await (db.update(db.appointments)..where((t) => t.id.equals(id))).write(
       AppointmentsCompanion(
@@ -69,17 +79,25 @@ class AppointmentService {
         note: Value(note),
         appointmentTime: Value(appointmentTime),
         criticalReminder: Value(criticalReminder),
+        reminderMinutesBefore: Value(reminderMinutesBefore),
       ),
     );
 
     developer.log(
-      'Updated appointment $id: "$title" at $appointmentTime (critical: $criticalReminder)',
+      'Updated appointment $id: "$title" at $appointmentTime '
+      '(critical: $criticalReminder, reminder: ${reminderMinutesBefore}m before)',
       name: 'AppointmentService',
     );
 
     // Cancel old notifications and schedule new ones
     await _cancelNotifications(id);
-    await _scheduleNotifications(id, title, appointmentTime, criticalReminder);
+    await _scheduleNotifications(
+      id,
+      title,
+      appointmentTime,
+      criticalReminder,
+      reminderMinutesBefore,
+    );
   }
 
   /// Delete an appointment and cancel its notifications.
@@ -122,14 +140,18 @@ class AppointmentService {
 
   /// Schedules two notifications for an appointment:
   ///   1. A regular push notification **1 day before**.
-  ///   2. A full-screen alarm **2 hours before**. When [criticalReminder] is
-  ///      true the alarm uses the critical alarm settings (sound + vibration);
-  ///      otherwise it is silent.
+  ///   2. A full-screen alarm **[reminderMinutesBefore] minutes before**.
+  ///      When [criticalReminder] is true the alarm uses the critical alarm
+  ///      settings (sound + vibration); otherwise it is silent.
+  ///
+  /// If [reminderMinutesBefore] is ≥ 1440 (24h) the second alarm is suppressed
+  /// to avoid colliding with the day-before push notification.
   Future<void> _scheduleNotifications(
     int appointmentId,
     String title,
     DateTime appointmentTime,
     bool criticalReminder,
+    int reminderMinutesBefore,
   ) async {
     final now = DateTime.now();
 
@@ -145,15 +167,17 @@ class AppointmentService {
       );
     }
 
-    // --- 2 hours before: full-screen alarm ---
-    final twoHoursBefore = appointmentTime.subtract(const Duration(hours: 2));
-    if (twoHoursBefore.isAfter(now)) {
+    // --- [reminderMinutesBefore] before: full-screen alarm ---
+    final alarmTime =
+        appointmentTime.subtract(Duration(minutes: reminderMinutesBefore));
+    if (alarmTime.isAfter(now) && reminderMinutesBefore < 1440) {
       await _scheduleFullScreenAlarm(
         appointmentId: appointmentId,
         title: title,
         appointmentTime: appointmentTime,
-        scheduledTime: twoHoursBefore,
+        scheduledTime: alarmTime,
         criticalReminder: criticalReminder,
+        reminderMinutesBefore: reminderMinutesBefore,
       );
     }
   }
@@ -222,6 +246,7 @@ class AppointmentService {
     required DateTime appointmentTime,
     required DateTime scheduledTime,
     required bool criticalReminder,
+    required int reminderMinutesBefore,
   }) async {
     final alarmId = notifIdOffset + appointmentId * 2 + 1;
 
@@ -249,9 +274,9 @@ class AppointmentService {
       warningNotificationOnKill: false,
       volumeSettings: VolumeSettings.fixed(volume: volume),
       notificationSettings: NotificationSettings(
-        title: 'Termin čez 2 uri: $title',
+        title: 'Termin ${formatRelativeOffset(reminderMinutesBefore)}: $title',
         body: _formatBody(appointmentTime),
-        stopButton: 'Opusti',
+        stopButton: 'Ustavi alarm',
         icon: 'notification_icon',
       ),
     );
@@ -297,7 +322,13 @@ class AppointmentService {
     final upcoming = await getUpcomingAppointments();
     for (final appt in upcoming) {
       await _cancelNotifications(appt.id);
-      await _scheduleNotifications(appt.id, appt.title, appt.appointmentTime, appt.criticalReminder);
+      await _scheduleNotifications(
+        appt.id,
+        appt.title,
+        appt.appointmentTime,
+        appt.criticalReminder,
+        appt.reminderMinutesBefore,
+      );
     }
     developer.log(
       'Rescheduled notifications for ${upcoming.length} appointments',
@@ -316,4 +347,44 @@ class AppointmentService {
     final minute = dt.minute.toString().padLeft(2, '0');
     return '$day.$month.${dt.year} ob $hour:$minute';
   }
+}
+
+/// Slovenian "čez X" / "X prej" phrase for the alarm offset.
+/// E.g., 30 → "čez 30 minut", 120 → "čez 2 uri", 1440 → "čez 1 dan".
+String formatRelativeOffset(int minutes) {
+  if (minutes < 60) {
+    return 'čez $minutes ${_minutesWord(minutes)}';
+  }
+  if (minutes % 60 == 0) {
+    final hours = minutes ~/ 60;
+    if (hours >= 24 && hours % 24 == 0) {
+      final days = hours ~/ 24;
+      return 'čez $days ${_daysWord(days)}';
+    }
+    return 'čez $hours ${_hoursWord(hours)}';
+  }
+  final hours = minutes ~/ 60;
+  final mins = minutes % 60;
+  return 'čez $hours ${_hoursWord(hours)} $mins ${_minutesWord(mins)}';
+}
+
+String _minutesWord(int n) {
+  if (n == 1) return 'minuto';
+  if (n == 2) return 'minuti';
+  if (n == 3 || n == 4) return 'minute';
+  return 'minut';
+}
+
+String _hoursWord(int n) {
+  if (n == 1) return 'uro';
+  if (n == 2) return 'uri';
+  if (n == 3 || n == 4) return 'ure';
+  return 'ur';
+}
+
+String _daysWord(int n) {
+  if (n == 1) return 'dan';
+  if (n == 2) return 'dneva';
+  if (n == 3 || n == 4) return 'dni';
+  return 'dni';
 }

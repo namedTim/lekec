@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -33,6 +34,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   bool _criticalReminder = false;
   bool _isSaving = false;
 
+  /// Minutes before the appointment when the full-screen alarm should ring.
+  int _reminderMinutesBefore = 120;
+
   bool get _isEditing => widget.existingAppointment != null;
 
   @override
@@ -43,6 +47,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       _titleController.text = appt.title;
       _noteController.text = appt.note ?? '';
       _criticalReminder = appt.criticalReminder;
+      _reminderMinutesBefore = appt.reminderMinutesBefore;
       _selectedDate = DateTime(
         appt.appointmentTime.year,
         appt.appointmentTime.month,
@@ -133,6 +138,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           note: note.isEmpty ? null : note,
           appointmentTime: appointmentTime,
           criticalReminder: _criticalReminder,
+          reminderMinutesBefore: _reminderMinutesBefore,
         );
       } else {
         await service.createAppointment(
@@ -141,6 +147,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           note: note.isEmpty ? null : note,
           appointmentTime: appointmentTime,
           criticalReminder: _criticalReminder,
+          reminderMinutesBefore: _reminderMinutesBefore,
         );
       }
 
@@ -208,6 +215,107 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     }
   }
 
+  /// Compact digit-style label, e.g. "2h", "1h 30min", "45min".
+  String _offsetLabel() {
+    final m = _reminderMinutesBefore;
+    if (m <= 0) return '0min';
+    final h = m ~/ 60;
+    final min = m % 60;
+    if (h == 0) return '${min}min';
+    if (min == 0) return '${h}h';
+    return '${h}h ${min}min';
+  }
+
+  /// "DD.MM.YYYY ob HH:MM" — when the full-screen alarm will ring.
+  /// Null until both date and time have been picked.
+  String? _ringDateTimeStr() {
+    if (_selectedDate == null || _selectedTime == null) return null;
+    final appt = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+    final ring = appt.subtract(Duration(minutes: _reminderMinutesBefore));
+    final dd = ring.day.toString().padLeft(2, '0');
+    final mm = ring.month.toString().padLeft(2, '0');
+    final hh = ring.hour.toString().padLeft(2, '0');
+    final mn = ring.minute.toString().padLeft(2, '0');
+    return '$dd.$mm.${ring.year} ob $hh:$mn';
+  }
+
+  /// Wheel duration picker (hours + minutes). Returns the chosen offset
+  /// in minutes; null if the user cancels.
+  Future<void> _pickOffset() async {
+    _titleFocusNode.unfocus();
+    FocusScope.of(context).unfocus();
+
+    int draft = _reminderMinutesBefore;
+
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final colors = theme.colorScheme;
+        return SafeArea(
+          child: SizedBox(
+            height: 320,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  child: Text(
+                    'Koliko prej naj zazvoni alarm',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: CupertinoTimerPicker(
+                    mode: CupertinoTimerPickerMode.hm,
+                    initialTimerDuration: Duration(minutes: draft),
+                    minuteInterval: 1,
+                    onTimerDurationChanged: (d) => draft = d.inMinutes,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Prekliči'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(draft),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.primary,
+                          ),
+                          child: const Text('Potrdi'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected != null && selected > 0) {
+      setState(() => _reminderMinutesBefore = selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -219,6 +327,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     final timeStr = _selectedTime != null
         ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
         : 'Izberite čas';
+    final ringStr = _ringDateTimeStr();
 
     return Scaffold(
       appBar: AppBar(
@@ -284,41 +393,31 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
               colors: colors,
               theme: theme,
             ),
-            const SizedBox(height: 12),
-
-            // Info box
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colors.secondaryContainer.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colors.outlineVariant.withOpacity(0.5),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Symbols.notifications_active,
-                      color: colors.secondary, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Prejeli boste opomnik 1 dan prej in 2 uri pred terminom.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurface,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 16),
 
             // Critical Reminder
             CriticalReminderRecap(
               enabled: _criticalReminder,
               onChanged: (value) => setState(() => _criticalReminder = value),
+            ),
+            const SizedBox(height: 12),
+
+            // Reminder offset picker
+            _PickerCard(
+              icon: Symbols.alarm,
+              label: 'Alarm pred terminom',
+              value: _offsetLabel(),
+              onTap: _pickOffset,
+              colors: colors,
+              theme: theme,
+            ),
+            const SizedBox(height: 12),
+
+            // Info box — shows when notifications will fire.
+            _ReminderInfoBox(
+              ringStr: ringStr,
+              colors: colors,
+              theme: theme,
             ),
             const SizedBox(height: 32),
 
@@ -435,6 +534,89 @@ class _PickerCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Info box that summarises the two reminder events.
+/// Shows a placeholder with muted style when date/time aren't picked yet.
+class _ReminderInfoBox extends StatelessWidget {
+  const _ReminderInfoBox({
+    required this.ringStr,
+    required this.colors,
+    required this.theme,
+  });
+
+  final String? ringStr;
+  final ColorScheme colors;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = ringStr != null;
+    final headerStyle = theme.textTheme.labelLarge?.copyWith(
+      color: colors.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+    );
+    final lineStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: hasData ? colors.onSurface : colors.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+      fontStyle: hasData ? FontStyle.normal : FontStyle.italic,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.secondaryContainer.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Symbols.notifications_active, color: colors.secondary, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('OPOMNIKI', style: headerStyle),
+                const SizedBox(height: 8),
+                _line(
+                  Symbols.schedule,
+                  hasData
+                      ? 'Tihi opomnik: 1 dan prej'
+                      : 'Tihi opomnik 1 dan prej',
+                  lineStyle,
+                ),
+                const SizedBox(height: 4),
+                _line(
+                  Symbols.alarm,
+                  hasData
+                      ? 'Alarm: $ringStr'
+                      : 'Alarm — izberite datum in uro termina',
+                  lineStyle,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _line(IconData icon, String text, TextStyle? style) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: colors.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: style)),
+      ],
     );
   }
 }

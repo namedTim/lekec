@@ -4521,6 +4521,17 @@ class $AppointmentsTable extends Appointments
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _reminderMinutesBeforeMeta =
+      const VerificationMeta('reminderMinutesBefore');
+  @override
+  late final GeneratedColumn<int> reminderMinutesBefore = GeneratedColumn<int>(
+    'reminder_minutes_before',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(120),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4541,6 +4552,7 @@ class $AppointmentsTable extends Appointments
     note,
     appointmentTime,
     criticalReminder,
+    reminderMinutesBefore,
     createdAt,
   ];
   @override
@@ -4600,6 +4612,15 @@ class $AppointmentsTable extends Appointments
         ),
       );
     }
+    if (data.containsKey('reminder_minutes_before')) {
+      context.handle(
+        _reminderMinutesBeforeMeta,
+        reminderMinutesBefore.isAcceptableOrUnknown(
+          data['reminder_minutes_before']!,
+          _reminderMinutesBeforeMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4639,6 +4660,10 @@ class $AppointmentsTable extends Appointments
         DriftSqlType.bool,
         data['${effectivePrefix}critical_reminder'],
       )!,
+      reminderMinutesBefore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes_before'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4668,6 +4693,10 @@ class Appointment extends DataClass implements Insertable<Appointment> {
   /// Whether a critical (full-screen) alarm is enabled for this appointment
   final bool criticalReminder;
 
+  /// Minutes before the appointment when the full-screen alarm should ring.
+  /// Defaults to 120 (2 hours).
+  final int reminderMinutesBefore;
+
   /// When this record was created
   final DateTime createdAt;
   const Appointment({
@@ -4677,6 +4706,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     this.note,
     required this.appointmentTime,
     required this.criticalReminder,
+    required this.reminderMinutesBefore,
     required this.createdAt,
   });
   @override
@@ -4690,6 +4720,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     }
     map['appointment_time'] = Variable<DateTime>(appointmentTime);
     map['critical_reminder'] = Variable<bool>(criticalReminder);
+    map['reminder_minutes_before'] = Variable<int>(reminderMinutesBefore);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -4702,6 +4733,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       appointmentTime: Value(appointmentTime),
       criticalReminder: Value(criticalReminder),
+      reminderMinutesBefore: Value(reminderMinutesBefore),
       createdAt: Value(createdAt),
     );
   }
@@ -4718,6 +4750,9 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       note: serializer.fromJson<String?>(json['note']),
       appointmentTime: serializer.fromJson<DateTime>(json['appointmentTime']),
       criticalReminder: serializer.fromJson<bool>(json['criticalReminder']),
+      reminderMinutesBefore: serializer.fromJson<int>(
+        json['reminderMinutesBefore'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -4731,6 +4766,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       'note': serializer.toJson<String?>(note),
       'appointmentTime': serializer.toJson<DateTime>(appointmentTime),
       'criticalReminder': serializer.toJson<bool>(criticalReminder),
+      'reminderMinutesBefore': serializer.toJson<int>(reminderMinutesBefore),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -4742,6 +4778,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     Value<String?> note = const Value.absent(),
     DateTime? appointmentTime,
     bool? criticalReminder,
+    int? reminderMinutesBefore,
     DateTime? createdAt,
   }) => Appointment(
     id: id ?? this.id,
@@ -4750,6 +4787,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     note: note.present ? note.value : this.note,
     appointmentTime: appointmentTime ?? this.appointmentTime,
     criticalReminder: criticalReminder ?? this.criticalReminder,
+    reminderMinutesBefore: reminderMinutesBefore ?? this.reminderMinutesBefore,
     createdAt: createdAt ?? this.createdAt,
   );
   Appointment copyWithCompanion(AppointmentsCompanion data) {
@@ -4764,6 +4802,9 @@ class Appointment extends DataClass implements Insertable<Appointment> {
       criticalReminder: data.criticalReminder.present
           ? data.criticalReminder.value
           : this.criticalReminder,
+      reminderMinutesBefore: data.reminderMinutesBefore.present
+          ? data.reminderMinutesBefore.value
+          : this.reminderMinutesBefore,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4777,6 +4818,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
           ..write('note: $note, ')
           ..write('appointmentTime: $appointmentTime, ')
           ..write('criticalReminder: $criticalReminder, ')
+          ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4790,6 +4832,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
     note,
     appointmentTime,
     criticalReminder,
+    reminderMinutesBefore,
     createdAt,
   );
   @override
@@ -4802,6 +4845,7 @@ class Appointment extends DataClass implements Insertable<Appointment> {
           other.note == this.note &&
           other.appointmentTime == this.appointmentTime &&
           other.criticalReminder == this.criticalReminder &&
+          other.reminderMinutesBefore == this.reminderMinutesBefore &&
           other.createdAt == this.createdAt);
 }
 
@@ -4812,6 +4856,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
   final Value<String?> note;
   final Value<DateTime> appointmentTime;
   final Value<bool> criticalReminder;
+  final Value<int> reminderMinutesBefore;
   final Value<DateTime> createdAt;
   const AppointmentsCompanion({
     this.id = const Value.absent(),
@@ -4820,6 +4865,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     this.note = const Value.absent(),
     this.appointmentTime = const Value.absent(),
     this.criticalReminder = const Value.absent(),
+    this.reminderMinutesBefore = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   AppointmentsCompanion.insert({
@@ -4829,6 +4875,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     this.note = const Value.absent(),
     required DateTime appointmentTime,
     this.criticalReminder = const Value.absent(),
+    this.reminderMinutesBefore = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : userId = Value(userId),
        title = Value(title),
@@ -4840,6 +4887,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     Expression<String>? note,
     Expression<DateTime>? appointmentTime,
     Expression<bool>? criticalReminder,
+    Expression<int>? reminderMinutesBefore,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -4849,6 +4897,8 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
       if (note != null) 'note': note,
       if (appointmentTime != null) 'appointment_time': appointmentTime,
       if (criticalReminder != null) 'critical_reminder': criticalReminder,
+      if (reminderMinutesBefore != null)
+        'reminder_minutes_before': reminderMinutesBefore,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -4860,6 +4910,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     Value<String?>? note,
     Value<DateTime>? appointmentTime,
     Value<bool>? criticalReminder,
+    Value<int>? reminderMinutesBefore,
     Value<DateTime>? createdAt,
   }) {
     return AppointmentsCompanion(
@@ -4869,6 +4920,8 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
       note: note ?? this.note,
       appointmentTime: appointmentTime ?? this.appointmentTime,
       criticalReminder: criticalReminder ?? this.criticalReminder,
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -4894,6 +4947,11 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
     if (criticalReminder.present) {
       map['critical_reminder'] = Variable<bool>(criticalReminder.value);
     }
+    if (reminderMinutesBefore.present) {
+      map['reminder_minutes_before'] = Variable<int>(
+        reminderMinutesBefore.value,
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4909,6 +4967,7 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
           ..write('note: $note, ')
           ..write('appointmentTime: $appointmentTime, ')
           ..write('criticalReminder: $criticalReminder, ')
+          ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -9260,6 +9319,7 @@ typedef $$AppointmentsTableCreateCompanionBuilder =
       Value<String?> note,
       required DateTime appointmentTime,
       Value<bool> criticalReminder,
+      Value<int> reminderMinutesBefore,
       Value<DateTime> createdAt,
     });
 typedef $$AppointmentsTableUpdateCompanionBuilder =
@@ -9270,6 +9330,7 @@ typedef $$AppointmentsTableUpdateCompanionBuilder =
       Value<String?> note,
       Value<DateTime> appointmentTime,
       Value<bool> criticalReminder,
+      Value<int> reminderMinutesBefore,
       Value<DateTime> createdAt,
     });
 
@@ -9327,6 +9388,11 @@ class $$AppointmentsTableFilterComposer
 
   ColumnFilters<bool> get criticalReminder => $composableBuilder(
     column: $table.criticalReminder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9393,6 +9459,11 @@ class $$AppointmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9447,6 +9518,11 @@ class $$AppointmentsTableAnnotationComposer
 
   GeneratedColumn<bool> get criticalReminder => $composableBuilder(
     column: $table.criticalReminder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
     builder: (column) => column,
   );
 
@@ -9511,6 +9587,7 @@ class $$AppointmentsTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> appointmentTime = const Value.absent(),
                 Value<bool> criticalReminder = const Value.absent(),
+                Value<int> reminderMinutesBefore = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => AppointmentsCompanion(
                 id: id,
@@ -9519,6 +9596,7 @@ class $$AppointmentsTableTableManager
                 note: note,
                 appointmentTime: appointmentTime,
                 criticalReminder: criticalReminder,
+                reminderMinutesBefore: reminderMinutesBefore,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -9529,6 +9607,7 @@ class $$AppointmentsTableTableManager
                 Value<String?> note = const Value.absent(),
                 required DateTime appointmentTime,
                 Value<bool> criticalReminder = const Value.absent(),
+                Value<int> reminderMinutesBefore = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => AppointmentsCompanion.insert(
                 id: id,
@@ -9537,6 +9616,7 @@ class $$AppointmentsTableTableManager
                 note: note,
                 appointmentTime: appointmentTime,
                 criticalReminder: criticalReminder,
+                reminderMinutesBefore: reminderMinutesBefore,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

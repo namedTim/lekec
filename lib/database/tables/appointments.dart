@@ -18,6 +18,11 @@ class Appointments extends Table {
   BoolColumn get criticalReminder =>
       boolean().withDefault(const Constant(false))();
 
+  /// Minutes before the appointment when the full-screen alarm should ring.
+  /// Defaults to 120 (2 hours).
+  IntColumn get reminderMinutesBefore =>
+      integer().withDefault(const Constant(120))();
+
   /// When this record was created
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

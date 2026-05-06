@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The alarm plugin references @drawable/notification_icon by string at
+    runtime, so the resource shrinker (shrinkResources true) cannot see the
+    usage and strips it from release builds. Without a valid small icon the
+    foreground-service notification posted alongside the alarm sound is
+    rejected by Android's NotificationManager — the alarm rings but nothing
+    appears in the notification shade. Pinning it here keeps it.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/notification_icon" />
