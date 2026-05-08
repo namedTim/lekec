@@ -5,7 +5,6 @@ import 'package:lekec/screens/edit_alarm.dart';
 import 'package:lekec/screens/shortcut_button.dart';
 import 'package:lekec/services/alarm_service.dart';
 import 'package:lekec/services/notifications.dart';
-import 'package:lekec/services/permission.dart';
 import 'package:lekec/widgets/tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,9 +25,8 @@ class _ExampleAlarmHomeScreenState extends ConsumerState<ExampleAlarmHomeScreen>
   @override
   void initState() {
     super.initState();
-    AlarmPermissions.checkNotificationPermission()
-        .then((_) => AlarmPermissions.checkAndroidScheduleExactAlarmPermission())
-        .then((_) => AlarmPermissions.checkIgnoreBatteryOptimizations());
+    // Permission requests live in the onboarding `PermissionsScreen` so the
+    // user is primed before the system dialogs. Don't request them here.
     notifications = Notifications();
   }
 

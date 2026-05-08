@@ -8,6 +8,7 @@ import 'welcome_screen.dart';
 import 'user_type_selection_screen.dart';
 import 'user_setup_screen.dart';
 import 'app_guide_screen.dart';
+import 'permissions_screen.dart';
 
 class OnboardingFlow extends ConsumerStatefulWidget {
   final VoidCallback onComplete;
@@ -130,8 +131,12 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
         AppGuideScreen(
           userName: _userNames.isNotEmpty ? _userNames.first : null,
           userType: _selectedUserType,
-          onComplete: _completeOnboarding,
+          onComplete: _nextStep,
         ),
+
+        // Step 4: Permissions explainer (primes the user before
+        // the system permission dialogs fire).
+        PermissionsScreen(onComplete: _completeOnboarding),
       ],
     );
   }

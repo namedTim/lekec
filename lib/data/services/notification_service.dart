@@ -87,74 +87,16 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    // Request permissions for Android 13+
-    await _requestPermissions();
+    // Permissions (notification, exact alarm, full-screen intent, battery
+    // optimisation) are requested by the onboarding `PermissionsScreen` via
+    // `AlarmPermissions`, so the user sees a primer first. Don't fire the
+    // system dialogs here at app start.
 
     _initialized = true;
     developer.log(
       'Notification service initialized',
       name: 'NotificationService',
     );
-  }
-
-  Future<void> _requestPermissions() async {
-    final androidPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-
-    if (androidPlugin != null) {
-      // AlarmPermissions (in lib/services/permission.dart) also requests these
-      // from the dashboard screen. If both run concurrently Android throws
-      // `permissionRequestInProgress` — swallow that case so it can't crash
-      // app startup.
-      try {
-        final granted = await androidPlugin.requestNotificationsPermission();
-        developer.log(
-          'Notification permission granted: $granted',
-          name: 'NotificationService',
-        );
-      } catch (e) {
-        developer.log(
-          'Notification permission request skipped: $e',
-          name: 'NotificationService',
-        );
-      }
-
-      try {
-        final exactAlarmGranted = await androidPlugin
-            .requestExactAlarmsPermission();
-        developer.log(
-          'Exact alarm permission granted: $exactAlarmGranted',
-          name: 'NotificationService',
-        );
-      } catch (e) {
-        developer.log(
-          'Exact alarm permission request skipped: $e',
-          name: 'NotificationService',
-        );
-      }
-    }
-
-    final iosPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
-
-    if (iosPlugin != null) {
-      try {
-        await iosPlugin.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-      } catch (e) {
-        developer.log(
-          'iOS permission request skipped: $e',
-          name: 'NotificationService',
-        );
-      }
-    }
   }
 
   void _onNotificationTap(NotificationResponse response) {

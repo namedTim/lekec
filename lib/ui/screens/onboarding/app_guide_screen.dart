@@ -181,9 +181,9 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
-                  _currentPage < 6 ? 'Naprej' : 'Začnimo!',
-                  style: const TextStyle(
+                child: const Text(
+                  'Naprej',
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
