@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../database/tables/medications.dart';
+import '../../helpers/medication_icon_helper.dart';
+
 class MedicationDetailDialog extends StatelessWidget {
   final String medName;
   final String dosage;
@@ -9,6 +12,7 @@ class MedicationDetailDialog extends StatelessWidget {
   final int? pillsRemaining;
   final String userName;
   final String? intakeAdvice;
+  final MedicationType? medType;
   /// Called when user taps "Sem vzel". If null the action row is hidden.
   final VoidCallback? onTake;
   /// Called when user taps "Nisem vzel".
@@ -23,6 +27,7 @@ class MedicationDetailDialog extends StatelessWidget {
     required this.pillsRemaining,
     required this.userName,
     this.intakeAdvice,
+    this.medType,
     this.onTake,
     this.onNotTake,
   });
@@ -49,15 +54,25 @@ class MedicationDetailDialog extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(Symbols.medication,
-                      color: colors.onPrimaryContainer, size: 28),
+                Builder(
+                  builder: (_) {
+                    final style = medType != null
+                        ? getMedicationStyle(medType!)
+                        : (
+                            icon: Symbols.medication,
+                            color: colors.primary,
+                          );
+                    return Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: style.color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(style.icon, color: style.color, size: 28),
+                    );
+                  },
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -22,6 +22,9 @@ class TimeIsland extends StatefulWidget {
     this.controller,
     this.ownerName,
     this.greetingDuration = const Duration(seconds: 5),
+    this.appointmentTitle,
+    this.appointmentTime,
+    this.rotationInterval = const Duration(seconds: 5),
   });
 
   final String? medicationName;
@@ -32,17 +35,23 @@ class TimeIsland extends StatefulWidget {
   final TimeIslandController? controller;
   final String? ownerName;
   final Duration greetingDuration;
+  final String? appointmentTitle;
+  final DateTime? appointmentTime;
+  final Duration rotationInterval;
 
   @override
   State<TimeIsland> createState() => _TimeIslandState();
 }
+
+enum _IslandView { greeting, meds, appointment }
 
 class _TimeIslandState extends State<TimeIsland>
     with SingleTickerProviderStateMixin {
   late Duration _remaining;
   Timer? _timer;
   Timer? _greetingTimer;
-  bool _showGreeting = false;
+  Timer? _rotationTimer;
+  _IslandView _view = _IslandView.meds;
   late AnimationController _pulseController;
   late Animation<double> _pulse;
 
@@ -57,7 +66,9 @@ class _TimeIslandState extends State<TimeIsland>
   void initState() {
     super.initState();
     _remaining = widget.remainingDuration;
-    _showGreeting = widget.ownerName != null && widget.ownerName!.isNotEmpty;
+    final hasOwner =
+        widget.ownerName != null && widget.ownerName!.isNotEmpty;
+    _view = hasOwner ? _IslandView.greeting : _initialPostGreetingView();
 
     _pulseController = AnimationController(
       vsync: this,
@@ -70,15 +81,44 @@ class _TimeIslandState extends State<TimeIsland>
     widget.controller?._update = _update;
     _startTimer();
     _scheduleGreetingDismiss();
+    _scheduleRotation();
     _syncPulse();
+  }
+
+  bool get _hasAppointment =>
+      widget.appointmentTitle != null &&
+      widget.appointmentTitle!.isNotEmpty &&
+      widget.appointmentTime != null;
+
+  _IslandView _initialPostGreetingView() {
+    if (_hasMedication) return _IslandView.meds;
+    if (_hasAppointment) return _IslandView.appointment;
+    return _IslandView.meds;
   }
 
   void _scheduleGreetingDismiss() {
     _greetingTimer?.cancel();
-    if (!_showGreeting) return;
+    if (_view != _IslandView.greeting) return;
     _greetingTimer = Timer(widget.greetingDuration, () {
       if (!mounted) return;
-      setState(() => _showGreeting = false);
+      setState(() => _view = _initialPostGreetingView());
+      _scheduleRotation();
+      _syncPulse();
+    });
+  }
+
+  void _scheduleRotation() {
+    _rotationTimer?.cancel();
+    if (_view == _IslandView.greeting) return;
+    if (!(_hasMedication && _hasAppointment)) return;
+    _rotationTimer = Timer(widget.rotationInterval, () {
+      if (!mounted) return;
+      setState(() {
+        _view = _view == _IslandView.meds
+            ? _IslandView.appointment
+            : _IslandView.meds;
+      });
+      _scheduleRotation();
       _syncPulse();
     });
   }
@@ -91,8 +131,24 @@ class _TimeIslandState extends State<TimeIsland>
             oldWidget.ownerName!.isEmpty) &&
         (widget.ownerName != null && widget.ownerName!.isNotEmpty);
     if (ownerArrived) {
-      setState(() => _showGreeting = true);
+      setState(() => _view = _IslandView.greeting);
       _scheduleGreetingDismiss();
+    }
+
+    final apptChanged =
+        oldWidget.appointmentTitle != widget.appointmentTitle ||
+            oldWidget.appointmentTime != widget.appointmentTime;
+    final medChanged = oldWidget.medicationName != widget.medicationName;
+    if (apptChanged || medChanged) {
+      // If the currently shown view disappeared, fall back.
+      if (_view == _IslandView.appointment && !_hasAppointment) {
+        setState(() => _view = _IslandView.meds);
+      } else if (_view == _IslandView.meds &&
+          !_hasMedication &&
+          _hasAppointment) {
+        setState(() => _view = _IslandView.appointment);
+      }
+      _scheduleRotation();
     }
 
     if (oldWidget.remainingDuration != widget.remainingDuration ||
@@ -132,7 +188,7 @@ class _TimeIslandState extends State<TimeIsland>
   }
 
   void _syncPulse() {
-    if (_isFinished && _hasMedication) {
+    if (_view == _IslandView.meds && _isFinished && _hasMedication) {
       if (!_pulseController.isAnimating) {
         _pulseController.repeat(reverse: true);
       }
@@ -176,6 +232,7 @@ class _TimeIslandState extends State<TimeIsland>
   void dispose() {
     _timer?.cancel();
     _greetingTimer?.cancel();
+    _rotationTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -244,11 +301,17 @@ class _TimeIslandState extends State<TimeIsland>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final showGreeting = _showGreeting && widget.ownerName != null;
+    final isGreeting =
+        _view == _IslandView.greeting && widget.ownerName != null;
+    final isAppointment = _view == _IslandView.appointment && _hasAppointment;
     final medsStyle = _resolveStyle(colors);
     final greetingStyle = _resolveGreeting();
-    final accent = showGreeting ? greetingStyle.accent : medsStyle.accent;
-    final pulseEnabled = !showGreeting && _isFinished;
+    final apptAccent = const Color(0xFF3B82F6);
+    final accent = isGreeting
+        ? greetingStyle.accent
+        : (isAppointment ? apptAccent : medsStyle.accent);
+    final pulseEnabled =
+        _view == _IslandView.meds && _isFinished && _hasMedication;
 
     return AnimatedBuilder(
       animation: _pulse,
@@ -296,13 +359,106 @@ class _TimeIslandState extends State<TimeIsland>
                   child: SlideTransition(position: offset, child: child),
                 );
               },
-              child: showGreeting
+              child: isGreeting
                   ? _buildGreeting(theme, greetingStyle)
-                  : _buildMedsView(theme, colors, medsStyle),
+                  : (isAppointment
+                      ? _buildAppointmentView(theme, colors, apptAccent)
+                      : _buildMedsView(theme, colors, medsStyle)),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _iconTile({
+    required IconData icon,
+    required Color accent,
+    bool emphasis = false,
+  }) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: accent.withOpacity(emphasis ? 0.18 : 0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, size: 26, color: accent, fill: 0),
+    );
+  }
+
+  String _formatAppointmentWhen(DateTime time) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final apptDay = DateTime(time.year, time.month, time.day);
+    final dayDiff = apptDay.difference(today).inDays;
+    final hh = time.hour.toString().padLeft(2, '0');
+    final mm = time.minute.toString().padLeft(2, '0');
+    if (dayDiff <= 0) return 'ob $hh:$mm';
+    if (dayDiff == 1) return 'jutri ob $hh:$mm';
+    if (dayDiff < 7) return 'čez $dayDiff dni';
+    final dd = time.day.toString().padLeft(2, '0');
+    final mo = time.month.toString().padLeft(2, '0');
+    return '$dd.$mo.';
+  }
+
+  Widget _buildAppointmentView(
+    ThemeData theme,
+    ColorScheme colors,
+    Color accent,
+  ) {
+    final time = widget.appointmentTime!;
+    final whenText = _formatAppointmentWhen(time);
+    return Row(
+      key: const ValueKey('appointment'),
+      children: [
+        _iconTile(icon: Symbols.calendar_month, accent: accent),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Naslednji termin',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.appointmentTitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: accent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            whenText,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -313,16 +469,7 @@ class _TimeIslandState extends State<TimeIsland>
     return Row(
       key: const ValueKey('greeting'),
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: g.accent.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          alignment: Alignment.center,
-          child: Icon(g.icon, size: 26, color: g.accent),
-        ),
+        _iconTile(icon: g.icon, accent: g.accent),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -362,7 +509,6 @@ class _TimeIslandState extends State<TimeIsland>
     ({Color accent, IconData icon}) style,
   ) {
     final accent = style.accent;
-    final tileBg = accent.withOpacity(_isFinished ? 0.18 : 0.12);
 
     return Column(
       key: const ValueKey('meds'),
@@ -370,15 +516,10 @@ class _TimeIslandState extends State<TimeIsland>
       children: [
         Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: tileBg,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: Icon(style.icon, size: 26, color: accent),
+            _iconTile(
+              icon: style.icon,
+              accent: accent,
+              emphasis: _isFinished,
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationType;
 import '../../main.dart' show db;
 import '../../helpers/medication_unit_helper.dart';
 import '../../ui/widgets/medication_card.dart';
@@ -44,6 +45,7 @@ class DashboardScreenState extends State<DashboardScreen>
 
   // Time Island state
   Map<String, dynamic>? _nextMedication;
+  Appointment? _nextAppointment;
   Timer? _islandUpdateTimer;
   Timer? _dayChangeTimer;
 
@@ -125,9 +127,16 @@ class DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _updateTimeIsland() async {
     final nextMed = await _intakeService.getNextMedication();
+    final nextAppt = await (db.select(db.appointments)
+          ..where((t) =>
+              t.appointmentTime.isBiggerThanValue(DateTime.now()))
+          ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)])
+          ..limit(1))
+        .getSingleOrNull();
     if (mounted) {
       setState(() {
         _nextMedication = nextMed;
+        _nextAppointment = nextAppt;
       });
       controller.update();
     }
@@ -293,6 +302,7 @@ class DashboardScreenState extends State<DashboardScreen>
     required int? pillsRemaining,
     required String userName,
     String? intakeAdvice,
+    MedicationType? medType,
   }) {
     // Only offer take/not-take for non-one-time scheduled entries that are not in the future
     final isFuture = scheduledTime.isAfter(DateTime.now());
@@ -308,6 +318,7 @@ class DashboardScreenState extends State<DashboardScreen>
         pillsRemaining: pillsRemaining,
         userName: userName,
         intakeAdvice: intakeAdvice,
+        medType: medType,
         onTake: canAct
             ? () {
                 Navigator.of(ctx).pop();
@@ -572,6 +583,9 @@ class DashboardScreenState extends State<DashboardScreen>
                               _nextMedication!['timeUntil'] as Duration,
                           isOverdue: _nextMedication!['isOverdue'] as bool,
                           ownerName: _ownerName,
+                          appointmentTitle: _nextAppointment?.title,
+                          appointmentTime:
+                              _nextAppointment?.appointmentTime,
                           controller: controller,
                         )
                       : TimeIsland(
@@ -579,6 +593,9 @@ class DashboardScreenState extends State<DashboardScreen>
                           remainingDuration: const Duration(minutes: 30),
                           isOverdue: false,
                           ownerName: _ownerName,
+                          appointmentTitle: _nextAppointment?.title,
+                          appointmentTime:
+                              _nextAppointment?.appointmentTime,
                           controller: controller,
                         ),
                 ),
@@ -764,6 +781,7 @@ class DashboardScreenState extends State<DashboardScreen>
                                           : null,
                                       userName: userName,
                                       intakeAdvice: medication.intakeAdvice,
+                                      medType: medication.medType,
                                     );
                                   },
                                   onStatusChanged: isOneTime

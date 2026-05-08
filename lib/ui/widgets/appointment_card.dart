@@ -61,27 +61,28 @@ class AppointmentCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Calendar icon
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isPast
-                      ? colors.outlineVariant
-                      : const Color(0xFF22C55E),
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Symbols.calendar_month,
-                color: isPast
+            Builder(
+              builder: (_) {
+                final accent = isPast
                     ? colors.onSurfaceVariant
-                    : const Color(0xFF22C55E),
-                size: 24,
-              ),
+                    : const Color(0xFF22C55E);
+                return Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Symbols.calendar_month,
+                    color: accent,
+                    size: 26,
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
 
             // Content
             Expanded(
