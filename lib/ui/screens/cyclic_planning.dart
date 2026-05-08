@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
+import '../components/hinted_scroll_view.dart';
 
 class CyclicPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -49,7 +50,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
         title: const Text('Ciklično jemanje'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

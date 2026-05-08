@@ -6,6 +6,7 @@ import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import 'package:drift/drift.dart' as drift;
+import '../components/hinted_scroll_view.dart';
 import '../components/step_progress_indicator.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/medication_camera_dialog.dart';
@@ -420,7 +421,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         title: const Text(''),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,

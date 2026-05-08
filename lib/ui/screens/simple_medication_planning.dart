@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/tables/medications.dart';
 import '../../services/gemini_medication_service.dart';
+import '../components/hinted_scroll_view.dart';
 import '../components/quantity_selector.dart';
 import '../components/step_progress_indicator.dart';
 import '../components/critical_reminder_recap.dart';
@@ -303,7 +304,7 @@ class _SimpleMedicationPlanningScreenState
         title: const Text(''),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -90,6 +90,15 @@ class AppTheme {
         ),
         behavior: SnackBarBehavior.floating,
       ),
+
+      // Quiet, theme-tinted scrollbar — visible on long forms (e.g. add
+      // medication) without competing for attention with the content.
+      scrollbarTheme: const ScrollbarThemeData(
+        thumbColor: WidgetStatePropertyAll(Color(0xFFC2C7C3)),
+        thickness: WidgetStatePropertyAll(2),
+        radius: Radius.circular(8),
+        crossAxisMargin: 2,
+      ),
     );
   }
 
@@ -176,6 +185,15 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
         ),
         behavior: SnackBarBehavior.floating,
+      ),
+
+      // Slightly lighter than the dark surface — visible against #1E1E1E /
+      // #141414 backgrounds without lighting up the screen.
+      scrollbarTheme: const ScrollbarThemeData(
+        thumbColor: WidgetStatePropertyAll(Color(0xFF4F4F4F)),
+        thickness: WidgetStatePropertyAll(2),
+        radius: Radius.circular(8),
+        crossAxisMargin: 2,
       ),
     );
   }

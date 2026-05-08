@@ -8,6 +8,7 @@ import '../../database/tables/medications.dart';
 import '../../features/meds/providers/medications_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
+import '../components/hinted_scroll_view.dart';
 import '../components/quantity_selector.dart';
 import '../components/critical_reminder_recap.dart';
 
@@ -55,7 +56,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
