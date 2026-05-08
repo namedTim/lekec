@@ -40,6 +40,7 @@ class DashboardScreenState extends State<DashboardScreen>
   late IntakeLogService _intakeService;
   int _totalUserCount = 0;
   Map<int, String> _userNames = {};
+  String? _ownerName;
 
   // Time Island state
   Map<String, dynamic>? _nextMedication;
@@ -77,13 +78,15 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadUserData() async {
-    final users = await (db.select(
-      db.users,
-    )..where((t) => t.isActive.equals(true))).get();
+    final users = await (db.select(db.users)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
+        .get();
     if (mounted) {
       setState(() {
         _totalUserCount = users.length;
         _userNames = {for (var user in users) user.id: user.name};
+        _ownerName = users.isNotEmpty ? users.first.name : null;
       });
     }
   }
@@ -561,31 +564,39 @@ class DashboardScreenState extends State<DashboardScreen>
                           medicationName:
                               (_nextMedication!['medication'] as Medication)
                                   .name,
+                          medType:
+                              (_nextMedication!['medication'] as Medication)
+                                  .medType,
                           totalDuration: const Duration(minutes: 30),
                           remainingDuration:
                               _nextMedication!['timeUntil'] as Duration,
                           isOverdue: _nextMedication!['isOverdue'] as bool,
+                          ownerName: _ownerName,
                           controller: controller,
                         )
                       : TimeIsland(
                           totalDuration: const Duration(minutes: 30),
                           remainingDuration: const Duration(minutes: 30),
                           isOverdue: false,
+                          ownerName: _ownerName,
                           controller: controller,
                         ),
                 ),
               ),
               Expanded(
-                child: _groupedIntakes.isEmpty
-                    ? Center(
-                        child: EmptyStateCard(
-                          icon: Symbols.event_available,
-                          title: 'Ni načrtovanih vnosov za danes',
-                          subtitle: 'Dodajte zdravila ali termine',
-                          onTap: () => context.push('/add-medication'),
-                        ),
-                      )
-                    : ListView.builder(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _groupedIntakes.isEmpty
+                          ? Center(
+                              child: EmptyStateCard(
+                                icon: Symbols.event_available,
+                                title: 'Ni načrtovanih vnosov za danes',
+                                subtitle: 'Dodajte zdravila ali termine',
+                                onTap: () => context.push('/add-medication'),
+                              ),
+                            )
+                          : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(
                           left: 16.0,
@@ -774,6 +785,31 @@ class DashboardScreenState extends State<DashboardScreen>
                           );
                         },
                       ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 24,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Theme.of(context).scaffoldBackgroundColor,
+                                Theme.of(context)
+                                    .scaffoldBackgroundColor
+                                    .withOpacity(0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
