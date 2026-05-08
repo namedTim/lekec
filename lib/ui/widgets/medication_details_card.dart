@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../components/quantity_selector.dart';
 import '../../database/tables/medications.dart';
+import '../../helpers/medication_icon_helper.dart';
 import '../../helpers/medication_unit_helper.dart';
 
 class MedicationDetailsCard extends StatelessWidget {
@@ -64,6 +65,20 @@ class MedicationDetailsCard extends StatelessWidget {
     return 'ob $allButLast in ${times.last}';
   }
 
+  Widget _buildTypeIcon() {
+    final style = getMedicationStyle(medType);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: style.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: Icon(style.icon, size: 26, color: style.color),
+    );
+  }
+
   Future<void> _handleAddMedication(BuildContext context) async {
     final quantity = await showQuantitySelector(
       context,
@@ -123,6 +138,8 @@ class MedicationDetailsCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            _buildTypeIcon(),
+            const SizedBox(width: 14),
             // Main content
             Expanded(
               child: Column(
@@ -229,7 +246,7 @@ class MedicationDetailsCard extends StatelessWidget {
                     ),
                     child: IconButton(
                       onPressed: onLogIntake,
-                      icon: const Icon(Symbols.add_circle),
+                      icon: const Icon(Symbols.task_alt),
                       color: colors.onPrimary,
                       tooltip: 'Zabeleži vnos',
                       iconSize: 22,

@@ -719,6 +719,7 @@ class DashboardScreenState extends State<DashboardScreen>
 
                                 return MedicationCard(
                                   medName: medication.name,
+
                                   medType: medication.medType,
                                   dosage:
                                       '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
