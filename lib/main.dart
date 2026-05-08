@@ -404,8 +404,8 @@ Future<void> main() async {
 
     // Set alarm warning notification
     await Alarm.setWarningNotificationOnKill(
-      "Aktivnost opozoril",
-      "Pustite aplikacijo zagnano v ozadju, da prejmete opozorila o zdravilih.",
+      "Lekec opozorilo",
+      "Pustite aplikacijo zagnano v ozadju, da zanesljivo prejmete opozorila o zdravilih.",
     ).timeout(const Duration(seconds: 3), onTimeout: () {});
   } catch (e, st) {
     Logger('main').severe('Critical startup error', e, st);
