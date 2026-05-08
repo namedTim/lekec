@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../database/tables/medications.dart' as db;
+
 enum MedicationStatus {
   notTaken,
   taken,
@@ -17,6 +19,7 @@ class MedicationCard extends StatefulWidget {
     required this.showName,
     required this.username,
     required this.userId,
+    required this.medType,
     this.status = MedicationStatus.upcoming,
     this.onStatusChanged,
     this.isOneTimeEntry = false,
@@ -34,6 +37,7 @@ class MedicationCard extends StatefulWidget {
   final bool showName;
   final String username;
   final String userId;
+  final db.MedicationType medType;
   final MedicationStatus status;
   final Function(MedicationStatus)? onStatusChanged;
   final bool isOneTimeEntry;
@@ -45,6 +49,43 @@ class MedicationCard extends StatefulWidget {
 
   @override
   State<MedicationCard> createState() => _MedicationCardState();
+}
+
+({IconData icon, Color color}) _medicationStyle(db.MedicationType type) {
+  switch (type) {
+    case db.MedicationType.pills:
+      return (icon: Symbols.pill, color: const Color(0xFF6366F1));
+    case db.MedicationType.capsules:
+      return (icon: Symbols.medication, color: const Color(0xFF8B5CF6));
+    case db.MedicationType.drops:
+      return (icon: Symbols.water_drop, color: const Color(0xFF06B6D4));
+    case db.MedicationType.milliliters:
+      return (icon: Symbols.medication_liquid, color: const Color(0xFF0EA5E9));
+    case db.MedicationType.sprays:
+      return (icon: Symbols.airwave, color: const Color(0xFF14B8A6));
+    case db.MedicationType.injections:
+      return (icon: Symbols.vaccines, color: const Color(0xFFEC4899));
+    case db.MedicationType.patches:
+      return (icon: Symbols.healing, color: const Color(0xFFF59E0B));
+    case db.MedicationType.puffs:
+      return (icon: Symbols.pulmonology, color: const Color(0xFF38BDF8));
+    case db.MedicationType.applications:
+      return (icon: Symbols.healing, color: const Color(0xFFF97316));
+    case db.MedicationType.ampules:
+      return (icon: Symbols.science, color: const Color(0xFFA855F7));
+    case db.MedicationType.grams:
+    case db.MedicationType.milligrams:
+    case db.MedicationType.micrograms:
+      return (icon: Symbols.scale, color: const Color(0xFF64748B));
+    case db.MedicationType.tablespoons:
+      return (icon: Symbols.restaurant, color: const Color(0xFFEAB308));
+    case db.MedicationType.portions:
+      return (icon: Symbols.restaurant_menu, color: const Color(0xFFD97706));
+    case db.MedicationType.pieces:
+      return (icon: Symbols.category, color: const Color(0xFF10B981));
+    case db.MedicationType.units:
+      return (icon: Symbols.inventory_2, color: const Color(0xFF22C55E));
+  }
 }
 
 class _MedicationCardState extends State<MedicationCard> {
@@ -139,6 +180,8 @@ class _MedicationCardState extends State<MedicationCard> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              _buildTypeIcon(),
+              const SizedBox(width: 14),
               // Left content
               Expanded(
                 child: Column(
@@ -221,6 +264,20 @@ class _MedicationCardState extends State<MedicationCard> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTypeIcon() {
+    final style = _medicationStyle(widget.medType);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: style.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: Icon(style.icon, size: 26, color: style.color),
     );
   }
 
