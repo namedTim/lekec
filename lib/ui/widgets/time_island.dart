@@ -541,7 +541,7 @@ class _TimeIslandState extends State<TimeIsland>
                   Text(
                     _hasMedication
                         ? widget.medicationName!
-                        : 'Vse opravljeno',
+                        : 'Za danes ni načrtovanih zdravil',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
