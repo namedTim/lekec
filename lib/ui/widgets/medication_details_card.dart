@@ -5,6 +5,54 @@ import '../../database/tables/medications.dart';
 import '../../helpers/medication_icon_helper.dart';
 import '../../helpers/medication_unit_helper.dart';
 
+class _AddPillIcon extends StatelessWidget {
+  const _AddPillIcon({
+    required this.pillColor,
+    required this.badgeColor,
+    required this.badgeBorderColor,
+    required this.badgeIconColor,
+  });
+
+  final Color pillColor;
+  final Color badgeColor;
+  final Color badgeBorderColor;
+  final Color badgeIconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: Icon(Symbols.pill, size: 22, color: pillColor)),
+          Positioned(
+            right: -6,
+            top: 1,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: badgeBorderColor, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Symbols.add,
+                size: 9,
+                color: badgeIconColor,
+                weight: 700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class MedicationDetailsCard extends StatelessWidget {
   const MedicationDetailsCard({
     super.key,
@@ -264,7 +312,12 @@ class MedicationDetailsCard extends StatelessWidget {
                   ),
                   child: IconButton(
                     onPressed: () => _handleAddMedication(context),
-                    icon: const Icon(Symbols.add),
+                    icon: _AddPillIcon(
+                      pillColor: colors.onSurfaceVariant,
+                      badgeColor: colors.primary,
+                      badgeBorderColor: colors.surfaceContainerHighest,
+                      badgeIconColor: colors.onPrimary,
+                    ),
                     color: colors.onSurfaceVariant,
                     tooltip: 'Upravljaj zalogo',
                     iconSize: 22,
