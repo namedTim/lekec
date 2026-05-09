@@ -37,16 +37,14 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.backgroundLight,
         height: 64,
-
-        // 🔥 STRONG active indicator
-        indicatorColor: const Color.fromARGB(87, 8, 211, 35),
+        indicatorColor: AppColors.primary.withOpacity(0.18),
 
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 11,
-              color: Color.fromARGB(255, 12, 160, 56),
+              color: AppColors.primaryDark,
             );
           }
           return const TextStyle(
@@ -109,7 +107,7 @@ class AppTheme {
 
       colorScheme: ColorScheme(
         brightness: Brightness.dark,
-        primary: AppColors.primaryLight, // brighter green pops on dark
+        primary: AppColors.primary,
         onPrimary: Colors.black,
 
         primaryContainer: AppColors.primaryDark,
@@ -145,7 +143,7 @@ class AppTheme {
             return const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 11,
-              color: AppColors.primaryLight,
+              color: AppColors.primary,
             );
           }
           return const TextStyle(
@@ -156,7 +154,7 @@ class AppTheme {
         }),
 
         iconTheme: WidgetStateProperty.all(
-          const IconThemeData(color: AppColors.primaryLight),
+          const IconThemeData(color: AppColors.primary),
         ),
       ),
 

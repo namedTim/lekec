@@ -194,35 +194,34 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
     final alarmSounds = ref.watch(alarmSoundsProvider);
 
-    final cardShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: BorderSide(
-        color: colors.outlineVariant.withOpacity(0.5),
-        width: 1,
-      ),
-    );
-
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 88),
       children: [
-        // ── Theme Settings ─────────────────────────────────────────────
-        Card(
-          shape: cardShape,
-          child: Column(
-            children: [
-              ListTile(
-                title: const Text('Izgled aplikacije'),
-                subtitle: Text(
-                  themeMode.when(
-                    data: (mode) => _getThemeModeName(mode),
-                    loading: () => 'Pridobivanje nastavitve...',
-                    error: (_, __) => 'NaN',
-                  ),
-                ),
-                leading: const Icon(Symbols.brightness_6),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+          child: Text(
+            'Nastavitve',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+
+        // ── Izgled ────────────────────────────────────────────────────
+        _SettingsSection(
+          icon: Symbols.brightness_6,
+          accent: const Color(0xFFF59E0B),
+          title: 'Izgled aplikacije',
+          subtitle: themeMode.when(
+            data: (mode) => _getThemeModeName(mode),
+            loading: () => 'Pridobivanje nastavitve...',
+            error: (_, __) => '—',
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
                 child: SegmentedButton<ThemeMode>(
                   segments: const [
                     ButtonSegment<ThemeMode>(
@@ -249,250 +248,268 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   },
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
-        // ── Kritični opomniki ───────────────────────────────────────────
-        Card(
-          shape: cardShape,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Icon(Symbols.alarm, color: colors.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Kritični opomniki',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+        // ── Kritični opomniki ─────────────────────────────────────────
+        _SettingsSection(
+          icon: Symbols.alarm,
+          accent: const Color(0xFFEF4444),
+          title: 'Kritični opomniki',
+          subtitle: 'Glasnost, melodija, vibracije',
+          children: [
+            // Volume slider
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.volume_up,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-
-              // Volume Slider
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Symbols.volume_up, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Glasnost', style: theme.textTheme.bodyLarge),
-                        const Spacer(),
-                        Text(
+                      const SizedBox(width: 8),
+                      Text(
+                        'Glasnost',
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
                           '${((_settings?.alarmVolume ?? 0.8) * 100).round()}%',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.labelMedium?.copyWith(
                             color: colors.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _settings?.alarmVolume ?? 0.8,
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 10,
+                    onChanged: (value) {
+                      _updateSetting(
+                        (_) => value,
+                        (v) =>
+                            AppSettingsCompanion(alarmVolume: drift.Value(v)),
+                        isAlarmSetting: true,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Sound dropdown
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Symbols.music_note,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text('Melodija', style: theme.textTheme.bodyLarge),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _settings?.alarmSound ?? '8bit_arcade.mp3',
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: colors.surfaceContainerHighest,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                     ),
-                    Slider(
-                      value: _settings?.alarmVolume ?? 0.8,
-                      min: 0.0,
-                      max: 1.0,
-                      divisions: 10,
-                      onChanged: (value) {
+                    items: alarmSounds.map((sound) {
+                      return DropdownMenuItem<String>(
+                        value: sound['file'],
+                        child: Text(sound['name']!),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
                         _updateSetting(
                           (_) => value,
-                          (v) => AppSettingsCompanion(alarmVolume: drift.Value(v)),
+                          (v) => AppSettingsCompanion(
+                            alarmSound: drift.Value(v),
+                          ),
                           isAlarmSetting: true,
                         );
-                      },
-                    ),
-                  ],
-                ),
+                      }
+                    },
+                  ),
+                ],
               ),
+            ),
 
-              // Alarm Sound Dropdown
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Symbols.music_note, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Melodija', style: theme.textTheme.bodyLarge),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _settings?.alarmSound ?? '8bit_arcade.mp3',
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      items: alarmSounds.map((sound) {
-                        return DropdownMenuItem<String>(
-                          value: sound['file'],
-                          child: Text(sound['name']!),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          _updateSetting(
-                            (_) => value,
-                            (v) => AppSettingsCompanion(
-                              alarmSound: drift.Value(v),
-                            ),
-                            isAlarmSetting: true,
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
+            // Vibration toggle
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              secondary: Icon(
+                Symbols.vibration,
+                color: colors.onSurfaceVariant,
               ),
+              title: const Text('Vibracije'),
+              subtitle: const Text('Vibriraj ob alarmu'),
+              value: _settings?.alarmVibration ?? true,
+              onChanged: (value) {
+                _updateSetting(
+                  (_) => value,
+                  (v) => AppSettingsCompanion(
+                    alarmVibration: drift.Value(v),
+                  ),
+                  isAlarmSetting: true,
+                );
+              },
+            ),
 
-              const SizedBox(height: 16),
-
-              // Vibration Toggle
-              SwitchListTile(
-                secondary: const Icon(Symbols.vibration),
-                title: const Text('Vibracije'),
-                subtitle: const Text('Vibriraj ob alarmu'),
-                value: _settings?.alarmVibration ?? true,
-                onChanged: (value) {
-                  _updateSetting(
-                    (_) => value,
-                    (v) => AppSettingsCompanion(alarmVibration: drift.Value(v)),
-                    isAlarmSetting: true,
-                  );
-                },
-              ),
-
-              const Divider(height: 1),
-
-              // Test Alarm Button
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _testAlarm,
-                    icon: const Icon(Symbols.play_arrow),
-                    label: const Text('Testiraj alarm'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      foregroundColor: theme.brightness == Brightness.dark
-                          ? Colors.black
-                          : Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+            // Test alarm
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _testAlarm,
+                  icon: const Icon(Symbols.play_arrow, size: 20),
+                  label: const Text('Testiraj alarm'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.primary,
+                    side: BorderSide(
+                      color: colors.primary.withOpacity(0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(height: 24),
 
-        // ── Prenos podatkov ──────────────────────────────────────────
-        Card(
-          shape: cardShape,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Icon(Symbols.sync_alt, color: colors.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Prenos podatkov',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _exportDatabase,
-                        icon: const Icon(Symbols.upload),
-                        label: const Text('Izvozi'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colors.primary,
-                          foregroundColor: theme.brightness == Brightness.dark
-                              ? Colors.black
-                              : Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+        const SizedBox(height: 14),
+
+        // ── Prenos podatkov ───────────────────────────────────────────
+        _SettingsSection(
+          icon: Symbols.sync_alt,
+          accent: const Color(0xFF0EA5E9),
+          title: 'Prenos podatkov',
+          subtitle: 'Varnostna kopija ali obnovitev',
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _exportDatabase,
+                      icon: const Icon(Symbols.upload, size: 20),
+                      label: const Text('Izvozi'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _importDatabase,
-                        icon: const Icon(Symbols.download),
-                        label: const Text('Uvozi'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colors.primary,
-                          foregroundColor: theme.brightness == Brightness.dark
-                              ? Colors.black
-                              : Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _importDatabase,
+                      icon: const Icon(Symbols.download, size: 20),
+                      label: const Text('Uvozi'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colors.primary,
+                        side: BorderSide(
+                          color: colors.primary.withOpacity(0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
 
-        const SizedBox(height: 24),
-        ListTile(
-          leading: Icon(Symbols.favorite, color: colors.primary, fill: 1),
-          title: const Text('Podpri razvoj'),
-          subtitle: const Text('Neobvezen prispevek prek Google Play'),
-          trailing: const Icon(Symbols.chevron_right),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TipScreen()),
-            );
-          },
+        const SizedBox(height: 14),
+
+        // ── O aplikaciji ──────────────────────────────────────────────
+        _SettingsSection(
+          icon: Symbols.info,
+          accent: const Color(0xFF64748B),
+          title: 'O aplikaciji',
+          children: [
+            _SettingsTile(
+              icon: Symbols.favorite,
+              accent: const Color(0xFFEC4899),
+              filled: true,
+              title: 'Podpri razvoj',
+              subtitle: 'Neobvezen prispevek prek Google Play',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TipScreen()),
+                );
+              },
+            ),
+            Divider(
+              height: 1,
+              indent: 72,
+              color: colors.outlineVariant.withOpacity(0.4),
+            ),
+            _SettingsTile(
+              icon: Symbols.description,
+              accent: const Color(0xFF64748B),
+              title: 'Pogoji uporabe',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TermsOfServiceScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
-        ListTile(
-          leading: const Icon(Symbols.description),
-          title: const Text('Pogoji uporabe'),
-          trailing: const Icon(Symbols.chevron_right),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const TermsOfServiceScreen(),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -589,5 +606,168 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       case ThemeMode.dark:
         return 'Temna';
     }
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.children,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: accent, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            subtitle!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+    this.filled = false,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accent.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: accent, size: 22, fill: filled ? 1 : 0),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(
+              Symbols.chevron_right,
+              color: colors.onSurfaceVariant.withOpacity(0.6),
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -1,25 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand greens
-  static const Color primary = Color.fromARGB(
-    255,
-    31,
-    191,
-    31,
-  ); // main brand green
-  static const Color primaryDark = Color.fromARGB(
-    255,
-    23,
-    158,
-    46,
-  ); // dark container
-  static const Color primaryLight = Color.fromARGB(
-    255,
-    110,
-    231,
-    126,
-  ); // light container
+  // Brand greens — aligned with Tailwind green palette so accents
+  // (next-medication border, take-button, appointment chips, etc.) match.
+  static const Color primary = Color(0xFF22C55E); // green-500
+  static const Color primaryDark = Color(0xFF15803D); // green-700
+  static const Color primaryLight = Color(0xFFBBF7D0); // green-200
 
   // Neutral surfaces (no blue tint)
   static const Color backgroundLight = Color(0xFFFAFAF8);
