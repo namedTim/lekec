@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../helpers/user_color_helper.dart';
+
 class UserCard extends StatelessWidget {
   final String userName;
   final int? userAge;
+  final int? userId;
   final VoidCallback onTap;
 
   const UserCard({
     super.key,
     required this.userName,
     this.userAge,
+    this.userId,
     required this.onTap,
   });
 
@@ -19,6 +23,7 @@ class UserCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     final initial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+    final accent = getUserColor(userId: userId, name: userName);
 
     return Material(
       color: Colors.transparent,
@@ -38,19 +43,24 @@ class UserCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: colors.primaryContainer,
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
                 child: Text(
                   initial,
                   style: TextStyle(
-                    color: colors.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

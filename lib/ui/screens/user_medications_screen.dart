@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:alarm/alarm.dart';
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
+import '../../helpers/user_color_helper.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/period_service.dart';
@@ -814,25 +815,38 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: colors.primaryContainer,
-              child: Text(
-                widget.userName.isNotEmpty
-                    ? widget.userName[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  color: colors.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+        title: Builder(
+          builder: (_) {
+            final accent = getUserColor(
+              userId: widget.userId,
+              name: widget.userName,
+            );
+            return Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    widget.userName.isNotEmpty
+                        ? widget.userName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(widget.userName),
-          ],
+                const SizedBox(width: 10),
+                Text(widget.userName),
+              ],
+            );
+          },
         ),
         scrolledUnderElevation: 1,
       ),

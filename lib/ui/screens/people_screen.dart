@@ -190,6 +190,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                           return UserCard(
                             userName: user.name,
                             userAge: user.age,
+                            userId: user.id,
                             onTap: () => _openUserDetails(user),
                           );
                         },

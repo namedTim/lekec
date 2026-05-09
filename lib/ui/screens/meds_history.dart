@@ -9,6 +9,7 @@ import '../components/history_time_slot.dart';
 import '../widgets/empty_state_card.dart';
 import '../../data/services/history_service.dart';
 import '../../data/services/mood_service.dart';
+import '../../helpers/user_color_helper.dart';
 import '../widgets/history_detail_dialogs.dart';
 
 enum HistoryFilter { all, taken, missed }
@@ -195,6 +196,43 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  Widget _userChip(int userId) {
+    final name = _getUserName(userId) ?? '';
+    final accent = getUserColor(userId: userId, name: name);
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            color: accent.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          name,
+          style: TextStyle(
+            color: accent,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
   }
 
   String? _getUserName(int userId) {
@@ -538,22 +576,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                 ),
                 if (showUserNames) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.person,
-                        size: 14,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getUserName(intake.userId) ?? '',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _userChip(intake.userId),
                 ],
               ],
             ),
@@ -640,22 +663,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                 ],
                 if (showUserNames) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.person,
-                        size: 14,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getUserName(appt.userId) ?? '',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _userChip(appt.userId),
                 ],
               ],
             ),
@@ -729,22 +737,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                 ],
                 if (showUserNames) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Symbols.person,
-                        size: 14,
-                        color: colors.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getUserName(mood.userId) ?? '',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _userChip(mood.userId),
                 ],
               ],
             ),
