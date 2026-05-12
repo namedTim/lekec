@@ -489,11 +489,65 @@ Future<void> _initializeServicesInBackground() async {
   }
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  /// Skip the very first `resumed` event — it fires right after the app is
+  /// pushed to the foreground at cold start, and `_initializeServicesInBackground`
+  /// already covers that path. Without this guard we'd run the same heavy work
+  /// twice on every cold start.
+  bool _skipFirstResume = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_skipFirstResume) {
+      _skipFirstResume = false;
+      return;
+    }
+    _refreshSchedulesOnResume();
+  }
+
+  /// Triggered when the app comes back to the foreground. Extends the intake
+  /// schedule horizon and re-arms OS notifications/alarms so a long backgrounded
+  /// session can't leave the user without upcoming reminders.
+  Future<void> _refreshSchedulesOnResume() async {
+    try {
+      final generator = IntakeScheduleGenerator(db);
+      await generator.generateScheduledIntakes().timeout(
+        const Duration(seconds: 30),
+      );
+    } catch (e) {
+      Logger('main').warning('Resume: generateScheduledIntakes failed: $e');
+    }
+    try {
+      await NotificationService()
+          .scheduleAllUpcomingNotifications(db)
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      Logger('main').warning('Resume: scheduleAllUpcomingNotifications failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final onboardingStatus = ref.watch(onboardingStatusProvider);
 

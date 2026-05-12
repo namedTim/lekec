@@ -14,6 +14,7 @@ import '../../ui/widgets/medication_detail_dialog.dart';
 import '../../ui/components/confirmation_dialog.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
@@ -335,6 +336,47 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Keep the OS-scheduled reminder for a single intake in sync with the
+  /// user's choice on the dashboard:
+  ///   - marked taken → cancel pending notification/alarm for that intake.
+  ///   - marked not-taken AND scheduled time is in the future → (re)schedule
+  ///     it, so toggling back restores the reminder.
+  /// Past not-taken intakes get no reminder (the time has already passed).
+  Future<void> _syncIntakeReminder(int intakeId, bool wasTaken) async {
+    final notificationService = NotificationService();
+    if (wasTaken) {
+      await notificationService.cancelNotification(intakeId);
+      return;
+    }
+
+    final intake = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.id.equals(intakeId)))
+        .getSingleOrNull();
+    if (intake == null) return;
+    if (!intake.scheduledTime.isAfter(DateTime.now())) return;
+
+    final medication = await (db.select(db.medications)
+          ..where((m) => m.id.equals(intake.medicationId)))
+        .getSingleOrNull();
+    final plan = await (db.select(db.medicationPlans)
+          ..where((p) => p.id.equals(intake.planId)))
+        .getSingleOrNull();
+    if (medication == null || plan == null) return;
+
+    final dosageCount = plan.dosageAmount.toInt();
+    final dosage =
+        '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+
+    await notificationService.scheduleIntakeNotification(
+      id: intakeId,
+      medicationName: medication.name,
+      scheduledTime: intake.scheduledTime,
+      dosage: dosage,
+      criticalReminder: medication.criticalReminder,
+      database: db,
+    );
+  }
+
   Future<void> _updateIntakeStatus(
     int intakeId,
     MedicationStatus newStatus,
@@ -342,6 +384,7 @@ class DashboardScreenState extends State<DashboardScreen>
     try {
       final wasTaken = newStatus == MedicationStatus.taken;
       await _intakeService.updateIntakeStatus(intakeId, wasTaken);
+      await _syncIntakeReminder(intakeId, wasTaken);
       await loadTodaysIntakes(autoScroll: false);
 
       // Update time island immediately after taking medication

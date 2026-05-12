@@ -328,19 +328,34 @@ class NotificationService {
     }
   }
 
-  /// Cancel a specific notification
+  /// Cancel a specific notification AND any matching alarm for the same id.
+  /// Safe to call even if neither was scheduled — both calls are no-ops then.
   Future<void> cancelNotification(int id) async {
     await _notifications.cancel(id);
-    developer.log('Cancelled notification $id', name: 'NotificationService');
+    try {
+      await Alarm.stop(id);
+    } catch (_) {
+      // No alarm with this id — ignore.
+    }
+    developer.log('Cancelled notification/alarm $id', name: 'NotificationService');
   }
 
-  /// Cancel all notifications and medication alarms.
-  /// Appointment alarms (IDs >= 900000) are preserved.
+  /// Cancel all medication-related notifications and alarms.
+  /// Appointment notifications and alarms (IDs >= 900000) are preserved so a
+  /// medication refresh doesn't wipe scheduled appointment reminders.
   Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
+    // Cancel pending FLN notifications with id < 900000 only.
+    final pending = await _notifications.pendingNotificationRequests();
+    int cancelledNotifs = 0;
+    for (final notif in pending) {
+      if (notif.id < 900000) {
+        await _notifications.cancel(notif.id);
+        cancelledNotifs++;
+      }
+    }
 
-    // Also stop all medication-related Alarm alarms (IDs < 900000)
-    // but never stop an alarm that is currently ringing
+    // Stop medication-related Alarm alarms (IDs < 900000), but never an
+    // alarm that is currently ringing.
     final activeAlarms = await Alarm.getAlarms();
     final ringingIds = Alarm.ringing.value.alarms.map((a) => a.id).toSet();
     int stoppedCount = 0;
@@ -352,7 +367,8 @@ class NotificationService {
     }
 
     developer.log(
-      'Cancelled all notifications and $stoppedCount medication alarms (skipped ${ringingIds.length} ringing)',
+      'Cancelled $cancelledNotifs medication notifications and $stoppedCount alarms '
+      '(skipped ${ringingIds.length} ringing, preserved appointments)',
       name: 'NotificationService',
     );
   }
