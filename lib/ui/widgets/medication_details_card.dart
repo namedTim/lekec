@@ -21,18 +21,18 @@ class _AddPillIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 24,
-      height: 24,
+      width: 32,
+      height: 32,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Center(child: Icon(Symbols.pill, size: 22, color: pillColor)),
+          Center(child: Icon(Symbols.pill, size: 30, color: pillColor)),
           Positioned(
             right: -6,
             top: 1,
             child: Container(
-              width: 14,
-              height: 14,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 color: badgeColor,
                 shape: BoxShape.circle,
@@ -41,7 +41,7 @@ class _AddPillIcon extends StatelessWidget {
               alignment: Alignment.center,
               child: Icon(
                 Symbols.add,
-                size: 9,
+                size: 12,
                 color: badgeIconColor,
                 weight: 700,
               ),
@@ -320,10 +320,10 @@ class MedicationDetailsCard extends StatelessWidget {
                     ),
                     color: colors.onSurfaceVariant,
                     tooltip: 'Upravljaj zalogo',
-                    iconSize: 22,
+                    iconSize: 32,
                     constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
+                      minWidth: 48,
+                      minHeight: 48,
                     ),
                   ),
                 ),
