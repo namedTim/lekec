@@ -17,7 +17,6 @@ import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/appointment_service.dart';
-import 'medication_detail_screen.dart';
 import 'add_appointment_screen.dart';
 import '../widgets/empty_state_card.dart';
 import '../components/log_intake_sheet.dart';
@@ -579,33 +578,27 @@ class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvid
                       final dosageCount = dosageAmount.toInt();
                       return GestureDetector(
                         onTap: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => MedicationDetailScreen(
-                                medicationId: med['id'] as int,
-                                medicationName: med['name'] as String,
-                                medType: med['medType'] as MedicationType,
-                                pillsRemaining: med['remaining'] as int,
-                                dosageAmount: dosageAmount,
-                                frequency: med['frequency'] as String,
-                                times: med['times'] as List<String>,
-                                intakeAdvice: med['intakeAdvice'] as String?,
-                                criticalReminder:
-                                    med['criticalReminder'] as bool,
-                                isAsNeeded:
-                                    (med['frequency'] as String) ==
-                                    'Po potrebi',
-                                planId: (med['plan'] as MedicationPlan?)?.id,
-                                userId:
-                                    (med['plan'] as MedicationPlan?)?.userId,
-                                onDelete: () => _deleteMedication(
-                                  med['id'] as int,
-                                  med['name'] as String,
-                                ),
-                                onRefresh: _refreshMedications,
-                              ),
+                          await context.push('/medication-detail', extra: {
+                            'medicationId': med['id'] as int,
+                            'medicationName': med['name'] as String,
+                            'medType': med['medType'] as MedicationType,
+                            'pillsRemaining': med['remaining'] as int,
+                            'dosageAmount': dosageAmount,
+                            'frequency': med['frequency'] as String,
+                            'times': med['times'] as List<String>,
+                            'intakeAdvice': med['intakeAdvice'] as String?,
+                            'criticalReminder': med['criticalReminder'] as bool,
+                            'isAsNeeded':
+                                (med['frequency'] as String) == 'Po potrebi',
+                            'planId': (med['plan'] as MedicationPlan?)?.id,
+                            'userId':
+                                (med['plan'] as MedicationPlan?)?.userId,
+                            'onDelete': () => _deleteMedication(
+                              med['id'] as int,
+                              med['name'] as String,
                             ),
-                          );
+                            'onRefresh': _refreshMedications,
+                          });
                           if (mounted) {
                             homePageKey.currentState?.loadTodaysIntakes(
                               autoScroll: false,

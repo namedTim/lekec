@@ -157,7 +157,7 @@ Widget _buildHeader({
   required String subtitle,
 }) {
   return Padding(
-    padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
+    padding: const EdgeInsets.fromLTRB(20, 20, 8, 16),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,13 +173,15 @@ Widget _buildHeader({
                       fontWeight: FontWeight.bold,
                     ),
               ),
-              if (subtitle.isNotEmpty)
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
+              ],
             ],
           ),
         ),
@@ -190,6 +192,74 @@ Widget _buildHeader({
         ),
       ],
     ),
+  );
+}
+
+/// Full-width status pill — used at the top of the body to highlight the
+/// outcome of an entry (taken/missed). Keeps the visual hierarchy clean.
+Widget _statusStrip({
+  required BuildContext context,
+  required IconData icon,
+  required String label,
+  required Color background,
+  required Color foreground,
+}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: foreground),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: foreground,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Standard footer with a single filled "Zapri" action — gives the dialog a
+/// definite bottom edge instead of trailing whitespace.
+Widget _dialogFooter(BuildContext context) {
+  final colors = Theme.of(context).colorScheme;
+  return Column(
+    children: [
+      Divider(height: 1, color: colors.outlineVariant.withOpacity(0.5)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonal(
+            onPressed: () => Navigator.of(context).pop(),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Zapri',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
+    ],
   );
 }
 
@@ -237,55 +307,21 @@ class HistoryIntakeDetailDialog extends StatelessWidget {
             subtitle: dosageStr,
           ),
 
-          // Status badge
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: wasTaken
-                        ? Colors.green.shade100
-                        : Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        wasTaken ? Symbols.check_circle : Symbols.cancel,
-                        size: 16,
-                        color: wasTaken
-                            ? Colors.green.shade700
-                            : Colors.red.shade700,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        wasTaken ? 'Vzeto' : 'Izpuščeno',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: wasTaken
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          _statusStrip(
+            context: context,
+            icon: wasTaken ? Symbols.check_circle : Symbols.cancel,
+            label: wasTaken ? 'Vzeto' : 'Izpuščeno',
+            background: wasTaken ? Colors.green.shade100 : Colors.red.shade100,
+            foreground: wasTaken ? Colors.green.shade700 : Colors.red.shade700,
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                _buildRow(context, Symbols.schedule, 'Čas',
+                _buildRow(context, Symbols.schedule, 'Predviden čas',
                     _formatTime(intake.scheduledTime)),
                 if (intake.takenTime != null) ...[
                   const SizedBox(height: 14),
@@ -314,7 +350,8 @@ class HistoryIntakeDetailDialog extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          _dialogFooter(context),
         ],
       ),
     );
@@ -337,6 +374,7 @@ class HistoryAppointmentDetailDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const apptAccent = Color(0xFF22C55E);
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
@@ -348,16 +386,24 @@ class HistoryAppointmentDetailDialog extends StatelessWidget {
             context: context,
             iconWidget: _buildIconTile(
               icon: Symbols.calendar_month,
-              accent: const Color(0xFF22C55E),
+              accent: apptAccent,
             ),
             title: appointment.title,
             subtitle: _formatDateTime(appointment.appointmentTime),
           ),
 
-          const SizedBox(height: 16),
+          _statusStrip(
+            context: context,
+            icon: Symbols.event_available,
+            label: 'Termin',
+            background: apptAccent.withOpacity(0.12),
+            foreground: apptAccent,
+          ),
+
+          const SizedBox(height: 18),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
                 _buildRow(context, Symbols.schedule, 'Datum in čas',
@@ -376,7 +422,8 @@ class HistoryAppointmentDetailDialog extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          _dialogFooter(context),
         ],
       ),
     );
@@ -427,15 +474,22 @@ class HistoryMoodDetailDialog extends StatelessWidget {
             subtitle: _formatDateTime(mood.createdAt),
           ),
 
-          const SizedBox(height: 16),
+          _statusStrip(
+            context: context,
+            icon: Symbols.mood,
+            label: 'Razpoloženje',
+            background: moodAccent.withOpacity(0.12),
+            foreground: moodAccent,
+          ),
+
+          const SizedBox(height: 18),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
                 _buildRow(context, Symbols.schedule, 'Čas',
                     _formatTime(mood.createdAt)),
-                // Mood level bar
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -490,7 +544,8 @@ class HistoryMoodDetailDialog extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          _dialogFooter(context),
         ],
       ),
     );

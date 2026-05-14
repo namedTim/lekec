@@ -35,6 +35,7 @@ import 'ui/screens/specific_days_select_times.dart';
 import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
 import 'ui/screens/add_appointment_screen.dart';
+import 'ui/screens/medication_detail_screen.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'features/core/providers/onboarding_provider.dart';
@@ -327,6 +328,28 @@ final _router = GoRouter(
         return AddAppointmentScreen(
           userId: extra?['userId'] as int? ?? 1,
           existingAppointment: extra?['existingAppointment'] as Appointment?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/medication-detail',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return MedicationDetailScreen(
+          medicationId: extra['medicationId'] as int,
+          medicationName: extra['medicationName'] as String,
+          medType: extra['medType'] as MedicationType,
+          pillsRemaining: extra['pillsRemaining'] as int,
+          dosageAmount: extra['dosageAmount'] as double,
+          frequency: extra['frequency'] as String,
+          times: (extra['times'] as List).cast<String>(),
+          intakeAdvice: extra['intakeAdvice'] as String?,
+          criticalReminder: extra['criticalReminder'] as bool,
+          onDelete: extra['onDelete'] as VoidCallback,
+          onRefresh: extra['onRefresh'] as VoidCallback,
+          isAsNeeded: (extra['isAsNeeded'] as bool?) ?? false,
+          planId: extra['planId'] as int?,
+          userId: extra['userId'] as int?,
         );
       },
     ),

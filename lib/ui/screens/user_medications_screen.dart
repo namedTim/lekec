@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:alarm/alarm.dart';
@@ -18,7 +19,6 @@ import '../components/mood_logging_sheet.dart';
 import '../components/period_logging_sheet.dart';
 import '../../main.dart' show db, homePageKey;
 import '../../data/services/intake_log_service.dart';
-import '../screens/medication_detail_screen.dart';
 import '../screens/add_appointment_screen.dart';
 import '../components/log_intake_sheet.dart';
 
@@ -990,29 +990,25 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
 
         return GestureDetector(
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => MedicationDetailScreen(
-                  medicationId: med['id'] as int,
-                  medicationName: med['name'] as String,
-                  medType: med['medType'] as MedicationType,
-                  pillsRemaining: med['remaining'] as int,
-                  dosageAmount: dosageAmount,
-                  frequency: med['frequency'] as String,
-                  times: med['times'] as List<String>,
-                  intakeAdvice: med['intakeAdvice'] as String?,
-                  criticalReminder: med['criticalReminder'] as bool,
-                  isAsNeeded: (med['frequency'] as String) == 'Po potrebi',
-                  planId: (med['plan'] as MedicationPlan?)?.id,
-                  userId: (med['plan'] as MedicationPlan?)?.userId,
-                  onDelete: () => _deleteMedication(
-                    med['id'] as int,
-                    med['name'] as String,
-                  ),
-                  onRefresh: _loadUserMedications,
-                ),
+            context.push('/medication-detail', extra: {
+              'medicationId': med['id'] as int,
+              'medicationName': med['name'] as String,
+              'medType': med['medType'] as MedicationType,
+              'pillsRemaining': med['remaining'] as int,
+              'dosageAmount': dosageAmount,
+              'frequency': med['frequency'] as String,
+              'times': med['times'] as List<String>,
+              'intakeAdvice': med['intakeAdvice'] as String?,
+              'criticalReminder': med['criticalReminder'] as bool,
+              'isAsNeeded': (med['frequency'] as String) == 'Po potrebi',
+              'planId': (med['plan'] as MedicationPlan?)?.id,
+              'userId': (med['plan'] as MedicationPlan?)?.userId,
+              'onDelete': () => _deleteMedication(
+                med['id'] as int,
+                med['name'] as String,
               ),
-            );
+              'onRefresh': _loadUserMedications,
+            });
           },
           child: MedicationDetailsCard(
             medName: med['name'] as String,

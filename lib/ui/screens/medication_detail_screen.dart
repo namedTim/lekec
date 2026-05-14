@@ -530,7 +530,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                 _DetailCard(
                   icon: Symbols.alarm,
                   title: 'Kritični opomniki',
-                  borderColor: colors.primary.withOpacity(0.6),
+                  borderColor: (_criticalReminder ? colors.error : colors.primary)
+                      .withOpacity(0.6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

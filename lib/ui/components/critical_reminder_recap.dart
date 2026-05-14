@@ -21,15 +21,12 @@ class CriticalReminderRecap extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: enabled
-            ? colors.errorContainer.withOpacity(0.3)
-            : colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: enabled
-              ? colors.error.withOpacity(0.5)
-              : colors.outlineVariant.withOpacity(0.5),
-          width: enabled ? 1.5 : 1,
+              ? colors.error.withOpacity(0.6)
+              : colors.primary.withOpacity(0.6),
+          width: 1,
         ),
       ),
       child: Column(
