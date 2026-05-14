@@ -410,56 +410,79 @@ class _TimeIslandState extends State<TimeIsland>
   ) {
     final time = widget.appointmentTime!;
     final whenText = _formatAppointmentWhen(time);
-    return Row(
+    return Column(
       key: const ValueKey('appointment'),
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _iconTile(icon: Symbols.calendar_month, accent: accent),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Naslednji termin',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
+        Row(
+          children: [
+            _iconTile(icon: Symbols.calendar_month, accent: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Naslednji termin',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.appointmentTitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                widget.appointmentTitle!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: accent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            whenText,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
             ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                whenText,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: _appointmentProgress(time),
+            minHeight: 5,
+            backgroundColor: accent.withOpacity(0.15),
+            valueColor: AlwaysStoppedAnimation<Color>(accent),
           ),
         ),
       ],
     );
+  }
+
+  double _appointmentProgress(DateTime time) {
+    const window = Duration(hours: 24);
+    final remaining = time.difference(DateTime.now());
+    if (remaining.isNegative) return 1;
+    if (remaining >= window) return 0;
+    return 1 - remaining.inSeconds / window.inSeconds;
   }
 
   Widget _buildGreeting(

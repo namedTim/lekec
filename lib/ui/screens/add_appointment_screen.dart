@@ -568,17 +568,24 @@ class _ReminderInfoBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.secondaryContainer.withOpacity(0.4),
+        color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: colors.outlineVariant.withOpacity(0.5),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Symbols.notifications_active, color: colors.secondary, size: 24),
+          Icon(Symbols.notifications_active, color: colors.primary, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

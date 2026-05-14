@@ -11,7 +11,9 @@ import '../../main.dart' show db;
 import '../../helpers/medication_unit_helper.dart';
 import '../../ui/widgets/medication_card.dart';
 import '../../ui/widgets/medication_detail_dialog.dart';
+import '../../ui/widgets/appointment_detail_dialog.dart';
 import '../../ui/components/confirmation_dialog.dart';
+import '../../data/services/appointment_service.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/notification_service.dart';
@@ -20,7 +22,6 @@ import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
-import 'add_appointment_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -332,6 +333,30 @@ class DashboardScreenState extends State<DashboardScreen>
                 _updateIntakeStatus(intakeId, MedicationStatus.notTaken);
               }
             : null,
+      ),
+    );
+  }
+
+  void _showAppointmentDetail(Appointment appt) {
+    final userName = _userNames[appt.userId] ?? '';
+    showDialog(
+      context: context,
+      builder: (ctx) => AppointmentDetailDialog(
+        title: appt.title,
+        appointmentTime: appt.appointmentTime,
+        note: appt.note,
+        userName: userName,
+        onDelete: () async {
+          Navigator.of(ctx).pop();
+          final confirmed = await showConfirmationDialog(
+            context,
+            title: 'Izbriši termin',
+            message: 'Ali želite izbrisati termin "${appt.title}"?',
+          );
+          if (!confirmed || !mounted) return;
+          await AppointmentService(db).deleteAppointment(appt.id);
+          await loadTodaysIntakes(autoScroll: false);
+        },
       ),
     );
   }
@@ -709,19 +734,7 @@ class DashboardScreenState extends State<DashboardScreen>
                                     showName: _totalUserCount > 1,
                                     isPast: isPast,
                                     isActive: isApptActive,
-                                    onTap: () async {
-                                      final result = await Navigator.of(context).push<bool>(
-                                        MaterialPageRoute(
-                                          builder: (_) => AddAppointmentScreen(
-                                            userId: appt.userId,
-                                            existingAppointment: appt,
-                                          ),
-                                        ),
-                                      );
-                                      if (result == true) {
-                                        await loadTodaysIntakes(autoScroll: false);
-                                      }
-                                    },
+                                    onTap: () => _showAppointmentDetail(appt),
                                   );
                                 }
 
