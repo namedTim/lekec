@@ -53,6 +53,7 @@ late final AppDatabase db;
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<DashboardScreenState> homePageKey =
     GlobalKey<DashboardScreenState>();
+final GlobalKey<MedsScreenState> medsPageKey = GlobalKey<MedsScreenState>();
 
 final _router = GoRouter(
   navigatorKey: rootNavigatorKey,
@@ -75,7 +76,7 @@ final _router = GoRouter(
           routes: [
             GoRoute(
               path: '/meds',
-              builder: (context, state) => const MedsScreen(),
+              builder: (context, state) => MedsScreen(key: medsPageKey),
             ),
           ],
         ),

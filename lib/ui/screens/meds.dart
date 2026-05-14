@@ -28,10 +28,10 @@ class MedsScreen extends ConsumerStatefulWidget {
   const MedsScreen({super.key});
 
   @override
-  ConsumerState<MedsScreen> createState() => _MedsScreenState();
+  ConsumerState<MedsScreen> createState() => MedsScreenState();
 }
 
-class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProviderStateMixin {
+class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProviderStateMixin {
   MedsTab _selectedTab = MedsTab.medications;
   int _refreshKey = 0;
   // ValueNotifier instead of plain bool so toggling the FAB never calls
@@ -61,10 +61,15 @@ class _MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvid
   }
 
   void _refreshMedications() {
+    if (!mounted) return;
     setState(() {
       _refreshKey++;
     });
   }
+
+  /// Public hook so other screens (e.g. PeopleScreen) can ask this tab to
+  /// re-fetch users + medications after the active user set changes.
+  void refresh() => _refreshMedications();
 
   void _toggleSpeedDial() {
     _fabExpanded.value = !_fabExpanded.value;

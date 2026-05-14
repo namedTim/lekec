@@ -17,7 +17,7 @@ import '../widgets/empty_state_card.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/mood_logging_sheet.dart';
 import '../components/period_logging_sheet.dart';
-import '../../main.dart' show db, homePageKey;
+import '../../main.dart' show db, homePageKey, medsPageKey;
 import '../../data/services/intake_log_service.dart';
 import '../screens/add_appointment_screen.dart';
 import '../components/log_intake_sheet.dart';
@@ -268,6 +268,11 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          // Active-user set shrank: refresh other tabs so cards drop the
+          // owner labels (and remove this user's intakes) right away.
+          homePageKey.currentState?.loadUserData();
+          homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+          medsPageKey.currentState?.refresh();
           Navigator.of(context).pop(); // Go back to user list
         }
       } catch (e) {

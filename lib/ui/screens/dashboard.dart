@@ -65,7 +65,7 @@ class DashboardScreenState extends State<DashboardScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-    _loadUserData();
+    loadUserData();
     loadTodaysIntakes();
     _updateTimeIsland();
     _startIslandUpdateTimer();
@@ -81,7 +81,7 @@ class DashboardScreenState extends State<DashboardScreen>
     });
   }
 
-  Future<void> _loadUserData() async {
+  Future<void> loadUserData() async {
     final users = await (db.select(db.users)
           ..where((t) => t.isActive.equals(true))
           ..orderBy([(t) => OrderingTerm.asc(t.id)]))
@@ -482,7 +482,7 @@ class DashboardScreenState extends State<DashboardScreen>
     await context.push('/add-medication');
     _ensureSpeedDialClosed();
     // Refresh after returning — medication or new user may have been added
-    await _loadUserData();
+    await loadUserData();
     await loadTodaysIntakes(autoScroll: false);
   }
 
