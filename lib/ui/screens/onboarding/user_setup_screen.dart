@@ -126,16 +126,19 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
     final colors = theme.colorScheme;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text(''), centerTitle: true),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     const SizedBox(height: 16),
 
                     Text(
@@ -408,8 +411,9 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                           ],
                         ),
                       ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

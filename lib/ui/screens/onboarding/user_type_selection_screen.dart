@@ -13,7 +13,7 @@ class UserTypeSelectionScreen extends StatefulWidget {
 }
 
 class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
-  UserType? _selectedType;
+  UserType? _selectedType = UserType.personal;
 
   @override
   Widget build(BuildContext context) {
@@ -54,8 +54,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
               _UserTypeCard(
                 icon: Symbols.person,
                 title: 'Osebna uporaba',
-                description:
-                    'Uporabljam aplikacijo za sledenje svojim zdravilom',
+                description: 'Sledim svojim zdravilom',
                 isSelected: _selectedType == UserType.personal,
                 onTap: () => setState(() => _selectedType = UserType.personal),
                 colors: colors,
@@ -106,7 +105,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
             ],
           ),
         ),

@@ -43,13 +43,15 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: 10,
+              letterSpacing: -0.1,
               color: AppColors.primaryDark,
             );
           }
           return const TextStyle(
             fontWeight: FontWeight.w500,
-            fontSize: 11,
+            fontSize: 10,
+            letterSpacing: -0.1,
             color: Color(0xFF6B7280),
           );
         }),
@@ -142,13 +144,15 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: 10,
+              letterSpacing: -0.1,
               color: AppColors.primary,
             );
           }
           return const TextStyle(
             fontWeight: FontWeight.w500,
-            fontSize: 11,
+            fontSize: 10,
+            letterSpacing: -0.1,
             color: Color(0xFF9CA3AF),
           );
         }),

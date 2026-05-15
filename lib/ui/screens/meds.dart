@@ -289,7 +289,13 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
                         });
                       },
                       style: ButtonStyle(
-                        visualDensity: VisualDensity(horizontal: -2),
+                        visualDensity: const VisualDensity(horizontal: -2),
+                        textStyle: WidgetStateProperty.all(
+                          const TextStyle(fontSize: 13),
+                        ),
+                        padding: WidgetStateProperty.all(
+                          const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                       ),
                     ),
                   ),
