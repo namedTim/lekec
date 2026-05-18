@@ -20,6 +20,7 @@ import '../../data/services/notification_service.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
+import '../../ui/components/week_strip.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
 
@@ -39,7 +40,10 @@ class DashboardScreenState extends State<DashboardScreen>
   bool _isExpanded = false;
   final ScrollController _scrollController = ScrollController();
 
+  DateTime _selectedDate = _today();
+
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
+  Set<String> _activeDateKeys = <String>{};
   late IntakeLogService _intakeService;
   int _totalUserCount = 0;
   Map<int, String> _userNames = {};
@@ -66,11 +70,55 @@ class DashboardScreenState extends State<DashboardScreen>
       curve: Curves.easeInOut,
     );
     loadUserData();
-    loadTodaysIntakes();
+    _loadIntakesForSelectedDate();
+    _loadActivityWindow();
     _updateTimeIsland();
     _startIslandUpdateTimer();
     _startDayChangeTimer();
     loadAlarms();
+  }
+
+  Future<void> _loadActivityWindow() async {
+    final today = _today();
+    final start = today.subtract(const Duration(days: 35));
+    // Cap forward at +1 month + 1 day to match the WeekStrip's lock.
+    final end = DateTime(today.year, today.month + 1, today.day + 2);
+
+    final intakeKeys = await _intakeService.loadIntakesForRange(
+      start: start,
+      end: end,
+    );
+
+    final appts = await (db.select(db.appointments)
+          ..where((t) => t.appointmentTime.isBiggerOrEqualValue(start))
+          ..where((t) => t.appointmentTime.isSmallerThanValue(end)))
+        .get();
+
+    final keys = <String>{};
+    keys.addAll(intakeKeys.keys);
+    for (final a in appts) {
+      final d = a.appointmentTime;
+      keys.add(
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _activeDateKeys = keys;
+    });
+  }
+
+  static DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool get _isViewingToday {
+    final today = _today();
+    return _selectedDate.year == today.year &&
+        _selectedDate.month == today.month &&
+        _selectedDate.day == today.day;
   }
 
   Future<void> loadAlarms() async {
@@ -113,7 +161,11 @@ class DashboardScreenState extends State<DashboardScreen>
     // Schedule refresh at midnight
     _dayChangeTimer = Timer(timeUntilMidnight, () {
       if (mounted) {
-        loadTodaysIntakes();
+        // If the user was looking at today, slide the selection forward.
+        if (_isViewingToday) {
+          setState(() => _selectedDate = _today());
+        }
+        _loadIntakesForSelectedDate();
         // Restart timer for next day
         _startDayChangeTimer();
       }
@@ -144,50 +196,70 @@ class DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Future<void> loadTodaysIntakes({bool autoScroll = true}) async {
-    final grouped = await _intakeService.loadTodaysIntakes();
-    
-    // Also load today's appointments
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
+  Future<void> _loadIntakesForSelectedDate({bool autoScroll = true}) async {
+    final startOfDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    // Filter to today's appointments (upcoming service only returns future, so also fetch past-today)
-    final allAppts = await (db.select(db.appointments)
-      ..where((t) => t.appointmentTime.isBiggerOrEqualValue(startOfDay))
-      ..where((t) => t.appointmentTime.isSmallerThanValue(endOfDay))
-      ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)]))
-      .get();
 
-    // Merge appointments into grouped map
-    for (final appt in allAppts) {
+    final grouped = await _intakeService.loadIntakesForRange(
+      start: startOfDay,
+      end: endOfDay,
+    );
+
+    final dayAppts = await (db.select(db.appointments)
+          ..where((t) => t.appointmentTime.isBiggerOrEqualValue(startOfDay))
+          ..where((t) => t.appointmentTime.isSmallerThanValue(endOfDay))
+          ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)]))
+        .get();
+
+    final byTime = <String, List<Map<String, dynamic>>>{};
+    for (final entries in grouped.values) {
+      for (final entry in entries) {
+        final intake = entry['intake'] as MedicationIntakeLog;
+        final t = intake.scheduledTime;
+        final timeKey =
+            '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+        byTime.putIfAbsent(timeKey, () => []).add(entry);
+      }
+    }
+
+    for (final appt in dayAppts) {
       final timeKey =
           '${appt.appointmentTime.hour.toString().padLeft(2, '0')}:${appt.appointmentTime.minute.toString().padLeft(2, '0')}';
-      grouped.putIfAbsent(timeKey, () => []);
-      grouped[timeKey]!.add({
+      byTime.putIfAbsent(timeKey, () => []);
+      byTime[timeKey]!.add({
         'isAppointment': true,
         'appointment': appt,
       });
     }
 
-    // Re-sort the grouped map by time key
     final sortedGrouped = Map.fromEntries(
-      grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+      byTime.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
     );
 
+    if (!mounted) return;
     setState(() {
       _groupedIntakes = sortedGrouped;
     });
 
-    // Update time island after loading intakes
+    // Keep activity dots in sync after any change to intakes/appointments.
+    unawaited(_loadActivityWindow());
+
     await _updateTimeIsland();
 
-    // Scroll to next intake only if autoScroll is true
-    if (autoScroll) {
+    if (autoScroll && _isViewingToday) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToNextIntake();
       });
     }
   }
+
+  /// Back-compat shim — keep the existing public API used by speed-dial flows.
+  Future<void> loadTodaysIntakes({bool autoScroll = true}) =>
+      _loadIntakesForSelectedDate(autoScroll: autoScroll);
 
   void _scrollToNextIntake() {
     if (_groupedIntakes.isEmpty) return;
@@ -668,6 +740,22 @@ class DashboardScreenState extends State<DashboardScreen>
                         ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: WeekStrip(
+                  selectedDate: _selectedDate,
+                  activeDateKeys: _activeDateKeys,
+                  onDateSelected: (date) {
+                    if (date.year == _selectedDate.year &&
+                        date.month == _selectedDate.month &&
+                        date.day == _selectedDate.day) {
+                      return;
+                    }
+                    setState(() => _selectedDate = date);
+                    _loadIntakesForSelectedDate();
+                  },
+                ),
+              ),
               Expanded(
                 child: Stack(
                   children: [
@@ -676,7 +764,9 @@ class DashboardScreenState extends State<DashboardScreen>
                           ? Center(
                               child: EmptyStateCard(
                                 icon: Symbols.event_available,
-                                title: 'Ni načrtovanih vnosov za danes',
+                                title: _isViewingToday
+                                    ? 'Ni načrtovanih vnosov za danes'
+                                    : 'Ni načrtovanih vnosov za izbrani dan',
                                 subtitle: 'Dodajte zdravila ali termine',
                                 onTap: () => context.push('/add-medication'),
                               ),
@@ -699,9 +789,9 @@ class DashboardScreenState extends State<DashboardScreen>
                           final hour = int.parse(parts[0]);
                           final minute = int.parse(parts[1]);
                           final slotTime = DateTime(
-                            now.year,
-                            now.month,
-                            now.day,
+                            _selectedDate.year,
+                            _selectedDate.month,
+                            _selectedDate.day,
                             hour,
                             minute,
                           );
@@ -1109,3 +1199,4 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 }
+

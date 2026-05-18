@@ -157,6 +157,76 @@ class IntakeLogService {
     return grouped;
   }
 
+  /// Load all intakes for a date range, grouped by date key (yyyy-MM-dd).
+  /// Excludes future intakes for deleted medications.
+  Future<Map<String, List<Map<String, dynamic>>>> loadIntakesForRange({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final now = DateTime.now();
+    final intakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((t) => t.scheduledTime.isBiggerOrEqualValue(start))
+              ..where((t) => t.scheduledTime.isSmallerThanValue(end))
+              ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+            .get();
+
+    final planIds = intakes.map((i) => i.planId).toSet().toList();
+    final medIds = intakes.map((i) => i.medicationId).toSet().toList();
+
+    final plans = planIds.isEmpty
+        ? <MedicationPlan>[]
+        : await (db.select(db.medicationPlans)
+              ..where((t) => t.id.isIn(planIds)))
+            .get();
+    final medications = medIds.isEmpty
+        ? <Medication>[]
+        : await (db.select(db.medications)
+              ..where((t) => t.id.isIn(medIds)))
+            .get();
+    final rules = planIds.isEmpty
+        ? <MedicationScheduleRule>[]
+        : await (db.select(db.medicationScheduleRules)
+              ..where((t) => t.planId.isIn(planIds)))
+            .get();
+
+    final planMap = {for (final p in plans) p.id: p};
+    final medMap = {for (final m in medications) m.id: m};
+    final ruleByPlan = {for (final r in rules) r.planId: r};
+
+    final grouped = <String, List<Map<String, dynamic>>>{};
+
+    for (final intake in intakes) {
+      final plan = planMap[intake.planId];
+      if (plan == null) continue;
+      final medication = medMap[plan.medicationId];
+      if (medication == null) continue;
+
+      if (medication.status == MedicationStatus.deleted &&
+          intake.scheduledTime.isAfter(now)) {
+        continue;
+      }
+
+      final rule = ruleByPlan[plan.id];
+      final isOneTime =
+          rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
+
+      final d = intake.scheduledTime;
+      final dateKey =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+      grouped.putIfAbsent(dateKey, () => []);
+      grouped[dateKey]!.add({
+        'intake': intake,
+        'plan': plan,
+        'medication': medication,
+        'isOneTimeEntry': isOneTime,
+      });
+    }
+
+    return grouped;
+  }
+
   /// Delete a one-time entry
   Future<void> deleteOneTimeEntry(int intakeId) async {
     await (db.delete(
