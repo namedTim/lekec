@@ -212,42 +212,44 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
 
   Future<void> _deleteMedication(
     int medicationId,
-    String medicationName,
-  ) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Izbris zdravila',
-      message: 'Ali želite izbrisati zdravilo $medicationName?',
-    );
+    String medicationName, {
+    bool skipConfirm = false,
+  }) async {
+    if (!skipConfirm) {
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: 'Izbris zdravila',
+        message: 'Ali želite izbrisati zdravilo $medicationName?',
+      );
+      if (!confirmed) return;
+    }
 
-    if (confirmed) {
-      try {
-        final db = ref.read(databaseProvider);
-        final medicationService = MedicationService(db);
-        await medicationService.deleteMedication(medicationId);
+    try {
+      final db = ref.read(databaseProvider);
+      final medicationService = MedicationService(db);
+      await medicationService.deleteMedication(medicationId);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Zdravilo $medicationName je bilo izbrisano'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _refreshMedications();
-          // Refresh home screen to reflect deleted medication
-          homePageKey.currentState?.loadTodaysIntakes();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Napaka pri brisanju: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Zdravilo $medicationName je bilo izbrisano'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshMedications();
+        // Refresh home screen to reflect deleted medication
+        homePageKey.currentState?.loadTodaysIntakes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka pri brisanju: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -607,6 +609,7 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
                             'onDelete': () => _deleteMedication(
                               med['id'] as int,
                               med['name'] as String,
+                              skipConfirm: true,
                             ),
                             'onRefresh': _refreshMedications,
                           });

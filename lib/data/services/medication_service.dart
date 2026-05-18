@@ -231,7 +231,9 @@ class MedicationService {
           case 'weekly':
             if (rule.daysOfWeek != null) {
               final daysOfWeek = (jsonDecode(rule.daysOfWeek!) as List<dynamic>)
-                  .cast<int>();
+                  .cast<int>()
+                  .toList()
+                ..sort();
               final dayNames = [
                 'Pon',
                 'Tor',
@@ -259,6 +261,11 @@ class MedicationService {
             frequency = '${times.length}x dnevno';
         }
       }
+
+      // "HH:MM" sorts lexicographically — same order as chronologically.
+      // Guarantees the detail screen + the medication card display times
+      // in order regardless of the order the user originally entered them.
+      times.sort();
 
       result.add({
         'id': medication.id,

@@ -4,7 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../features/core/providers/database_provider.dart';
-import '../../main.dart' show homePageKey, medsPageKey;
+import '../../main.dart' show homePageKey, medsPageKey, userDetailsPageKey;
 import '../widgets/user_card.dart';
 import '../widgets/add_user_dialog.dart';
 import '../widgets/empty_state_card.dart';
@@ -53,6 +53,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => UserMedicationsScreen(
+          key: userDetailsPageKey,
           userId: user.id,
           userName: user.name,
         ),

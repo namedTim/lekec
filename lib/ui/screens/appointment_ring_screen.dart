@@ -107,7 +107,20 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
 
   Future<void> _dismiss() async {
     await Alarm.stop(widget.alarmSettings.id);
-    if (mounted) context.go('/');
+    if (!mounted) return;
+    // For synthetic/demo appointments (lookup returned nothing) just pop
+    // back to wherever we came from. Falling through to context.go('/') here
+    // would yank the user to the daily view, which is the wrong destination
+    // when they fired the alarm from the demo / settings flow.
+    if (_appointment == null) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        context.go('/');
+      }
+      return;
+    }
+    context.go('/');
   }
 
   String _formatTime(DateTime dt) {

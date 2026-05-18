@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../data/services/appointment_service.dart';
 import '../../database/drift_database.dart';
+import '../../main.dart' show userDetailsPageKey;
 import '../../ui/components/critical_reminder_recap.dart';
 
 /// Screen for creating or editing an appointment.
@@ -159,6 +160,11 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        // If the user details screen is alive in another tab branch
+        // (e.g. user opened it, switched to dashboard, then added a termin
+        // via the speed dial) refresh it so the appointment shows up without
+        // an app restart. Harmless no-op when nothing is listening.
+        userDetailsPageKey.currentState?.refresh();
         Navigator.of(context).pop(true); // return true to signal refresh needed
       }
     } catch (e) {
@@ -204,6 +210,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        userDetailsPageKey.currentState?.refresh();
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -332,6 +339,15 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Uredi termin' : 'Nov termin'),
+        actions: [
+          if (_isEditing)
+            IconButton(
+              onPressed: _isSaving ? null : _delete,
+              icon: Icon(Symbols.delete, color: colors.error),
+              tooltip: 'Izbriši termin',
+            ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

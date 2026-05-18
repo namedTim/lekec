@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:alarm/alarm.dart';
 import 'package:drift/drift.dart' as drift;
 import 'dart:convert';
 import '../../database/drift_database.dart';
@@ -7,6 +9,7 @@ import '../../database/tables/medications.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../components/confirmation_dialog.dart';
 import '../../main.dart' show db, homePageKey;
+import '../../data/services/medication_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/intake_schedule_generator.dart';
@@ -23,7 +26,7 @@ class MedicationDetailScreen extends StatefulWidget {
   final List<String> times;
   final String? intakeAdvice;
   final bool criticalReminder;
-  final VoidCallback onDelete;
+  final Future<void> Function() onDelete;
   final VoidCallback onRefresh;
   final bool isAsNeeded;
   final int? planId;
@@ -57,6 +60,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   late double _dosageAmount;
   late List<String> _times;
   late String? _intakeAdvice;
+  late bool _isAsNeeded;
+  late String _frequencyLabel;
 
   @override
   void initState() {
@@ -66,6 +71,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     _dosageAmount = widget.dosageAmount;
     _times = List.from(widget.times);
     _intakeAdvice = widget.intakeAdvice;
+    _isAsNeeded = widget.isAsNeeded;
+    _frequencyLabel = widget.frequency;
   }
 
   Future<void> _editInventory() async {
@@ -178,6 +185,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     if (picked != null && mounted) {
       await _updateTimes(() {
         _times[index] = _formatTime(picked);
+        _times.sort();
       });
     }
   }
@@ -196,18 +204,106 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   }
 
   Future<void> _deleteTime(int index) async {
-    if (_times.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mora biti vsaj en čas'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+    if (_times.length == 1) {
+      await _switchToAsNeeded();
       return;
     }
     await _updateTimes(() {
       _times.removeAt(index);
     });
+  }
+
+  /// Flip this medication's schedule to "Po potrebi" (as-needed).
+  /// Keeps the plan active, clears times + rule type, cancels notifications.
+  Future<void> _switchToAsNeeded() async {
+    if (widget.planId == null) return;
+    try {
+      await (db.update(db.medicationScheduleRules)
+            ..where((t) => t.planId.equals(widget.planId!)))
+          .write(
+        const MedicationScheduleRulesCompanion(
+          ruleType: drift.Value('asNeeded'),
+          timesOfDay: drift.Value(null),
+        ),
+      );
+
+      // Drop future intake logs + cancel their notifications/alarms.
+      final now = DateTime.now();
+      final futureIntakes = await (db.select(db.medicationIntakeLogs)
+            ..where((log) => log.planId.equals(widget.planId!))
+            ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+          .get();
+      final notificationService = NotificationService();
+      for (final intake in futureIntakes) {
+        await Alarm.stop(intake.id);
+        await notificationService.cancelNotification(intake.id);
+      }
+      await (db.delete(db.medicationIntakeLogs)
+            ..where((log) => log.planId.equals(widget.planId!))
+            ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
+          .go();
+
+      setState(() {
+        _times = [];
+        _isAsNeeded = true;
+        _frequencyLabel = 'Po potrebi';
+      });
+
+      widget.onRefresh();
+      homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Zdravilo nastavljeno na "Po potrebi"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  /// From an as-needed medication, soft-delete the current one (keeping it
+  /// in history) and route the user into the normal add-medication flow with
+  /// the name/type/advice prefilled — they end up with a fresh medication
+  /// that has the new schedule. This avoids carrying stale plan + rule rows
+  /// that would otherwise duplicate the medication in list queries.
+  Future<void> _setUpScheduleAgain() async {
+    if (widget.userId == null) return;
+    try {
+      await MedicationService(db).deleteMedication(widget.medicationId);
+      widget.onRefresh();
+      homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    // Pop the now-stale detail screen, then enter the add-medication flow on
+    // top of the user_medications screen so the user lands back there after
+    // saving (simple-planning ends with context.go('/')).
+    Navigator.of(context).pop();
+    context.push(
+      '/add-medication/frequency',
+      extra: {
+        'name': widget.medicationName,
+        'medTypeIndex': widget.medType.index,
+        'intakeAdvice': _intakeAdvice ?? '',
+        'userId': widget.userId!,
+      },
+    );
   }
 
   Future<void> _updateTimes(VoidCallback modifier) async {
@@ -460,7 +556,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                 ),
               );
               if (confirmed == true && context.mounted) {
-                widget.onDelete();
+                await widget.onDelete();
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
               }
             },
@@ -493,9 +590,9 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                       ),
                       child: Text(
                         widget.medicationName,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           color: colors.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -596,9 +693,9 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                           const SizedBox(width: 8),
                           Text(
                             'še $_pillsRemaining ${getMedicationUnitShort(widget.medType, _pillsRemaining)}',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: colors.onPrimaryContainer,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -632,100 +729,58 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.frequency,
+                        _frequencyLabel,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (_times.isNotEmpty && !widget.isAsNeeded) ...[
+                      if (_times.isNotEmpty && !_isAsNeeded) ...[
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ..._times.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final time = entry.value;
-                              return GestureDetector(
-                                onTap: () => _editTime(index),
-                                onLongPress: () => _deleteTime(index),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colors.secondaryContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        time,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                              color:
-                                                  colors.onSecondaryContainer,
-                                            ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Symbols.edit,
-                                        size: 14,
-                                        color: colors.onSecondaryContainer
-                                            .withOpacity(0.6),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }),
-                            // Add time button
-                            GestureDetector(
-                              onTap: _addTime,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: colors.primary.withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Symbols.add,
-                                      size: 16,
-                                      color: colors.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Dodaj',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            color: colors.primary,
-                                          ),
-                                    ),
-                                  ],
-                                ),
+                        ..._times.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final time = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _TimeRow(
+                              time: time,
+                              onEdit: () => _editTime(index),
+                              onDelete: () => _deleteTime(index),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _addTime,
+                            icon: const Icon(Symbols.add, size: 18),
+                            label: const Text('Dodaj čas'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: colors.primary,
+                              side: BorderSide(
+                                color: colors.primary.withOpacity(0.5),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tapni za urejanje, dolg pritisk za brisanje',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant.withOpacity(0.6),
-                            fontStyle: FontStyle.italic,
+                      ] else if (_isAsNeeded && widget.planId != null) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _setUpScheduleAgain,
+                            icon: const Icon(Symbols.add_alarm),
+                            label: const Text('Nastavi urnik opomnikov'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -875,3 +930,68 @@ class _EditableDetailCard extends StatelessWidget {
     );
   }
 }
+
+class _TimeRow extends StatelessWidget {
+  final String time;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _TimeRow({
+    required this.time,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 6, 6, 6),
+      child: Row(
+        children: [
+          Icon(
+            Symbols.schedule,
+            size: 20,
+            color: colors.onSurfaceVariant,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              time,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Symbols.edit, size: 20),
+            color: colors.onSurfaceVariant,
+            tooltip: 'Uredi čas',
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Symbols.delete, size: 20),
+            color: colors.error,
+            tooltip: 'Izbriši čas',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+

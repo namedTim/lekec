@@ -110,9 +110,9 @@ class WelcomeScreen extends StatelessWidget {
 
                       _FeatureItem(
                         icon: Symbols.mood,
-                        title: 'Razpoloženje & menstruacija',
+                        title: 'Razpoloženje',
                         description:
-                            'Beležite počutje in spremljajte menstrualni cikel',
+                            'Beležite počutje in sledite kako se počutite',
                         colors: colors,
                       ),
 

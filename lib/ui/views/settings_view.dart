@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:alarm/alarm.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../features/core/providers/theme_provider.dart';
@@ -13,6 +14,7 @@ import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
 import '../screens/terms_of_service_screen.dart';
 import '../screens/tip_screen.dart';
+import '../screens/demo_screen.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
@@ -37,11 +39,26 @@ class SettingsView extends ConsumerStatefulWidget {
 class _SettingsViewState extends ConsumerState<SettingsView> {
   AppSetting? _settings;
   bool _isLoading = true;
+  String? _versionLabel;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _versionLabel = 'Različica ${info.version} (${info.buildNumber})';
+        });
+      }
+    } catch (_) {
+      // Leave _versionLabel null; section will fall back to a placeholder.
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -480,6 +497,22 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           title: 'O aplikaciji',
           children: [
             _SettingsTile(
+              icon: Symbols.notifications_active,
+              accent: const Color(0xFFF59E0B),
+              title: 'Preizkus opomnikov',
+              subtitle: 'Pošlji testno obvestilo',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DemoScreen()),
+                );
+              },
+            ),
+            Divider(
+              height: 1,
+              indent: 72,
+              color: colors.outlineVariant.withOpacity(0.4),
+            ),
+            _SettingsTile(
               icon: Symbols.favorite,
               accent: const Color(0xFFEC4899),
               filled: true,
@@ -507,6 +540,32 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   ),
                 );
               },
+            ),
+            Divider(
+              height: 1,
+              indent: 72,
+              color: colors.outlineVariant.withOpacity(0.4),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+              child: Row(
+                children: [
+                  Icon(
+                    Symbols.info,
+                    color: colors.onSurfaceVariant,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _versionLabel ?? 'Različica …',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

@@ -72,7 +72,6 @@ class _MedicationFrequencySelectionScreenState
     }
 
     if (_selectedFrequency == FrequencyOption.moreOptions) {
-      // Navigate to advanced medication planning
       context.push(
         '/add-medication/advanced-planning',
         extra: {

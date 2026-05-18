@@ -9,14 +9,12 @@ import '../../database/tables/medications.dart';
 import '../../helpers/user_color_helper.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/mood_service.dart';
-import '../../data/services/period_service.dart';
 import '../../data/services/appointment_service.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/empty_state_card.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/mood_logging_sheet.dart';
-import '../components/period_logging_sheet.dart';
 import '../../main.dart' show db, homePageKey, medsPageKey;
 import '../../data/services/intake_log_service.dart';
 import '../screens/add_appointment_screen.dart';
@@ -34,55 +32,36 @@ class UserMedicationsScreen extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<UserMedicationsScreen> createState() =>
-      _UserMedicationsScreenState();
+      UserMedicationsScreenState();
 }
 
-class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
+class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
   List<Map<String, dynamic>> _medications = [];
   bool _isLoading = true;
-  String? _userGender;
 
   // Mood tracking state
   List<Map<String, dynamic>> _moodHistory = [];
   double? _averageMood;
   MoodEntry? _todaysMood;
 
-  // Period tracking state
-  PeriodEntry? _activePeriod;
-  int? _avgCycleLength;
-  int? _avgPeriodDuration;
-  DateTime? _nextPeriodPrediction;
-  List<Map<String, dynamic>> _recentCycles = [];
-
   // Appointments state
   List<Appointment> _appointments = [];
-
-  bool get _isFemale => _userGender == 'female';
 
   @override
   void initState() {
     super.initState();
-    _loadUserGender();
     _loadUserMedications();
     _loadMoodData();
     _loadAppointments();
   }
 
-  Future<void> _loadUserGender() async {
-    try {
-      final user = await (db.select(
-        db.users,
-      )..where((t) => t.id.equals(widget.userId))).getSingleOrNull();
-      if (mounted && user != null) {
-        setState(() {
-          _userGender = user.gender;
-        });
-        // Only load period data for female users
-        if (user.gender == 'female') {
-          _loadPeriodData();
-        }
-      }
-    } catch (_) {}
+  /// Re-fetch everything this screen displays. Called from outside via the
+  /// global key (e.g. after an appointment is added from the dashboard speed
+  /// dial while this screen is alive in another tab branch).
+  void refresh() {
+    _loadUserMedications();
+    _loadMoodData();
+    _loadAppointments();
   }
 
   Future<void> _loadMoodData() async {
@@ -100,31 +79,6 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
           _moodHistory = history;
           _averageMood = avg;
           _todaysMood = todaysMood;
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _loadPeriodData() async {
-    try {
-      final periodService = PeriodService(db);
-      final active = await periodService.getActivePeriod(widget.userId);
-      final avgCycle = await periodService.getAverageCycleLength(widget.userId);
-      final avgDuration = await periodService.getAveragePeriodDuration(
-        widget.userId,
-      );
-      final nextPrediction = await periodService.predictNextPeriod(
-        widget.userId,
-      );
-      final cycles = await periodService.getCompletedCycles(widget.userId);
-
-      if (mounted) {
-        setState(() {
-          _activePeriod = active;
-          _avgCycleLength = avgCycle;
-          _avgPeriodDuration = avgDuration;
-          _nextPeriodPrediction = nextPrediction;
-          _recentCycles = cycles;
         });
       }
     } catch (_) {}
@@ -196,40 +150,44 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
 
   Future<void> _deleteMedication(
     int medicationId,
-    String medicationName,
-  ) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Izbris zdravila',
-      message:
-          'Ali želite izbrisati zdravilo $medicationName za uporabnika ${widget.userName}?',
-    );
+    String medicationName, {
+    bool skipConfirm = false,
+  }) async {
+    if (!skipConfirm) {
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: 'Izbris zdravila',
+        message:
+            'Ali želite izbrisati zdravilo $medicationName za uporabnika ${widget.userName}?',
+      );
+      if (!confirmed) return;
+    }
 
-    if (confirmed) {
-      try {
-        final medicationService = MedicationService(db);
-        await medicationService.deleteMedication(medicationId);
+    try {
+      final medicationService = MedicationService(db);
+      await medicationService.deleteMedication(medicationId);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Zdravilo $medicationName je bilo izbrisano'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _loadUserMedications();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Napaka pri brisanju: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Zdravilo $medicationName je bilo izbrisano'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadUserMedications();
+        homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+        medsPageKey.currentState?.refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka pri brisanju: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -494,325 +452,6 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     }
   }
 
-  Widget _buildPeriodSection(ThemeData theme, ColorScheme colors) {
-    final hasAnyData =
-        _activePeriod != null ||
-        _recentCycles.isNotEmpty ||
-        _avgCycleLength != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Quick log button
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _onQuickLogPeriod,
-              icon: const Icon(Symbols.water_drop, size: 16, color: Colors.red),
-              label: const Text('Zabeleži'),
-            ),
-          ),
-        ),
-
-        // Active period indicator
-        if (_activePeriod != null)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.errorContainer.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.error.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Symbols.water_drop, color: colors.error, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Menstruacija v teku',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colors.error,
-                        ),
-                      ),
-                      Text(
-                        'Začetek: ${_formatDate(_activePeriod!.date)} (${DateTime.now().difference(_activePeriod!.date).inDays + 1}. dan)',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton(
-                  onPressed: () => _endPeriod(),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.error,
-                    foregroundColor: colors.onError,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: const Text('Končaj'),
-                ),
-              ],
-            ),
-          ),
-
-        // Cycle stats
-        if (_avgCycleLength != null || _avgPeriodDuration != null)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                if (_avgCycleLength != null)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '$_avgCycleLength',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
-                          ),
-                        ),
-                        Text(
-                          'dni cikel',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (_avgCycleLength != null && _avgPeriodDuration != null)
-                  Container(width: 1, height: 40, color: colors.outlineVariant),
-                if (_avgPeriodDuration != null)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '$_avgPeriodDuration',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colors.error,
-                          ),
-                        ),
-                        Text(
-                          'dni trajanje',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-        // Next period prediction
-        if (_nextPeriodPrediction != null && _activePeriod == null)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.tertiaryContainer.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(Symbols.event, color: colors.tertiary, size: 24),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Naslednja predvidena menstruacija',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      _formatDate(_nextPeriodPrediction!),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.tertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-        // Recent cycles
-        if (_recentCycles.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Zadnji cikli',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ..._recentCycles.reversed.take(4).map((cycle) {
-                  final start = cycle['start'] as DateTime;
-                  final end = cycle['end'] as DateTime;
-                  final days = cycle['durationDays'] as int;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Icon(Symbols.water_drop, size: 16, color: colors.error),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_formatDate(start)} – ${_formatDate(end)}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        const Spacer(),
-                        Text(
-                          '$days dni',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-
-        if (!hasAnyData)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: EmptyStateInline(
-              icon: Symbols.water_drop,
-              message: 'Ni zabeleženih podatkov o menstruaciji',
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}. ${date.month}. ${date.year}';
-  }
-
-  Future<void> _onQuickLogPeriod() async {
-    try {
-      final periodService = PeriodService(db);
-      final active = await periodService.getActivePeriod(widget.userId);
-
-      if (!mounted) return;
-
-      final result = await showPeriodLoggingSheet(
-        context: context,
-        hasActivePeriod: active != null,
-      );
-      if (result == null || !mounted) return;
-
-      final action = result['action'] as String;
-      final now = DateTime.now();
-
-      if (action == 'start') {
-        await periodService.logPeriodStart(
-          userId: widget.userId,
-          date: now,
-          flowIntensity: result['flowIntensity'] as int?,
-          note: result['note'] as String?,
-        );
-      } else if (action == 'end') {
-        await periodService.logPeriodEnd(
-          userId: widget.userId,
-          date: now,
-          note: result['note'] as String?,
-        );
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              action == 'start'
-                  ? '🔴 Začetek menstruacije zabeležen'
-                  : '✓ Konec menstruacije zabeležen',
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        _loadPeriodData();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _endPeriod() async {
-    try {
-      final periodService = PeriodService(db);
-      await periodService.logPeriodEnd(
-        userId: widget.userId,
-        date: DateTime.now(),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Konec menstruacije zabeležen'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        _loadPeriodData();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Napaka: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -887,34 +526,6 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                         : null,
                     child: _buildMoodSection(theme, colors),
                   ),
-
-                  // ── Menstruacija (female only) ────────────────────────────
-                  if (_isFemale)
-                    _ExpandableSection(
-                      icon: Symbols.water_drop,
-                      iconColor: colors.error,
-                      title: 'Menstruacija',
-                      trailing: _activePeriod != null
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colors.errorContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'V teku',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colors.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            )
-                          : null,
-                      child: _buildPeriodSection(theme, colors),
-                    ),
 
                   // ── Termini ──────────────────────────────────────────────
                   _ExpandableSection(
@@ -1011,6 +622,7 @@ class _UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
               'onDelete': () => _deleteMedication(
                 med['id'] as int,
                 med['name'] as String,
+                skipConfirm: true,
               ),
               'onRefresh': _loadUserMedications,
             });

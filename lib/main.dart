@@ -14,12 +14,16 @@ import 'package:logging/logging.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
+import 'ui/screens/demo_screen.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'ui/screens/dashboard.dart';
 import 'ui/screens/people_screen.dart';
 
 export 'ui/screens/dashboard.dart' show DashboardScreenState;
+export 'ui/screens/user_medications_screen.dart'
+    show UserMedicationsScreenState;
+import 'ui/screens/user_medications_screen.dart';
 import 'ui/screens/add_medication.dart';
 import 'ui/screens/add_single_entry.dart';
 import 'ui/screens/add_single_entry_quantity.dart';
@@ -54,6 +58,8 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<DashboardScreenState> homePageKey =
     GlobalKey<DashboardScreenState>();
 final GlobalKey<MedsScreenState> medsPageKey = GlobalKey<MedsScreenState>();
+final GlobalKey<UserMedicationsScreenState> userDetailsPageKey =
+    GlobalKey<UserMedicationsScreenState>();
 
 final _router = GoRouter(
   navigatorKey: rootNavigatorKey,
@@ -131,6 +137,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/dev',
       builder: (context, state) => const DeveloperSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/demo',
+      builder: (context, state) => const DemoScreen(),
     ),
     GoRoute(
       path: '/add-medication',
@@ -346,7 +356,7 @@ final _router = GoRouter(
           times: (extra['times'] as List).cast<String>(),
           intakeAdvice: extra['intakeAdvice'] as String?,
           criticalReminder: extra['criticalReminder'] as bool,
-          onDelete: extra['onDelete'] as VoidCallback,
+          onDelete: extra['onDelete'] as Future<void> Function(),
           onRefresh: extra['onRefresh'] as VoidCallback,
           isAsNeeded: (extra['isAsNeeded'] as bool?) ?? false,
           planId: extra['planId'] as int?,
