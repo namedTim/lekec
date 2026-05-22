@@ -22,7 +22,11 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
   workmanager: ^0.9.0
-  alarm: ^5.1.5
+  # Vendored fork of the `alarm` package (see packages/alarm). Forked to add
+  # custom notification action buttons (e.g. "Sem vzel" / "Bom preskočil") to
+  # the full-screen alarm notification on Android.
+  alarm:
+    path: packages/alarm
   permission_handler: ^12.0.1
   url_launcher: ^6.3.1
   intl: any
@@ -36,6 +40,10 @@ dependencies:
   in_app_purchase: ^3.2.0
   in_app_purchase_android: ^0.4.0
   package_info_plus: ^8.0.0
+  # Backs the cross-isolate queue for medication notification action taps
+  # ("Sem vzel" / "Bom preskočil") on non-critical reminders — see
+  # lib/data/services/pending_action_queue.dart.
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

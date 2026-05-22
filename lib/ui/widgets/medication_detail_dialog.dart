@@ -145,13 +145,13 @@ class MedicationDetailDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Row(
                 children: [
-                  // Ne vzamem — left
+                  // Preskočim — left
                   if (onNotTake != null)
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: onNotTake,
                         icon: const Icon(Symbols.close, size: 18),
-                        label: const Text('Nisem vzel'),
+                        label: const Text('Preskočim'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.error,
                           side: BorderSide(color: colors.error.withOpacity(0.4)),
@@ -170,7 +170,7 @@ class MedicationDetailDialog extends StatelessWidget {
                       child: FilledButton.icon(
                         onPressed: onTake,
                         icon: const Icon(Symbols.check, size: 18),
-                        label: const Text('Sem vzel'),
+                        label: const Text('Vzamem'),
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF22C55E),
                           foregroundColor: Colors.white,

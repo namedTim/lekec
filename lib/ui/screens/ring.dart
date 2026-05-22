@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../data/services/notification_service.dart';
+import '../../data/services/user_labels.dart';
 import '../../database/drift_database.dart';
 import '../../main.dart' show db, homePageKey;
 
@@ -23,9 +25,17 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.lekec/lockscreen');
   Map<String, dynamic>? _medicationDetails;
+  UserLabels _labels = UserLabels.fallback;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   Timer? _autoStopTimer;
+  StreamSubscription<AlarmSet>? _ringingSub;
+
+  /// True once this screen has handled the alarm itself — via its own buttons
+  /// or the auto-stop timer. Guards the [Alarm.ringing] listener so it only
+  /// reacts when the alarm is stopped *externally* (a notification action).
+  bool _handledBySelf = false;
+  bool _autoStopped = false;
 
   /// Auto-stop ringing after 5 minutes
   static const _autoStopDuration = Duration(minutes: 5);
@@ -46,11 +56,34 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
     );
 
     _autoStopTimer = Timer(_autoStopDuration, _onAutoStop);
+
+    // Close this screen if the alarm is stopped from outside it — e.g. the
+    // user tapped a notification action button instead of using these
+    // controls. The action itself is applied by NotificationActionService.
+    _ringingSub = Alarm.ringing.listen((alarmSet) {
+      final stillRinging =
+          alarmSet.alarms.any((a) => a.id == widget.alarmSettings.id);
+      if (!stillRinging && !_handledBySelf && !_autoStopped && mounted) {
+        _onExternallyStopped();
+      }
+    });
   }
 
   Future<void> _onAutoStop() async {
     // Stop the alarm sound but leave the screen open for the user to act
+    _autoStopped = true;
     await Alarm.stop(widget.alarmSettings.id);
+  }
+
+  /// The alarm was stopped from outside this screen (a notification action
+  /// button). Just dismiss the full-screen UI — the database update was
+  /// already applied by NotificationActionService.
+  void _onExternallyStopped() {
+    _handledBySelf = true;
+    context.go('/');
+    Future.delayed(const Duration(milliseconds: 300), () {
+      homePageKey.currentState?.loadTodaysIntakes();
+    });
   }
 
   Future<void> _showOverLockscreen(bool show) async {
@@ -67,10 +100,12 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
       widget.alarmSettings.id,
       db,
     );
+    final labels = await UserLabels.forPrimaryUser(db);
 
     if (mounted) {
       setState(() {
         _medicationDetails = details;
+        _labels = labels;
       });
     }
   }
@@ -78,12 +113,14 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   @override
   void dispose() {
     _autoStopTimer?.cancel();
+    _ringingSub?.cancel();
     _showOverLockscreen(false);
     _pulseController.dispose();
     super.dispose();
   }
 
   Future<void> _stopAlarm() async {
+    _handledBySelf = true;
     // Stop the alarm
     await Alarm.stop(widget.alarmSettings.id);
 
@@ -122,6 +159,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   }
 
   Future<void> _snoozeAlarm() async {
+    _handledBySelf = true;
     final newTime = DateTime.now().add(const Duration(minutes: 10));
 
     // If this is a demo/test alarm (no medication details), just snooze and close
@@ -163,6 +201,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   }
 
   Future<void> _dismissAlarm() async {
+    _handledBySelf = true;
     // Just stop the alarm
     await Alarm.stop(widget.alarmSettings.id);
 
@@ -183,6 +222,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
   Future<void> _checkDemoAlarm() async{
     if (_medicationDetails?['dosage'] == ''){
       // just pop alarm screen and stop alarm
+      _handledBySelf = true;
       await Alarm.stop(widget.alarmSettings.id);
       if (mounted) {
         context.pop();
@@ -406,7 +446,7 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
                               Icon(Symbols.check_circle, size: 28),
                               const SizedBox(width: 12),
                               Text(
-                                'SEM VZEL',
+                                _labels.taken.toUpperCase(),
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.2,

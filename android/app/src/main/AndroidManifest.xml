@@ -36,6 +36,11 @@
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup" />
         </provider>
+        <!-- Receives taps on notification action buttons ("Sem vzel" /
+             "Bom preskočil"). flutter_local_notifications does not declare
+             this in its own manifest, so it must be added here or the action
+             buttons silently do nothing. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>

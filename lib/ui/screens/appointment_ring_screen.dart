@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -28,6 +29,13 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   Timer? _autoStopTimer;
+  StreamSubscription<AlarmSet>? _ringingSub;
+
+  /// True once this screen has handled the alarm itself. Guards the
+  /// [Alarm.ringing] listener so it only reacts to an external stop (the user
+  /// tapping the "Razumem" notification action button).
+  bool _handledBySelf = false;
+  bool _autoStopped = false;
 
   /// Auto-stop ringing after 5 minutes
   static const _autoStopDuration = Duration(minutes: 5);
@@ -48,10 +56,37 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
     );
 
     _autoStopTimer = Timer(_autoStopDuration, _onAutoStop);
+
+    // Close this screen if the alarm is stopped from the notification action
+    // button ("Razumem") instead of from this screen.
+    _ringingSub = Alarm.ringing.listen((alarmSet) {
+      final stillRinging =
+          alarmSet.alarms.any((a) => a.id == widget.alarmSettings.id);
+      if (!stillRinging && !_handledBySelf && !_autoStopped && mounted) {
+        _onExternallyStopped();
+      }
+    });
   }
 
   Future<void> _onAutoStop() async {
+    _autoStopped = true;
     await Alarm.stop(widget.alarmSettings.id);
+  }
+
+  /// The alarm was stopped from the notification action button. Just dismiss
+  /// the full-screen UI.
+  void _onExternallyStopped() {
+    _handledBySelf = true;
+    if (!mounted) return;
+    if (_appointment == null) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        context.go('/');
+      }
+      return;
+    }
+    context.go('/');
   }
 
   Future<void> _showOverLockscreen(bool show) async {
@@ -100,12 +135,14 @@ class _AppointmentRingScreenState extends State<AppointmentRingScreen>
   @override
   void dispose() {
     _autoStopTimer?.cancel();
+    _ringingSub?.cancel();
     _showOverLockscreen(false);
     _pulseController.dispose();
     super.dispose();
   }
 
   Future<void> _dismiss() async {
+    _handledBySelf = true;
     await Alarm.stop(widget.alarmSettings.id);
     if (!mounted) return;
     // For synthetic/demo appointments (lookup returned nothing) just pop

@@ -52,17 +52,37 @@ class AlarmPermissions {
   /// what bit us when the package was renamed to `si.lekec.app`. Detect the
   /// missing grant and route the user to the right settings page.
   static Future<void> checkFullScreenIntentPermission() async {
-    if (!Alarm.android) return;
+    if (await isFullScreenIntentAllowed()) return;
+    _log.info('Opening full-screen intent settings…');
+    await openFullScreenIntentSettings();
+  }
+
+  /// Whether the app may launch a full-screen intent (the alarm ring screen
+  /// over the lock screen). Always true below Android 14 and on iOS.
+  ///
+  /// This grant is **not** kept across an uninstall/reinstall, and a fresh
+  /// install on Android 14+ does not get it automatically — so it must be
+  /// re-checked on every startup, not only during onboarding.
+  static Future<bool> isFullScreenIntentAllowed() async {
+    if (!Alarm.android) return true;
     try {
-      final allowed =
-          await _platform.invokeMethod<bool>('canUseFullScreenIntent') ?? true;
-      _log.info('Full-screen intent allowed: $allowed.');
-      if (!allowed) {
-        _log.info('Opening full-screen intent settings…');
-        await _platform.invokeMethod('openFullScreenIntentSettings');
-      }
+      return await _platform.invokeMethod<bool>('canUseFullScreenIntent') ??
+          true;
     } catch (e) {
       _log.warning('Full-screen intent check failed: $e');
+      // Assume allowed so a flaky channel call never blocks the user.
+      return true;
+    }
+  }
+
+  /// Opens the system page where the user can grant the full-screen intent
+  /// permission (falls back to the app details page on older devices).
+  static Future<void> openFullScreenIntentSettings() async {
+    if (!Alarm.android) return;
+    try {
+      await _platform.invokeMethod('openFullScreenIntentSettings');
+    } catch (e) {
+      _log.warning('Could not open full-screen intent settings: $e');
     }
   }
 

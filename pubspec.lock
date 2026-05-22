@@ -12,10 +12,9 @@ packages:
   alarm:
     dependency: "direct main"
     description:
-      name: alarm
-      sha256: "1c85123c606586b449b6a6e27f808152c1cae759323aefbe4354317092d55dc9"
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/alarm"
+      relative: true
+    source: path
     version: "5.1.5"
   analyzer:
     dependency: transitive
@@ -993,7 +992,7 @@ packages:
     source: hosted
     version: "5.0.2"
   shared_preferences:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: shared_preferences
       sha256: "2939ae520c9024cb197fc20dee269cd8cdbf564c8b5746374ec6cacdc5169e64"

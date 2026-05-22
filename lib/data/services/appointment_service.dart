@@ -276,8 +276,13 @@ class AppointmentService {
       notificationSettings: NotificationSettings(
         title: 'Termin ${formatRelativeOffset(reminderMinutesBefore)}: $title',
         body: _formatBody(appointmentTime),
+        // iOS fallback — on Android the actionButton below takes over.
         stopButton: 'Ustavi alarm',
         icon: 'notification_icon',
+        // A single acknowledge button for appointment reminders.
+        actionButtons: const [
+          NotificationActionButton(id: 'ack', text: 'Razumem'),
+        ],
       ),
     );
 

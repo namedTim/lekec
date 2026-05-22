@@ -1,15 +1,36 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:ui' show DartPluginRegistrant;
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
-import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
 import '../../main.dart' show homePageKey, rootNavigatorKey;
 import 'package:go_router/go_router.dart';
 import 'package:alarm/alarm.dart';
+import 'pending_action_queue.dart';
+import 'user_labels.dart';
+
+/// Handles medication notification action button taps ("Sem vzel" /
+/// "Bom preskočil") that arrive while the app is terminated.
+///
+/// `flutter_local_notifications` runs this in a short-lived background
+/// isolate, so it only parks the tap in [PendingActionQueue] —
+/// [NotificationActionService] applies it the next time the app runs.
+@pragma('vm:entry-point')
+Future<void> notificationTapBackground(NotificationResponse response) async {
+  final actionId = response.actionId;
+  if (actionId != 'taken' && actionId != 'skip') return;
+  final intakeId = int.tryParse(response.payload ?? '');
+  if (intakeId == null) return;
+  // Required before using plugins (SharedPreferences) in a background isolate.
+  DartPluginRegistrant.ensureInitialized();
+  // actionId is non-null here — the guard above returns otherwise.
+  await PendingActionQueue.enqueue(intakeId, actionId!);
+}
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -85,6 +106,7 @@ class NotificationService {
     await _notifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
     // Permissions (notification, exact alarm, full-screen intent, battery
@@ -101,17 +123,19 @@ class NotificationService {
 
   void _onNotificationTap(NotificationResponse response) {
     developer.log(
-      'Notification tapped: ${response.payload}',
+      'Notification tapped: ${response.payload}, action: ${response.actionId}',
       name: 'NotificationService',
     );
 
-    // Parse intake ID from payload
     final intakeId = int.tryParse(response.payload ?? '');
-    if (intakeId != null) {
-      // Retry navigation with a delay in case the router isn't built yet
-      // (e.g., cold-start from notification)
-      _navigateToIntake(intakeId, retries: 5);
-    }
+    if (intakeId == null) return;
+
+    // Action button taps ("Sem vzel" / "Bom preskočil") are NOT delivered
+    // here — flutter_local_notifications always routes them to the background
+    // isolate (notificationTapBackground), even when the app is running. So
+    // this is always a plain tap on the notification body: open the app at
+    // this intake. Retry in case the router isn't built yet (cold start).
+    _navigateToIntake(intakeId, retries: 5);
   }
 
   void _navigateToIntake(int intakeId, {int retries = 5}) {
@@ -240,7 +264,12 @@ class NotificationService {
       final alarmVolume = settingsQuery?.alarmVolume ?? 0.8;
       final alarmSound = settingsQuery?.alarmSound ?? '8bit_arcade.mp3';
       final alarmVibration = settingsQuery?.alarmVibration ?? true;
-      final notificationOnKill = settingsQuery?.showKillWarning ?? true;
+      final labels = database != null
+          ? await UserLabels.forPrimaryUser(database)
+          : UserLabels.fallback;
+      // Kill-warning notification disabled for now — re-enable by restoring
+      // this line and the `warningNotificationOnKill` arg below.
+      // final notificationOnKill = settingsQuery?.showKillWarning ?? true;
 
       final alarmSettings = AlarmSettings(
         id: id,
@@ -249,13 +278,22 @@ class NotificationService {
         loopAudio: true,
         vibrate: alarmVibration,
         androidFullScreenIntent: true,
-        warningNotificationOnKill: notificationOnKill,
+        // Kill-warning notification disabled for now.
+        // warningNotificationOnKill: notificationOnKill,
+        warningNotificationOnKill: false,
         volumeSettings: VolumeSettings.fixed(volume: alarmVolume),
         notificationSettings: NotificationSettings(
           title: 'Kritičen opomnik: Vzemite $medicationName',
           body: dosage != null ? 'Vzemite $dosage' : 'Čas za jemanje zdravila',
+          // iOS fallback — on Android the actionButtons below take over.
           stopButton: 'Zaustavi',
           icon: 'notification_icon',
+          // Let the user act straight from the notification without opening
+          // the full-screen alarm UI. Handled by NotificationActionService.
+          actionButtons: [
+            NotificationActionButton(id: 'taken', text: labels.taken),
+            NotificationActionButton(id: 'skip', text: labels.skip),
+          ],
         ),
       );
 
@@ -277,7 +315,10 @@ class NotificationService {
     }
 
     // Regular notification for non-critical reminders
-    const androidDetails = AndroidNotificationDetails(
+    final nonCriticalLabels = database != null
+        ? await UserLabels.forPrimaryUser(database)
+        : UserLabels.fallback;
+    final androidDetails = AndroidNotificationDetails(
       'medication_reminders',
       'Opomniki za zdravila',
       channelDescription: 'Opomniki za jemanje zdravil',
@@ -286,6 +327,23 @@ class NotificationService {
       icon: '@mipmap/launcher_icon',
       playSound: true,
       enableVibration: true,
+      // Let the user act straight from the notification. Handled in the
+      // foreground by _onNotificationTap and, when the app is killed, by the
+      // top-level notificationTapBackground handler.
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'taken',
+          nonCriticalLabels.taken,
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+        AndroidNotificationAction(
+          'skip',
+          nonCriticalLabels.skip,
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+      ],
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -294,7 +352,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const notificationDetails = NotificationDetails(
+    final notificationDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -354,21 +412,34 @@ class NotificationService {
       }
     }
 
-    // Stop medication-related Alarm alarms (IDs < 900000), but never an
-    // alarm that is currently ringing.
+    // Stop medication-related Alarm alarms (IDs < 900000), but never one that
+    // is currently ringing.
+    //
+    // The ringing state is re-checked natively (`Alarm.isRinging`) right
+    // before each stop — NOT from a snapshot and NOT from `Alarm.ringing`:
+    //  * A snapshot taken once before the loop races with an alarm that starts
+    //    ringing mid-loop.
+    //  * This method also runs in the Workmanager background isolate, whose
+    //    Dart-side `Alarm.ringing` is always empty — relying on it there would
+    //    stop an alarm that is ringing right now, cutting the reminder off
+    //    about a second after it starts. `Alarm.isRinging` reads the
+    //    process-wide native state, so it is correct from any isolate.
     final activeAlarms = await Alarm.getAlarms();
-    final ringingIds = Alarm.ringing.value.alarms.map((a) => a.id).toSet();
     int stoppedCount = 0;
+    int skippedRinging = 0;
     for (final alarm in activeAlarms) {
-      if (alarm.id < 900000 && !ringingIds.contains(alarm.id)) {
-        await Alarm.stop(alarm.id);
-        stoppedCount++;
+      if (alarm.id >= 900000) continue;
+      if (await Alarm.isRinging(alarm.id)) {
+        skippedRinging++;
+        continue;
       }
+      await Alarm.stop(alarm.id);
+      stoppedCount++;
     }
 
     developer.log(
       'Cancelled $cancelledNotifs medication notifications and $stoppedCount alarms '
-      '(skipped ${ringingIds.length} ringing, preserved appointments)',
+      '(skipped $skippedRinging ringing, preserved appointments)',
       name: 'NotificationService',
     );
   }

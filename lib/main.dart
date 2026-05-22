@@ -45,9 +45,11 @@ import 'features/core/providers/theme_provider.dart';
 import 'features/core/providers/onboarding_provider.dart';
 import 'database/tables/medications.dart';
 import 'services/gemini_medication_service.dart';
+import 'services/permission.dart';
 import 'ui/theme/app_theme.dart';
 import 'data/services/intake_schedule_generator.dart';
 import 'data/services/notification_service.dart';
+import 'data/services/notification_action_service.dart';
 import 'data/services/background_task_service.dart';
 import 'ui/screens/onboarding/onboarding_flow.dart';
 
@@ -410,7 +412,7 @@ Future<void> main() async {
 
   // Initialize database early — constructor is cheap (lazy open)
   db = AppDatabase();
-  AlarmService alarmService = AlarmService(rootNavigatorKey);
+  AlarmService alarmService = AlarmService(rootNavigatorKey, db);
 
   try {
     // PRIORITY: Initialize alarm service FIRST for fastest response.
@@ -436,11 +438,26 @@ Future<void> main() async {
     // Initialize listeners
     alarmService.initialize();
 
-    // Set alarm warning notification
-    await Alarm.setWarningNotificationOnKill(
-      "Lekec opozorilo",
-      "Pustite aplikacijo zagnano v ozadju, da zanesljivo prejmete opozorila o zdravilih.",
-    ).timeout(const Duration(seconds: 3), onTimeout: () {});
+    // Apply notification action button taps recorded while the app was closed
+    // ("Sem vzel" / "Bom preskočil" / "Razumem") BEFORE checkInitialRingingAlarms
+    // runs below — otherwise a just-handled alarm could re-pop its ring screen.
+    await NotificationActionService(db)
+        .drainPendingActions()
+        .timeout(const Duration(seconds: 10), onTimeout: () {});
+
+    // Keep applying taps as they happen: the ringing set changes whenever an
+    // alarm starts or stops, including a stop triggered by a notification
+    // action button.
+    Alarm.ringing.listen((_) {
+      NotificationActionService(db).drainPendingActions();
+    });
+
+    // Kill-warning notification disabled for now — re-enable by uncommenting
+    // this together with `warningNotificationOnKill` in NotificationService.
+    // await Alarm.setWarningNotificationOnKill(
+    //   "Lekec opozorilo",
+    //   "Pustite aplikacijo zagnano v ozadju, da zanesljivo prejmete opozorila o zdravilih.",
+    // ).timeout(const Duration(seconds: 3), onTimeout: () {});
   } catch (e, st) {
     Logger('main').severe('Critical startup error', e, st);
   }
@@ -479,6 +496,9 @@ Future<void> _initializeServicesInBackground() async {
     // Initialize notification service
     final notificationService = NotificationService();
     await notificationService.initialize();
+
+    // Apply any notification action button taps made while the app was closed.
+    await NotificationActionService(db).drainPendingActions();
 
     // Generate upcoming intake schedules
     final scheduleGenerator = IntakeScheduleGenerator(db);
@@ -537,14 +557,27 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   /// twice on every cold start.
   bool _skipFirstResume = true;
 
+  /// Action buttons on non-critical reminders are delivered to a background
+  /// isolate (see notificationTapBackground), so a tap made while the app is
+  /// open isn't seen here directly. Poll the queue so those taps still get
+  /// applied promptly without needing an app resume.
+  Timer? _actionDrainTimer;
+
+  /// Guards the one-per-launch full-screen-intent permission re-check.
+  bool _fsiChecked = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _actionDrainTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      NotificationActionService(db).drainPendingActions();
+    });
   }
 
   @override
   void dispose() {
+    _actionDrainTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -563,6 +596,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   /// schedule horizon and re-arms OS notifications/alarms so a long backgrounded
   /// session can't leave the user without upcoming reminders.
   Future<void> _refreshSchedulesOnResume() async {
+    // Pick up any notification action taps made while backgrounded.
+    await NotificationActionService(db).drainPendingActions();
     try {
       final generator = IntakeScheduleGenerator(db);
       await generator.generateScheduledIntakes().timeout(
@@ -578,6 +613,57 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     } catch (e) {
       Logger('main').warning('Resume: scheduleAllUpcomingNotifications failed: $e');
     }
+  }
+
+  /// Re-checks the Android 14+ full-screen-intent permission once per launch.
+  /// Without it, alarm reminders can't appear over the lock screen — and the
+  /// grant is silently lost on an uninstall/reinstall or an OS upgrade, so the
+  /// onboarding-time check alone isn't enough.
+  void _scheduleFullScreenIntentCheck() {
+    if (_fsiChecked) return;
+    _fsiChecked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _promptFullScreenIntentIfNeeded();
+    });
+  }
+
+  Future<void> _promptFullScreenIntentIfNeeded() async {
+    // Let the app settle — and let any cold-start alarm screen open first.
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    // Never interrupt a ringing alarm with this dialog.
+    if (Alarm.ringing.value.alarms.isNotEmpty) return;
+    if (await AlarmPermissions.isFullScreenIntentAllowed()) return;
+
+    final context = rootNavigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Symbols.lock_open),
+        title: const Text('Opomniki se ne prikažejo čez zaklenjen zaslon'),
+        content: const Text(
+          'Da se opomnik za zdravilo pokaže čez zaklenjen zaslon — brez '
+          'predhodnega odklepanja — mora imeti Lekec dovoljenje za '
+          'celozaslonska obvestila.\n\nTo dovoljenje se ponastavi ob ponovni '
+          'namestitvi aplikacije. Odprite nastavitve in ga znova omogočite.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Pozneje'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              AlarmPermissions.openFullScreenIntentSettings();
+            },
+            child: const Text('Odpri nastavitve'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -610,6 +696,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         }
 
         // Show main app
+        _scheduleFullScreenIntentCheck();
         return MaterialApp.router(
           title: 'Lekec',
           theme: AppTheme.light,

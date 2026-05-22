@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:alarm/alarm.dart';
 import 'package:alarm/utils/alarm_set.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../data/services/appointment_service.dart';
+import '../database/drift_database.dart';
 
 /// Provider for the alarm service singleton
 final alarmServiceProvider = Provider<AlarmService>((ref) {
@@ -44,9 +46,10 @@ class AlarmNotifier extends Notifier<List<AlarmSettings>> {
 
 /// Service that manages alarm lifecycle and navigation
 class AlarmService {
-  AlarmService(this._navigatorKey);
+  AlarmService(this._navigatorKey, this._db);
 
   final GlobalKey<NavigatorState> _navigatorKey;
+  final AppDatabase _db;
 
   StreamSubscription<AlarmSet>? _ringSubscription;
   StreamSubscription<AlarmSet>? _updateSubscription;
@@ -91,6 +94,11 @@ class AlarmService {
     for (final alarm in ringingAlarms) {
       if (_isAlarmTooOld(alarm)) {
         // Alarm is too old, stop it silently
+        developer.log(
+          'checkInitialRingingAlarms: stopping alarm ${alarm.id} — too old '
+          '(scheduled ${alarm.dateTime}, now ${DateTime.now()})',
+          name: 'AlarmService',
+        );
         await Alarm.stop(alarm.id);
         continue;
       }
@@ -112,6 +120,21 @@ class AlarmService {
   ///   - we exceed _maxNavigatorWait (give up).
   Future<void> _showAlarmWithRetry(AlarmSettings alarm) async {
     if (_currentAlarmId == alarm.id) return;
+
+    // Don't show the ring screen for a medication intake that was already
+    // acted on — e.g. the user tapped "Sem vzel" / "Bom preskočil" on the
+    // notification. Without this the ring screen can reappear when the app is
+    // next opened. (Appointment alarms keep no such state — skip the check.)
+    if (!AppointmentService.isAppointmentAlarm(alarm.id) &&
+        await _intakeAlreadyHandled(alarm.id)) {
+      developer.log(
+        '_showAlarmWithRetry: stopping alarm ${alarm.id} — intake already '
+        'handled (taken/skipped)',
+        name: 'AlarmService',
+      );
+      await Alarm.stop(alarm.id);
+      return;
+    }
 
     final deadline = DateTime.now().add(_maxNavigatorWait);
 
@@ -140,6 +163,20 @@ class AlarmService {
     }
   }
 
+  /// Whether this medication intake already has a recorded action (taken or
+  /// skipped) — in which case its alarm screen should not be shown.
+  /// The alarm id of a medication reminder is the intake log id.
+  Future<bool> _intakeAlreadyHandled(int intakeId) async {
+    try {
+      final intake = await (_db.select(_db.medicationIntakeLogs)
+            ..where((t) => t.id.equals(intakeId)))
+          .getSingleOrNull();
+      return intake != null && intake.takenTime != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Handle when an alarm starts ringing
   void _onAlarmRinging(AlarmSet alarmSet) {
     if (alarmSet.alarms.isEmpty) {
@@ -153,6 +190,11 @@ class AlarmService {
     // Check if alarm is too old to ring
     if (_isAlarmTooOld(alarm)) {
       // Stop the alarm silently - it's too late
+      developer.log(
+        '_onAlarmRinging: stopping alarm ${alarm.id} — too old '
+        '(scheduled ${alarm.dateTime}, now ${DateTime.now()})',
+        name: 'AlarmService',
+      );
       Alarm.stop(alarm.id);
       return;
     }
