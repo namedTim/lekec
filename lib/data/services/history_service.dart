@@ -6,6 +6,16 @@ class HistoryService {
 
   HistoryService(this.db);
 
+  /// Subquery selecting the ids of all currently active (non-deactivated)
+  /// users. Used via `isInQuery` to scope the history loaders, so a user
+  /// removed via `_deactivateUser` no longer contributes intakes / moods /
+  /// appointments to the history view.
+  drift.JoinedSelectStatement<dynamic, dynamic> _activeUserIdsQuery() {
+    return db.selectOnly(db.users)
+      ..addColumns([db.users.id])
+      ..where(db.users.isActive.equals(true));
+  }
+
   /// Load medication history with pagination and optional user filter
   Future<List<Map<String, dynamic>>> loadHistory({
     required int limit,
@@ -35,6 +45,11 @@ class HistoryService {
     // Apply user filter
     if (userId != null) {
       query = query..where(db.medicationIntakeLogs.userId.equals(userId));
+    } else {
+      // Hide intakes belonging to deactivated users.
+      query = query..where(
+        db.medicationIntakeLogs.userId.isInQuery(_activeUserIdsQuery()),
+      );
     }
 
     // Apply filter
@@ -90,6 +105,9 @@ class HistoryService {
 
     if (userId != null) {
       query = query..where((t) => t.userId.equals(userId));
+    } else {
+      query = query
+        ..where((t) => t.userId.isInQuery(_activeUserIdsQuery()));
     }
 
     final results = await query.get();
@@ -123,6 +141,9 @@ class HistoryService {
 
     if (userId != null) {
       query = query..where((t) => t.userId.equals(userId));
+    } else {
+      query = query
+        ..where((t) => t.userId.isInQuery(_activeUserIdsQuery()));
     }
 
     final results = await query.get();

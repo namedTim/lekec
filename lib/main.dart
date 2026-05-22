@@ -14,7 +14,6 @@ import 'package:logging/logging.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
-import 'ui/screens/demo_screen.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
 import 'ui/screens/dashboard.dart';
@@ -139,10 +138,6 @@ final _router = GoRouter(
     GoRoute(
       path: '/dev',
       builder: (context, state) => const DeveloperSettingsScreen(),
-    ),
-    GoRoute(
-      path: '/demo',
-      builder: (context, state) => const DemoScreen(),
     ),
     GoRoute(
       path: '/add-medication',

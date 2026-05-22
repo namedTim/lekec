@@ -14,7 +14,6 @@ import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
 import '../screens/terms_of_service_screen.dart';
 import '../screens/tip_screen.dart';
-import '../screens/demo_screen.dart';
 
 final alarmSoundsProvider = Provider<List<Map<String, String>>>((ref) {
   return [
@@ -243,7 +242,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   segments: const [
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.system,
-                      label: Text('Sistemska'),
+                      label: Text('Sistem'),
                       icon: Icon(Symbols.brightness_auto),
                     ),
                     ButtonSegment<ThemeMode>(
@@ -497,22 +496,6 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           title: 'O aplikaciji',
           children: [
             _SettingsTile(
-              icon: Symbols.notifications_active,
-              accent: const Color(0xFFF59E0B),
-              title: 'Preizkus opomnikov',
-              subtitle: 'Pošlji testno obvestilo',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DemoScreen()),
-                );
-              },
-            ),
-            Divider(
-              height: 1,
-              indent: 72,
-              color: colors.outlineVariant.withOpacity(0.4),
-            ),
-            _SettingsTile(
               icon: Symbols.favorite,
               accent: const Color(0xFFEC4899),
               filled: true,
@@ -659,7 +642,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   String _getThemeModeName(ThemeMode mode) {
     switch (mode) {
       case ThemeMode.system:
-        return 'Sistemska';
+        return 'Sistem';
       case ThemeMode.light:
         return 'Svetla';
       case ThemeMode.dark:

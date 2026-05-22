@@ -505,6 +505,7 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                   _ExpandableSection(
                     icon: Symbols.pill,
                     title: 'Zdravila',
+                    initiallyExpanded: true,
                     trailing: _medications.isNotEmpty
                         ? _SectionBadge(
                             label: '${_medications.length}',
@@ -950,6 +951,7 @@ class _ExpandableSection extends StatefulWidget {
   final String title;
   final Widget? trailing;
   final Widget child;
+  final bool initiallyExpanded;
 
   const _ExpandableSection({
     required this.icon,
@@ -957,6 +959,7 @@ class _ExpandableSection extends StatefulWidget {
     required this.title,
     this.trailing,
     required this.child,
+    this.initiallyExpanded = false,
   });
 
   @override
@@ -965,7 +968,7 @@ class _ExpandableSection extends StatefulWidget {
 
 class _ExpandableSectionState extends State<_ExpandableSection>
     with SingleTickerProviderStateMixin {
-  bool _isExpanded = false;
+  late bool _isExpanded;
   late final AnimationController _controller;
   late final Animation<double> _expandAnim;
   late final Animation<double> _rotateAnim;
@@ -973,9 +976,11 @@ class _ExpandableSectionState extends State<_ExpandableSection>
   @override
   void initState() {
     super.initState();
+    _isExpanded = widget.initiallyExpanded;
     _controller = AnimationController(
       duration: const Duration(milliseconds: 280),
       vsync: this,
+      value: _isExpanded ? 1.0 : 0.0,
     );
     _expandAnim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     _rotateAnim = Tween<double>(

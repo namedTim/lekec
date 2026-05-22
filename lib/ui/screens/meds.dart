@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
-import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/appointment_card.dart';
 import '../components/confirmation_dialog.dart';
@@ -22,7 +21,7 @@ import '../widgets/empty_state_card.dart';
 import '../components/log_intake_sheet.dart';
 import '../../main.dart' show homePageKey;
 
-enum MedsTab { medications, appointments, settings }
+enum MedsTab { medications, appointments }
 
 class MedsScreen extends ConsumerStatefulWidget {
   const MedsScreen({super.key});
@@ -277,11 +276,6 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
                           value: MedsTab.appointments,
                           label: Text('Termini'),
                           icon: Icon(Symbols.calendar_month),
-                        ),
-                        ButtonSegment<MedsTab>(
-                          value: MedsTab.settings,
-                          label: Text('Nastavitve'),
-                          icon: Icon(Symbols.settings),
                         ),
                       ],
                       selected: {_selectedTab},
@@ -953,8 +947,6 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
             );
           },
         );
-      case MedsTab.settings:
-        return const SettingsView();
     }
   }
 }
