@@ -382,12 +382,10 @@ class DashboardScreenState extends State<DashboardScreen>
     final labels = await UserLabels.forPrimaryUser(db);
     if (!mounted) return;
     // Scheduled (non-one-time) intakes: allow marking only if the time is now
-    // or in the past. Already-marked future intakes still expose actions so
-    // the user can reverse an accidental tap.
+    // or in the past. Future intakes are read-only regardless of their
+    // current status — no editing doses for days ahead.
     final isFuture = scheduledTime.isAfter(DateTime.now());
-    final alreadyMarked = currentStatus == MedicationStatus.taken ||
-        currentStatus == MedicationStatus.notTaken;
-    final canAct = !isOneTimeEntry && (!isFuture || alreadyMarked);
+    final canAct = !isOneTimeEntry && !isFuture;
 
     showDialog(
       context: context,

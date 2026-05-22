@@ -265,13 +265,11 @@ class _MedicationCardState extends State<MedicationCard> {
         break;
     }
 
-    // Mirror the swipe gating: an `upcoming` intake can only be marked taken
-    // once its time has arrived (signalled by `enableRightSwipe`). Already
-    // marked intakes can still be toggled so a misclick on a future dose is
-    // reversible.
-    final canToggle = widget.status == MedicationStatus.taken ||
-        widget.status == MedicationStatus.notTaken ||
-        widget.enableRightSwipe;
+    // Mirror the swipe gating: marking / un-marking is only allowed once the
+    // intake's time has arrived (signalled by `enableRightSwipe`). Future
+    // intakes — including ones that were already marked — stay read-only,
+    // so a dose can't be edited days ahead.
+    final canToggle = widget.enableRightSwipe;
 
     return GestureDetector(
       onTap: canToggle
