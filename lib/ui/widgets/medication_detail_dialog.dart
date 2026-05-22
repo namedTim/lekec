@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../data/services/user_labels.dart';
 import '../../database/tables/medications.dart';
 import '../../helpers/medication_icon_helper.dart';
 
@@ -17,6 +18,12 @@ class MedicationDetailDialog extends StatelessWidget {
   final VoidCallback? onTake;
   /// Called when user taps "Nisem vzel".
   final VoidCallback? onNotTake;
+  /// Called when user taps "Izbriši". Used for one-time entries; if null the
+  /// delete row is hidden.
+  final VoidCallback? onDelete;
+  /// Gender-aware labels for the take / skip buttons. Falls back to the
+  /// male/neutral form if not provided.
+  final UserLabels labels;
 
   const MedicationDetailDialog({
     super.key,
@@ -30,6 +37,8 @@ class MedicationDetailDialog extends StatelessWidget {
     this.medType,
     this.onTake,
     this.onNotTake,
+    this.onDelete,
+    this.labels = UserLabels.fallback,
   });
 
   String _timeStr() =>
@@ -40,6 +49,7 @@ class MedicationDetailDialog extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final hasActions = onTake != null || onNotTake != null;
+    final hasDelete = onDelete != null;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -145,13 +155,13 @@ class MedicationDetailDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Row(
                 children: [
-                  // Preskočim — left
+                  // Skip — left
                   if (onNotTake != null)
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: onNotTake,
                         icon: const Icon(Symbols.close, size: 18),
-                        label: const Text('Preskočim'),
+                        label: Text(labels.skip),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.error,
                           side: BorderSide(color: colors.error.withOpacity(0.4)),
@@ -164,13 +174,13 @@ class MedicationDetailDialog extends StatelessWidget {
                     ),
                   if (onNotTake != null && onTake != null)
                     const SizedBox(width: 12),
-                  // Vzamem — right (primary, filled)
+                  // "Sem vzel/-a" — right (primary, filled)
                   if (onTake != null)
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: onTake,
                         icon: const Icon(Symbols.check, size: 18),
-                        label: const Text('Vzamem'),
+                        label: Text(labels.takenPast),
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF22C55E),
                           foregroundColor: Colors.white,
@@ -184,8 +194,30 @@ class MedicationDetailDialog extends StatelessWidget {
                 ],
               ),
             ),
-          ] else
+          ] else if (!hasDelete)
             const SizedBox(height: 16),
+
+          // ── Delete row (one-time entries) ───────────────────────────────
+          if (hasDelete)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onDelete,
+                  icon: const Icon(Symbols.delete, size: 18),
+                  label: const Text('Izbriši vnos'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.error,
+                    side: BorderSide(color: colors.error.withOpacity(0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

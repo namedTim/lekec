@@ -17,6 +17,7 @@ import '../../data/services/appointment_service.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/user_labels.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
@@ -365,7 +366,7 @@ class DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  void _showMedicationDetail({
+  Future<void> _showMedicationDetail({
     required int intakeId,
     required bool isOneTimeEntry,
     required MedicationStatus currentStatus,
@@ -377,10 +378,16 @@ class DashboardScreenState extends State<DashboardScreen>
     required String userName,
     String? intakeAdvice,
     MedicationType? medType,
-  }) {
-    // Only offer take/not-take for non-one-time scheduled entries that are not in the future
+  }) async {
+    final labels = await UserLabels.forPrimaryUser(db);
+    if (!mounted) return;
+    // Scheduled (non-one-time) intakes: allow marking only if the time is now
+    // or in the past. Already-marked future intakes still expose actions so
+    // the user can reverse an accidental tap.
     final isFuture = scheduledTime.isAfter(DateTime.now());
-    final canAct = !isOneTimeEntry && !isFuture;
+    final alreadyMarked = currentStatus == MedicationStatus.taken ||
+        currentStatus == MedicationStatus.notTaken;
+    final canAct = !isOneTimeEntry && (!isFuture || alreadyMarked);
 
     showDialog(
       context: context,
@@ -393,6 +400,7 @@ class DashboardScreenState extends State<DashboardScreen>
         userName: userName,
         intakeAdvice: intakeAdvice,
         medType: medType,
+        labels: labels,
         onTake: canAct
             ? () {
                 Navigator.of(ctx).pop();
@@ -403,6 +411,12 @@ class DashboardScreenState extends State<DashboardScreen>
             ? () {
                 Navigator.of(ctx).pop();
                 _updateIntakeStatus(intakeId, MedicationStatus.notTaken);
+              }
+            : null,
+        onDelete: isOneTimeEntry
+            ? () {
+                Navigator.of(ctx).pop();
+                _deleteOneTimeEntry(intakeId);
               }
             : null,
       ),

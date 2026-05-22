@@ -10,24 +10,40 @@ import '../../database/drift_database.dart';
 /// belongs to one person. Returns labels for the medication taken/skip
 /// actions plus the dismiss action on the ring screen.
 class UserLabels {
-  const UserLabels({required this.taken, required this.skip});
+  const UserLabels({
+    required this.taken,
+    required this.skip,
+    required this.takenPast,
+  });
 
   /// "Bom vzel" / "Bom vzela" — future-tense first person.
+  /// Used on the ring screen and on notification action buttons where the
+  /// user is *about to* take the dose.
   final String taken;
 
   /// "Preskoči" — imperative, gender-neutral.
   final String skip;
 
+  /// "Sem vzel" / "Sem vzela" — past-tense first person.
+  /// Used in the daily-view detail dialog where the user is confirming a
+  /// dose they *have already* taken.
+  final String takenPast;
+
   /// Fallback used when the database has no users yet (cold boot before
   /// onboarding finishes, etc.). Defaults to male form, matching the existing
   /// app voice.
-  static const UserLabels fallback = UserLabels(taken: 'Bom vzel', skip: 'Preskoči');
+  static const UserLabels fallback = UserLabels(
+    taken: 'Bom vzel',
+    skip: 'Preskoči',
+    takenPast: 'Sem vzel',
+  );
 
   static UserLabels forGender(String? gender) {
     final female = gender == 'female';
     return UserLabels(
       taken: female ? 'Bom vzela' : 'Bom vzel',
       skip: 'Preskoči',
+      takenPast: female ? 'Sem vzela' : 'Sem vzel',
     );
   }
 
