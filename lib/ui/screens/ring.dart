@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
+import '../../data/services/intake_log_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/user_labels.dart';
 import '../../database/drift_database.dart';
@@ -132,14 +133,11 @@ class _ExampleAlarmRingScreenState extends State<ExampleAlarmRingScreen>
       return;
     }
 
-    // Mark intake as taken in database
-    await (db.update(db.medicationIntakeLogs)
-          ..where((t) => t.id.equals(widget.alarmSettings.id)))
-        .write(
-      MedicationIntakeLogsCompanion(
-        wasTaken: const drift.Value(true),
-        takenTime: drift.Value(DateTime.now()),
-      ),
+    // Mark intake as taken via the service so dosagesRemaining is decremented
+    // (a direct DB write here used to leave the stock count untouched).
+    await IntakeLogService(db).updateIntakeStatus(
+      widget.alarmSettings.id,
+      true,
     );
 
     // Reschedule upcoming notifications/alarms so the next one is set immediately

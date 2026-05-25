@@ -162,6 +162,43 @@ class HistoryService {
     }).toList();
   }
 
+  /// Load water intake history with pagination and optional user filter.
+  /// Same shape as the other loaders so it merges cleanly in the history
+  /// screen's combined list.
+  Future<List<Map<String, dynamic>>> loadWaterHistory({
+    required int limit,
+    required int offset,
+    int? userId,
+  }) async {
+    final now = DateTime.now();
+
+    var query = db.select(db.waterIntakeLogs)
+      ..where((t) => t.loggedAt.isSmallerOrEqualValue(now))
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.loggedAt)])
+      ..limit(limit, offset: offset);
+
+    if (userId != null) {
+      query = query..where((t) => t.userId.equals(userId));
+    } else {
+      query = query
+        ..where((t) => t.userId.isInQuery(_activeUserIdsQuery()));
+    }
+
+    final results = await query.get();
+    return results.map((entry) {
+      return {
+        'type': 'water',
+        'water': entry,
+        'date': DateTime(
+          entry.loggedAt.year,
+          entry.loggedAt.month,
+          entry.loggedAt.day,
+        ),
+        'sortTime': entry.loggedAt,
+      };
+    }).toList();
+  }
+
   /// Get all active users
   Future<List<User>> getActiveUsers() async {
     return (db.select(db.users)

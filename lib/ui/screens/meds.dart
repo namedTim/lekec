@@ -8,7 +8,9 @@ import '../widgets/medication_details_card.dart';
 import '../widgets/appointment_card.dart';
 import '../components/confirmation_dialog.dart';
 import '../../data/services/mood_service.dart';
+import '../../data/services/water_service.dart';
 import '../components/mood_logging_sheet.dart';
+import '../components/water_logging_sheet.dart';
 import '../components/medication_presets_panel.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
@@ -110,6 +112,43 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
     _ensureSpeedDialClosed();
     _refreshMedications();
     homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onLogWater() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    final result = await showWaterLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+    try {
+      final database = ref.read(databaseProvider);
+      await WaterService(database).logIntake(
+        userId: userId,
+        amountMl: result['amountMl'] as int,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💧 ${result['amountMl']} ml zabeleženo'),
+            backgroundColor: const Color(0xFF38BDF8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _onLogMood() async {

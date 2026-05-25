@@ -14,7 +14,7 @@ import '../widgets/history_detail_dialogs.dart';
 
 enum HistoryFilter { all, taken, missed }
 
-enum EntryType { medications, mood, appointments }
+enum EntryType { medications, mood, appointments, water }
 
 class MedsHistoryScreen extends ConsumerStatefulWidget {
   const MedsHistoryScreen({super.key});
@@ -30,6 +30,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     EntryType.medications,
     EntryType.mood,
     EntryType.appointments,
+    EntryType.water,
   };
   int? _selectedUserId; // null = all users
   List<User> _users = [];
@@ -40,6 +41,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
   int _medOffset = 0;
   int _moodOffset = 0;
   int _appointmentOffset = 0;
+  int _waterOffset = 0;
   final int _limit = 50;
   final ScrollController _scrollController = ScrollController();
   late HistoryService _historyService;
@@ -89,6 +91,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       _medOffset = 0;
       _moodOffset = 0;
       _appointmentOffset = 0;
+      _waterOffset = 0;
       _hasMore = true;
     });
     await _loadMoreHistory();
@@ -103,6 +106,7 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
     bool medHasMore = false;
     bool moodHasMore = false;
     bool appointmentHasMore = false;
+    bool waterHasMore = false;
 
     // Load medication entries
     if (_selectedEntryTypes.contains(EntryType.medications)) {
@@ -142,6 +146,18 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
       appointmentHasMore = apptEntries.length == _limit;
     }
 
+    // Load water intake entries
+    if (_selectedEntryTypes.contains(EntryType.water)) {
+      final waterEntries = await _historyService.loadWaterHistory(
+        limit: _limit,
+        offset: _waterOffset,
+        userId: _selectedUserId,
+      );
+      newEntries.addAll(waterEntries);
+      _waterOffset += _limit;
+      waterHasMore = waterEntries.length == _limit;
+    }
+
     // Sort all entries by time descending
     newEntries.sort((a, b) {
       final timeA = a['sortTime'] as DateTime;
@@ -151,7 +167,8 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
 
     setState(() {
       _allEntries.addAll(newEntries);
-      _hasMore = medHasMore || moodHasMore || appointmentHasMore;
+      _hasMore =
+          medHasMore || moodHasMore || appointmentHasMore || waterHasMore;
       _isLoading = false;
     });
   }
@@ -390,6 +407,22 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                     },
                     colors: colors,
                   ),
+                  _buildFilterChip(
+                    label: 'Hidracija',
+                    icon: Symbols.water_drop,
+                    selected: _selectedEntryTypes.contains(EntryType.water),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedEntryTypes.add(EntryType.water);
+                        } else if (_selectedEntryTypes.length > 1) {
+                          _selectedEntryTypes.remove(EntryType.water);
+                        }
+                      });
+                      _refreshHistory();
+                    },
+                    colors: colors,
+                  ),
                 ],
               ),
             ),
@@ -452,6 +485,13 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
                                 );
                               } else if (entry['type'] == 'appointment') {
                                 return _buildAppointmentCard(
+                                  entry,
+                                  theme,
+                                  colors,
+                                  showUserNames,
+                                );
+                              } else if (entry['type'] == 'water') {
+                                return _buildWaterCard(
                                   entry,
                                   theme,
                                   colors,
@@ -751,6 +791,77 @@ class _MedsHistoryScreenState extends ConsumerState<MedsHistoryScreen>
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _buildWaterCard(
+    Map<String, dynamic> entry,
+    ThemeData theme,
+    ColorScheme colors,
+    bool showUserNames,
+  ) {
+    const waterBlue = Color(0xFF38BDF8);
+    final water = entry['water'] as WaterIntakeLog;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: waterBlue.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Symbols.water_drop,
+              color: waterBlue,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${water.amountMl} ml',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Hidracija',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                if (showUserNames) ...[
+                  const SizedBox(height: 4),
+                  _userChip(water.userId),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          HistoryTimeSlot(
+            text: _formatTime(water.loggedAt),
+            backgroundColor: waterBlue.withOpacity(0.18),
+            textColor: const Color(0xFF0284C7),
+            fontSize: 13,
+          ),
+        ],
       ),
     );
   }

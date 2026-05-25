@@ -14,22 +14,39 @@ import 'package:alarm/alarm.dart';
 import 'pending_action_queue.dart';
 import 'user_labels.dart';
 
-/// Handles medication notification action button taps ("Sem vzel" /
-/// "Bom preskočil") that arrive while the app is terminated.
+/// Handles notification action button taps that arrive while the app is
+/// terminated. Two flavours of reminder route here:
+///   * Medication reminders ("Sem vzel" / "Bom preskočil") — payload is the
+///     intake id as a plain integer string; parked in [PendingActionQueue].
+///   * Water reminders ("Sem spil" / "Preskoči") — payload is `water:<userId>`;
+///     parked in [WaterPendingActionQueue].
 ///
 /// `flutter_local_notifications` runs this in a short-lived background
-/// isolate, so it only parks the tap in [PendingActionQueue] —
-/// [NotificationActionService] applies it the next time the app runs.
+/// isolate, so it only parks the tap — [NotificationActionService] applies it
+/// the next time the app runs.
 @pragma('vm:entry-point')
 Future<void> notificationTapBackground(NotificationResponse response) async {
   final actionId = response.actionId;
+  if (actionId == null) return;
+  final payload = response.payload ?? '';
+
+  // Water reminder action (payload format "water:<userId>")
+  if (payload.startsWith('water:')) {
+    if (actionId != 'water_taken' && actionId != 'water_skip') return;
+    final userId = int.tryParse(payload.substring('water:'.length));
+    if (userId == null) return;
+    DartPluginRegistrant.ensureInitialized();
+    await WaterPendingActionQueue.enqueue(userId, actionId);
+    return;
+  }
+
+  // Medication reminder action (payload is the intake id)
   if (actionId != 'taken' && actionId != 'skip') return;
-  final intakeId = int.tryParse(response.payload ?? '');
+  final intakeId = int.tryParse(payload);
   if (intakeId == null) return;
   // Required before using plugins (SharedPreferences) in a background isolate.
   DartPluginRegistrant.ensureInitialized();
-  // actionId is non-null here — the guard above returns otherwise.
-  await PendingActionQueue.enqueue(intakeId, actionId!);
+  await PendingActionQueue.enqueue(intakeId, actionId);
 }
 
 class NotificationService {
@@ -1004,6 +1021,170 @@ class NotificationService {
       '=== END TEST MEDICATION NOTIFICATION ===',
       name: 'NotificationService',
     );
+  }
+
+  // ── Water reminders ────────────────────────────────────────────────────
+  //
+  // Water reminders are recurring (daily) notifications, one per slot in the
+  // user's configured window. They live in a dedicated id range so that
+  // `cancelAllNotifications()` — which wipes ids < 900000 on every
+  // medication refresh — leaves them alone.
+  //
+  //   id = _waterIdBase + userId * _waterSlotsPerUser + slotIndex
+  //
+  // _waterSlotsPerUser is a hard cap on slots per user. With a minimum
+  // interval of 15 min over a 24 h window that's 96 slots; rounding up to
+  // 100 gives us a clean per-user block and headroom for tweaks.
+
+  static const int _waterIdBase = 950000;
+  static const int _waterSlotsPerUser = 100;
+
+  int _waterReminderId(int userId, int slot) =>
+      _waterIdBase + userId * _waterSlotsPerUser + slot;
+
+  /// (Re)schedule the daily water reminders for [user] based on the
+  /// `waterReminder*` columns. Safe to call repeatedly: any previously
+  /// scheduled reminders for this user are cancelled first.
+  ///
+  /// When `waterReminderEnabled` is false this just cancels — call
+  /// [cancelWaterReminders] directly if you don't have a user row handy.
+  Future<void> scheduleWaterReminders(User user) async {
+    if (!_initialized) await initialize();
+
+    await cancelWaterReminders(user.id);
+
+    if (!user.waterReminderEnabled) {
+      developer.log(
+        'Water reminders disabled for user ${user.id}',
+        name: 'NotificationService',
+      );
+      return;
+    }
+
+    final int start = user.waterReminderStartHour.clamp(0, 23).toInt();
+    final int end = user.waterReminderEndHour.clamp(0, 23).toInt();
+    final int interval =
+        user.waterReminderIntervalMinutes.clamp(15, 360).toInt();
+    if (end <= start) {
+      developer.log(
+        'Water reminders skipped: end ($end) ≤ start ($start) for user ${user.id}',
+        name: 'NotificationService',
+      );
+      return;
+    }
+
+    final labels = UserLabels.forGender(user.gender);
+    final androidDetails = AndroidNotificationDetails(
+      'medication_reminders',
+      'Opomniki za zdravila',
+      channelDescription: 'Opomniki za jemanje zdravil',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/launcher_icon',
+      playSound: true,
+      enableVibration: true,
+      // Same one-tap log / skip affordance as medication reminders.
+      // "Sem spil" re-logs the user's last intake amount (or 200 ml if none
+      // yet); "Preskoči" just dismisses. Both handled by
+      // NotificationActionService.
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'water_taken',
+          labels.drank,
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+        AndroidNotificationAction(
+          'water_skip',
+          labels.skip,
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+      ],
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final tzNow = tz.TZDateTime.now(tz.local);
+    int slot = 0;
+    // Walk slots in minutes-since-midnight so an interval like 90 min still
+    // lands within the window between an early start and a late end.
+    final startMin = start * 60;
+    final endMin = end * 60;
+    for (int min = startMin; min < endMin; min += interval) {
+      if (slot >= _waterSlotsPerUser) {
+        developer.log(
+          'Water reminder slot cap hit for user ${user.id} — extra reminders skipped',
+          name: 'NotificationService',
+        );
+        break;
+      }
+      final hour = min ~/ 60;
+      final minute = min % 60;
+
+      // Build today's firing time; if already in the past today, bump to
+      // tomorrow so the first occurrence isn't immediate when the user
+      // enables reminders mid-day.
+      var fireAt = tz.TZDateTime(
+        tz.local,
+        tzNow.year,
+        tzNow.month,
+        tzNow.day,
+        hour,
+        minute,
+      );
+      if (!fireAt.isAfter(tzNow)) {
+        fireAt = fireAt.add(const Duration(days: 1));
+      }
+
+      final id = _waterReminderId(user.id, slot);
+      try {
+        await _notifications.zonedSchedule(
+          id,
+          'Čas za vodo 💧',
+          'Spij kozarec vode',
+          fireAt,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          // Repeat daily at the same wall-clock time.
+          matchDateTimeComponents: DateTimeComponents.time,
+          // "water:<userId>" so notificationTapBackground can route the
+          // action buttons through WaterPendingActionQueue rather than the
+          // medication queue (intake ids).
+          payload: 'water:${user.id}',
+        );
+      } catch (e, st) {
+        developer.log(
+          'Failed to schedule water reminder slot $slot for user ${user.id}',
+          error: e,
+          stackTrace: st,
+          name: 'NotificationService',
+        );
+      }
+      slot++;
+    }
+
+    developer.log(
+      'Scheduled $slot water reminders for user ${user.id}',
+      name: 'NotificationService',
+    );
+  }
+
+  /// Cancel every pending water reminder for [userId], regardless of how
+  /// many slots were last scheduled — iterates the full per-user block.
+  Future<void> cancelWaterReminders(int userId) async {
+    for (int slot = 0; slot < _waterSlotsPerUser; slot++) {
+      await _notifications.cancel(_waterReminderId(userId, slot));
+    }
   }
 
   /// Trigger a test alarm in 1 minute

@@ -9,12 +9,15 @@ import '../../database/tables/medications.dart';
 import '../../helpers/user_color_helper.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/mood_service.dart';
+import '../../data/services/water_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../data/services/appointment_service.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/empty_state_card.dart';
 import '../components/confirmation_dialog.dart';
 import '../components/mood_logging_sheet.dart';
+import '../components/water_logging_sheet.dart';
 import '../../main.dart' show db, homePageKey, medsPageKey;
 import '../../data/services/intake_log_service.dart';
 import '../screens/add_appointment_screen.dart';
@@ -47,12 +50,19 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
   // Appointments state
   List<Appointment> _appointments = [];
 
+  // Water tracking state
+  int _waterTodayMl = 0;
+  List<Map<String, dynamic>> _waterDailyTotals = [];
+  List<WaterIntakeLog> _waterTodayEntries = [];
+  WaterSettings _waterSettings = WaterSettings.defaults;
+
   @override
   void initState() {
     super.initState();
     _loadUserMedications();
     _loadMoodData();
     _loadAppointments();
+    _loadWaterData();
   }
 
   /// Re-fetch everything this screen displays. Called from outside via the
@@ -62,6 +72,26 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     _loadUserMedications();
     _loadMoodData();
     _loadAppointments();
+    _loadWaterData();
+  }
+
+  Future<void> _loadWaterData() async {
+    try {
+      final service = WaterService(db);
+      final total = await service.getTodayTotal(widget.userId);
+      final daily = await service.getDailyTotals(widget.userId, days: 7);
+      final entries = await service.getTodayEntries(widget.userId);
+      final settings = await service.getSettings(widget.userId);
+
+      if (mounted) {
+        setState(() {
+          _waterTodayMl = total;
+          _waterDailyTotals = daily;
+          _waterTodayEntries = entries;
+          _waterSettings = settings;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadMoodData() async {
@@ -253,10 +283,18 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
+            child: FilledButton.icon(
               onPressed: _onQuickLogMood,
               icon: const Text('😊', style: TextStyle(fontSize: 16)),
               label: const Text('Zabeleži'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEC4899),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
             ),
           ),
         ),
@@ -411,6 +449,188 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     return Colors.red;
   }
 
+  // ── Water actions ───────────────────────────────────────────────────────
+
+  /// Look up the active `User` row + (re)schedule water reminders to match.
+  /// Centralised so every settings write goes through the same path and the
+  /// OS schedule can't drift from the DB.
+  Future<void> _resyncWaterReminders() async {
+    final user = await (db.select(db.users)
+          ..where((t) => t.id.equals(widget.userId)))
+        .getSingleOrNull();
+    if (user == null) return;
+    await NotificationService().scheduleWaterReminders(user);
+  }
+
+  Future<void> _onLogWater() async {
+    final result = await showWaterLoggingSheet(context: context);
+    if (result == null || !mounted) return;
+    try {
+      await WaterService(db).logIntake(
+        userId: widget.userId,
+        amountMl: result['amountMl'] as int,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💧 ${result['amountMl']} ml zabeleženo'),
+            backgroundColor: const Color(0xFF38BDF8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _loadWaterData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteWaterIntake(int id) async {
+    try {
+      await WaterService(db).deleteIntake(id);
+      _loadWaterData();
+    } catch (_) {}
+  }
+
+  Future<void> _editWaterGoal() async {
+    int draft = _waterSettings.goalMl;
+    final newGoal = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Dnevni cilj'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$draft ml',
+                    style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF38BDF8),
+                    ),
+                  ),
+                  Slider(
+                    min: 500,
+                    max: 4000,
+                    divisions: 35, // 100 ml steps
+                    value: draft.clamp(500, 4000).toDouble(),
+                    activeColor: const Color(0xFF38BDF8),
+                    onChanged: (v) =>
+                        setDialogState(() => draft = v.round()),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Prekliči'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(draft),
+                  child: const Text('Shrani'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (newGoal == null) return;
+    await WaterService(db).setGoal(widget.userId, newGoal);
+    _loadWaterData();
+  }
+
+  Future<void> _setReminderEnabled(bool enabled) async {
+    await WaterService(db).setReminderSettings(widget.userId, enabled: enabled);
+    await _resyncWaterReminders();
+    _loadWaterData();
+  }
+
+  Future<void> _pickReminderHour({required bool isStart}) async {
+    final current = isStart
+        ? _waterSettings.startHour
+        : _waterSettings.endHour;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current, minute: 0),
+      helpText: isStart ? 'Začetek opomnikov' : 'Konec opomnikov',
+    );
+    if (picked == null) return;
+    await WaterService(db).setReminderSettings(
+      widget.userId,
+      startHour: isStart ? picked.hour : null,
+      endHour: isStart ? null : picked.hour,
+    );
+    await _resyncWaterReminders();
+    _loadWaterData();
+  }
+
+  Future<void> _pickReminderInterval() async {
+    // Common cadences. Anything finer would just spam.
+    const options = [30, 60, 90, 120, 180, 240];
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pogostost opomnikov',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final mins in options)
+                RadioListTile<int>(
+                  value: mins,
+                  groupValue: _waterSettings.intervalMinutes,
+                  title: Text(_intervalFullLabel(mins)),
+                  onChanged: (v) => Navigator.of(ctx).pop(v),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null) return;
+    await WaterService(db).setReminderSettings(
+      widget.userId,
+      intervalMinutes: picked,
+    );
+    await _resyncWaterReminders();
+    _loadWaterData();
+  }
+
   Future<void> _onQuickLogMood() async {
     final result = await showMoodLoggingSheet(
       context: context,
@@ -526,6 +746,19 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                           )
                         : null,
                     child: _buildMoodSection(theme, colors),
+                  ),
+
+                  // ── Voda ─────────────────────────────────────────────────
+                  _ExpandableSection(
+                    icon: Symbols.water_drop,
+                    iconColor: const Color(0xFF38BDF8),
+                    title: 'Voda',
+                    trailing: _SectionBadge(
+                      label:
+                          '$_waterTodayMl / ${_waterSettings.goalMl} ml',
+                      color: const Color(0xFF38BDF8),
+                    ),
+                    child: _buildWaterSection(theme, colors),
                   ),
 
                   // ── Termini ──────────────────────────────────────────────
@@ -751,6 +984,409 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  // ── Water section ───────────────────────────────────────────────────────
+
+  static const Color _waterBlue = Color(0xFF38BDF8);
+
+  Widget _buildWaterSection(ThemeData theme, ColorScheme colors) {
+    final goal = _waterSettings.goalMl;
+    final progress = goal == 0 ? 0.0 : (_waterTodayMl / goal).clamp(0.0, 1.0);
+    final percent = (progress * 100).round();
+    final remaining = (goal - _waterTodayMl).clamp(0, goal);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Quick log button (mirrors the mood section affordance).
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _onLogWater,
+              icon: const Icon(Symbols.water_drop, size: 18),
+              label: const Text('Zabeleži'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _waterBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Progress card ──────────────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _waterBlue.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _waterBlue.withOpacity(0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '$_waterTodayMl',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: _waterBlue,
+                      fontWeight: FontWeight.w800,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      'ml',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Tap-to-edit goal — filled blue chip so users notice
+                  // immediately that the goal is adjustable.
+                  Material(
+                    color: _waterBlue,
+                    borderRadius: BorderRadius.circular(20),
+                    elevation: 1,
+                    child: InkWell(
+                      onTap: _editWaterGoal,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Symbols.flag,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Cilj $goal ml',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Symbols.edit,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 10,
+                  backgroundColor: _waterBlue.withOpacity(0.15),
+                  valueColor: const AlwaysStoppedAnimation(_waterBlue),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                percent >= 100
+                    ? '🎉 Cilj dosežen!'
+                    : 'Še $remaining ml do cilja ($percent %)',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Today's entries (compact, swipe-to-delete) ─────────────────
+        if (_waterTodayEntries.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+            child: Text(
+              'Današnji vnosi',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ..._waterTodayEntries.map(
+            (entry) => _buildWaterEntryTile(entry, theme, colors),
+          ),
+        ],
+
+        // ── 7-day bar chart ────────────────────────────────────────────
+        if (_waterDailyTotals.any((d) => (d['totalMl'] as int) > 0))
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Zadnjih 7 dni',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 90,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: _waterDailyTotals.map((day) {
+                      final totalMl = day['totalMl'] as int;
+                      final ratio = goal == 0
+                          ? 0.0
+                          : (totalMl / goal).clamp(0.0, 1.2);
+                      // Reserve a little headroom so a perfect-100% bar fills
+                      // ~85% of the vertical space and going over goal is
+                      // still visually distinguishable.
+                      final height = (ratio * 70).clamp(4.0, 86.0);
+                      final hit = totalMl >= goal && goal > 0;
+
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 1),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (totalMl > 0)
+                                Text(
+                                  totalMl >= 1000
+                                      ? '${(totalMl / 1000).toStringAsFixed(1)}l'
+                                      : '${totalMl}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontSize: 9,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              const SizedBox(height: 2),
+                              Container(
+                                height: height,
+                                decoration: BoxDecoration(
+                                  color: totalMl == 0
+                                      ? colors.outlineVariant.withOpacity(0.3)
+                                      : hit
+                                          ? _waterBlue
+                                          : _waterBlue.withOpacity(0.55),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '6 dni nazaj',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant.withOpacity(0.6),
+                      ),
+                    ),
+                    Text(
+                      'Danes',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        // ── Reminders sub-panel ────────────────────────────────────────
+        _buildWaterReminderPanel(theme, colors),
+      ],
+    );
+  }
+
+  Widget _buildWaterEntryTile(
+    WaterIntakeLog entry,
+    ThemeData theme,
+    ColorScheme colors,
+  ) {
+    final t = entry.loggedAt;
+    final timeStr =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+    return Dismissible(
+      key: ValueKey('water_${entry.id}'),
+      direction: DismissDirection.endToStart,
+      background: const SizedBox.shrink(),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(Symbols.delete, color: colors.error),
+      ),
+      onDismissed: (_) => _deleteWaterIntake(entry.id),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border.all(color: _waterBlue.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Symbols.water_drop, color: _waterBlue, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              '${entry.amountMl} ml',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              timeStr,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Time part only, e.g. "30 min", "1 h", "1 h 30 min", "2 h".
+  static String _intervalTime(int mins) {
+    if (mins < 60) return '$mins min';
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    return m == 0 ? '$h h' : '$h h $m min';
+  }
+
+  /// Full "Vsak*" + time label with the correct Slovenian declension.
+  /// Hours count drives the prefix:
+  ///   1 → Vsako, 2 → Vsaki, 3–4 → Vsake, 0/5+ → Vsakih.
+  /// Sub-hour cadences (15/30/45 min) all take "Vsakih" (genitive plural).
+  static String _intervalFullLabel(int mins) {
+    String prefix;
+    if (mins < 60) {
+      prefix = 'Vsakih';
+    } else {
+      final h = mins ~/ 60;
+      if (h == 1) {
+        prefix = 'Vsako';
+      } else if (h == 2) {
+        prefix = 'Vsaki';
+      } else if (h <= 4) {
+        prefix = 'Vsake';
+      } else {
+        prefix = 'Vsakih';
+      }
+    }
+    return '$prefix ${_intervalTime(mins)}';
+  }
+
+  Widget _buildWaterReminderPanel(ThemeData theme, ColorScheme colors) {
+    final s = _waterSettings;
+    String fmtHour(int h) => '${h.toString().padLeft(2, '0')}:00';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _waterBlue.withOpacity(0.25)),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            value: s.reminderEnabled,
+            onChanged: _setReminderEnabled,
+            activeColor: _waterBlue,
+            secondary: const Icon(
+              Symbols.notifications_active,
+              color: _waterBlue,
+            ),
+            title: const Text('Opomniki za pitje'),
+            subtitle: Text(
+              s.reminderEnabled
+                  ? '${_intervalFullLabel(s.intervalMinutes)} med ${fmtHour(s.startHour)}–${fmtHour(s.endHour)}'
+                  : 'Izklopljeno',
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          if (s.reminderEnabled) ...[
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              leading: const Icon(Symbols.wb_sunny),
+              title: const Text('Začetek'),
+              trailing: Text(
+                fmtHour(s.startHour),
+                style: theme.textTheme.titleMedium,
+              ),
+              onTap: () => _pickReminderHour(isStart: true),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              leading: const Icon(Symbols.bedtime),
+              title: const Text('Konec'),
+              trailing: Text(
+                fmtHour(s.endHour),
+                style: theme.textTheme.titleMedium,
+              ),
+              onTap: () => _pickReminderHour(isStart: false),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              leading: const Icon(Symbols.schedule),
+              title: const Text('Pogostost'),
+              trailing: Text(
+                _intervalTime(s.intervalMinutes),
+                style: theme.textTheme.titleMedium,
+              ),
+              onTap: _pickReminderInterval,
+            ),
+          ],
+        ],
+      ),
     );
   }
 

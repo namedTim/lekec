@@ -15,6 +15,7 @@ import 'tables/onboarding_settings.dart';
 import 'tables/mood_entries.dart';
 import 'tables/period_entries.dart';
 import 'tables/appointments.dart';
+import 'tables/water_intake_logs.dart';
 
 part 'drift_database.g.dart';
 
@@ -30,13 +31,14 @@ part 'drift_database.g.dart';
     MoodEntries,
     PeriodEntries,
     Appointments,
+    WaterIntakeLogs,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration {
@@ -115,6 +117,15 @@ class AppDatabase extends _$AppDatabase {
         if (from < 16) {
           // Per-appointment custom alarm offset (was hardcoded 2h before)
           await m.addColumn(appointments, appointments.reminderMinutesBefore);
+        }
+        if (from < 17) {
+          // Water tracking: per-user goal + reminder window + the intake log.
+          await m.createTable(waterIntakeLogs);
+          await m.addColumn(users, users.dailyWaterGoalMl);
+          await m.addColumn(users, users.waterReminderEnabled);
+          await m.addColumn(users, users.waterReminderStartHour);
+          await m.addColumn(users, users.waterReminderEndHour);
+          await m.addColumn(users, users.waterReminderIntervalMinutes);
         }
       },
     );

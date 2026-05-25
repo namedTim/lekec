@@ -50,3 +50,42 @@ class PendingActionQueue {
     return result;
   }
 }
+
+/// Sibling queue for water-reminder action button taps. Mirrors
+/// [PendingActionQueue] but keyed by [userId] (water reminders are per-user
+/// recurring notifications, not per-intake).
+class WaterPendingActionQueue {
+  WaterPendingActionQueue._();
+
+  static const _key = 'pending_water_notification_actions';
+
+  static Future<void> enqueue(int userId, String actionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final list = prefs.getStringList(_key) ?? <String>[];
+    list.add(jsonEncode({'userId': userId, 'actionId': actionId}));
+    await prefs.setStringList(_key, list);
+  }
+
+  static Future<List<({int userId, String actionId})>> drain() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final list = prefs.getStringList(_key) ?? <String>[];
+    if (list.isEmpty) return const [];
+    await prefs.remove(_key);
+
+    final result = <({int userId, String actionId})>[];
+    for (final raw in list) {
+      try {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        result.add((
+          userId: (map['userId'] as num).toInt(),
+          actionId: map['actionId'] as String,
+        ));
+      } catch (_) {
+        // Skip malformed entries rather than losing the whole queue.
+      }
+    }
+    return result;
+  }
+}

@@ -8,6 +8,7 @@ import 'appointment_service.dart';
 import 'intake_log_service.dart';
 import 'notification_service.dart';
 import 'pending_action_queue.dart';
+import 'water_service.dart';
 
 /// Applies notification action button taps the user made on reminders:
 /// "Sem vzel" / "Bom preskočil" for medication reminders and "Razumem" for
@@ -65,11 +66,35 @@ class NotificationActionService {
         }
       }
 
+      // Water-reminder action button taps live on a sibling queue keyed by
+      // userId (water reminders are recurring per-user notifications, not
+      // per-intake events).
+      var touchedWater = false;
+      for (final action in await WaterPendingActionQueue.drain()) {
+        developer.log(
+          'Applying water action "${action.actionId}" for user '
+          '${action.userId}',
+          name: 'NotificationActionService',
+        );
+        if (await _applyWaterAction(action.userId, action.actionId)) {
+          touchedWater = true;
+        }
+      }
+
       // Re-arm upcoming reminders so the next dose is scheduled immediately.
       if (touchedMedication) {
         await NotificationService().scheduleAllUpcomingNotifications(db);
         // Refresh the dashboard if it is currently on screen.
         homePageKey.currentState?.loadTodaysIntakes();
+      }
+      // Water totals don't render on the dashboard, but the user-medications
+      // (Voda) page does — it reloads on resume anyway, so no explicit refresh
+      // is needed here.
+      if (touchedWater) {
+        developer.log(
+          'Applied water actions; user page will refresh on next view',
+          name: 'NotificationActionService',
+        );
       }
     } catch (e, st) {
       developer.log(
@@ -80,6 +105,28 @@ class NotificationActionService {
       );
     } finally {
       _draining = false;
+    }
+  }
+
+  /// Applies a single water-reminder action. "water_taken" logs the user's
+  /// previous intake amount again (or 200 ml if they have no history yet);
+  /// "water_skip" is just an acknowledged dismiss. Returns whether the
+  /// database changed.
+  Future<bool> _applyWaterAction(int userId, String actionId) async {
+    switch (actionId) {
+      case 'water_taken':
+        final water = WaterService(db);
+        final amount = await water.getLastIntakeAmount(userId);
+        await water.logIntake(userId: userId, amountMl: amount);
+        return true;
+      case 'water_skip':
+        return false;
+      default:
+        developer.log(
+          'Unknown water action "$actionId" for user $userId',
+          name: 'NotificationActionService',
+        );
+        return false;
     }
   }
 

@@ -75,6 +75,66 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _dailyWaterGoalMlMeta = const VerificationMeta(
+    'dailyWaterGoalMl',
+  );
+  @override
+  late final GeneratedColumn<int> dailyWaterGoalMl = GeneratedColumn<int>(
+    'daily_water_goal_ml',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(2000),
+  );
+  static const VerificationMeta _waterReminderEnabledMeta =
+      const VerificationMeta('waterReminderEnabled');
+  @override
+  late final GeneratedColumn<bool> waterReminderEnabled = GeneratedColumn<bool>(
+    'water_reminder_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("water_reminder_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _waterReminderStartHourMeta =
+      const VerificationMeta('waterReminderStartHour');
+  @override
+  late final GeneratedColumn<int> waterReminderStartHour = GeneratedColumn<int>(
+    'water_reminder_start_hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(8),
+  );
+  static const VerificationMeta _waterReminderEndHourMeta =
+      const VerificationMeta('waterReminderEndHour');
+  @override
+  late final GeneratedColumn<int> waterReminderEndHour = GeneratedColumn<int>(
+    'water_reminder_end_hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(22),
+  );
+  static const VerificationMeta _waterReminderIntervalMinutesMeta =
+      const VerificationMeta('waterReminderIntervalMinutes');
+  @override
+  late final GeneratedColumn<int> waterReminderIntervalMinutes =
+      GeneratedColumn<int>(
+        'water_reminder_interval_minutes',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(120),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -83,6 +143,11 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     gender,
     createdAt,
     isActive,
+    dailyWaterGoalMl,
+    waterReminderEnabled,
+    waterReminderStartHour,
+    waterReminderEndHour,
+    waterReminderIntervalMinutes,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -131,6 +196,51 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('daily_water_goal_ml')) {
+      context.handle(
+        _dailyWaterGoalMlMeta,
+        dailyWaterGoalMl.isAcceptableOrUnknown(
+          data['daily_water_goal_ml']!,
+          _dailyWaterGoalMlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('water_reminder_enabled')) {
+      context.handle(
+        _waterReminderEnabledMeta,
+        waterReminderEnabled.isAcceptableOrUnknown(
+          data['water_reminder_enabled']!,
+          _waterReminderEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('water_reminder_start_hour')) {
+      context.handle(
+        _waterReminderStartHourMeta,
+        waterReminderStartHour.isAcceptableOrUnknown(
+          data['water_reminder_start_hour']!,
+          _waterReminderStartHourMeta,
+        ),
+      );
+    }
+    if (data.containsKey('water_reminder_end_hour')) {
+      context.handle(
+        _waterReminderEndHourMeta,
+        waterReminderEndHour.isAcceptableOrUnknown(
+          data['water_reminder_end_hour']!,
+          _waterReminderEndHourMeta,
+        ),
+      );
+    }
+    if (data.containsKey('water_reminder_interval_minutes')) {
+      context.handle(
+        _waterReminderIntervalMinutesMeta,
+        waterReminderIntervalMinutes.isAcceptableOrUnknown(
+          data['water_reminder_interval_minutes']!,
+          _waterReminderIntervalMinutesMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -164,6 +274,26 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      dailyWaterGoalMl: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}daily_water_goal_ml'],
+      )!,
+      waterReminderEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}water_reminder_enabled'],
+      )!,
+      waterReminderStartHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}water_reminder_start_hour'],
+      )!,
+      waterReminderEndHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}water_reminder_end_hour'],
+      )!,
+      waterReminderIntervalMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}water_reminder_interval_minutes'],
+      )!,
     );
   }
 
@@ -182,6 +312,23 @@ class User extends DataClass implements Insertable<User> {
   final String? gender;
   final DateTime createdAt;
   final bool isActive;
+
+  /// Daily intake goal in millilitres. Default 2000 ml (8 × 250 ml glass).
+  final int dailyWaterGoalMl;
+
+  /// Whether recurring water reminders are scheduled for this user.
+  final bool waterReminderEnabled;
+
+  /// Hour of the day (0–23) at which water reminders begin.
+  final int waterReminderStartHour;
+
+  /// Hour of the day (0–23) after which no more water reminders fire.
+  /// End is exclusive of the hour — i.e. 22 means the last possible
+  /// reminder fires at 21:xx within the interval.
+  final int waterReminderEndHour;
+
+  /// Minutes between water reminders within the active window.
+  final int waterReminderIntervalMinutes;
   const User({
     required this.id,
     required this.name,
@@ -189,6 +336,11 @@ class User extends DataClass implements Insertable<User> {
     this.gender,
     required this.createdAt,
     required this.isActive,
+    required this.dailyWaterGoalMl,
+    required this.waterReminderEnabled,
+    required this.waterReminderStartHour,
+    required this.waterReminderEndHour,
+    required this.waterReminderIntervalMinutes,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -203,6 +355,13 @@ class User extends DataClass implements Insertable<User> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['is_active'] = Variable<bool>(isActive);
+    map['daily_water_goal_ml'] = Variable<int>(dailyWaterGoalMl);
+    map['water_reminder_enabled'] = Variable<bool>(waterReminderEnabled);
+    map['water_reminder_start_hour'] = Variable<int>(waterReminderStartHour);
+    map['water_reminder_end_hour'] = Variable<int>(waterReminderEndHour);
+    map['water_reminder_interval_minutes'] = Variable<int>(
+      waterReminderIntervalMinutes,
+    );
     return map;
   }
 
@@ -216,6 +375,11 @@ class User extends DataClass implements Insertable<User> {
           : Value(gender),
       createdAt: Value(createdAt),
       isActive: Value(isActive),
+      dailyWaterGoalMl: Value(dailyWaterGoalMl),
+      waterReminderEnabled: Value(waterReminderEnabled),
+      waterReminderStartHour: Value(waterReminderStartHour),
+      waterReminderEndHour: Value(waterReminderEndHour),
+      waterReminderIntervalMinutes: Value(waterReminderIntervalMinutes),
     );
   }
 
@@ -231,6 +395,19 @@ class User extends DataClass implements Insertable<User> {
       gender: serializer.fromJson<String?>(json['gender']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      dailyWaterGoalMl: serializer.fromJson<int>(json['dailyWaterGoalMl']),
+      waterReminderEnabled: serializer.fromJson<bool>(
+        json['waterReminderEnabled'],
+      ),
+      waterReminderStartHour: serializer.fromJson<int>(
+        json['waterReminderStartHour'],
+      ),
+      waterReminderEndHour: serializer.fromJson<int>(
+        json['waterReminderEndHour'],
+      ),
+      waterReminderIntervalMinutes: serializer.fromJson<int>(
+        json['waterReminderIntervalMinutes'],
+      ),
     );
   }
   @override
@@ -243,6 +420,13 @@ class User extends DataClass implements Insertable<User> {
       'gender': serializer.toJson<String?>(gender),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'isActive': serializer.toJson<bool>(isActive),
+      'dailyWaterGoalMl': serializer.toJson<int>(dailyWaterGoalMl),
+      'waterReminderEnabled': serializer.toJson<bool>(waterReminderEnabled),
+      'waterReminderStartHour': serializer.toJson<int>(waterReminderStartHour),
+      'waterReminderEndHour': serializer.toJson<int>(waterReminderEndHour),
+      'waterReminderIntervalMinutes': serializer.toJson<int>(
+        waterReminderIntervalMinutes,
+      ),
     };
   }
 
@@ -253,6 +437,11 @@ class User extends DataClass implements Insertable<User> {
     Value<String?> gender = const Value.absent(),
     DateTime? createdAt,
     bool? isActive,
+    int? dailyWaterGoalMl,
+    bool? waterReminderEnabled,
+    int? waterReminderStartHour,
+    int? waterReminderEndHour,
+    int? waterReminderIntervalMinutes,
   }) => User(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -260,6 +449,13 @@ class User extends DataClass implements Insertable<User> {
     gender: gender.present ? gender.value : this.gender,
     createdAt: createdAt ?? this.createdAt,
     isActive: isActive ?? this.isActive,
+    dailyWaterGoalMl: dailyWaterGoalMl ?? this.dailyWaterGoalMl,
+    waterReminderEnabled: waterReminderEnabled ?? this.waterReminderEnabled,
+    waterReminderStartHour:
+        waterReminderStartHour ?? this.waterReminderStartHour,
+    waterReminderEndHour: waterReminderEndHour ?? this.waterReminderEndHour,
+    waterReminderIntervalMinutes:
+        waterReminderIntervalMinutes ?? this.waterReminderIntervalMinutes,
   );
   User copyWithCompanion(UsersCompanion data) {
     return User(
@@ -269,6 +465,21 @@ class User extends DataClass implements Insertable<User> {
       gender: data.gender.present ? data.gender.value : this.gender,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      dailyWaterGoalMl: data.dailyWaterGoalMl.present
+          ? data.dailyWaterGoalMl.value
+          : this.dailyWaterGoalMl,
+      waterReminderEnabled: data.waterReminderEnabled.present
+          ? data.waterReminderEnabled.value
+          : this.waterReminderEnabled,
+      waterReminderStartHour: data.waterReminderStartHour.present
+          ? data.waterReminderStartHour.value
+          : this.waterReminderStartHour,
+      waterReminderEndHour: data.waterReminderEndHour.present
+          ? data.waterReminderEndHour.value
+          : this.waterReminderEndHour,
+      waterReminderIntervalMinutes: data.waterReminderIntervalMinutes.present
+          ? data.waterReminderIntervalMinutes.value
+          : this.waterReminderIntervalMinutes,
     );
   }
 
@@ -280,13 +491,30 @@ class User extends DataClass implements Insertable<User> {
           ..write('age: $age, ')
           ..write('gender: $gender, ')
           ..write('createdAt: $createdAt, ')
-          ..write('isActive: $isActive')
+          ..write('isActive: $isActive, ')
+          ..write('dailyWaterGoalMl: $dailyWaterGoalMl, ')
+          ..write('waterReminderEnabled: $waterReminderEnabled, ')
+          ..write('waterReminderStartHour: $waterReminderStartHour, ')
+          ..write('waterReminderEndHour: $waterReminderEndHour, ')
+          ..write('waterReminderIntervalMinutes: $waterReminderIntervalMinutes')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, age, gender, createdAt, isActive);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    age,
+    gender,
+    createdAt,
+    isActive,
+    dailyWaterGoalMl,
+    waterReminderEnabled,
+    waterReminderStartHour,
+    waterReminderEndHour,
+    waterReminderIntervalMinutes,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -296,7 +524,13 @@ class User extends DataClass implements Insertable<User> {
           other.age == this.age &&
           other.gender == this.gender &&
           other.createdAt == this.createdAt &&
-          other.isActive == this.isActive);
+          other.isActive == this.isActive &&
+          other.dailyWaterGoalMl == this.dailyWaterGoalMl &&
+          other.waterReminderEnabled == this.waterReminderEnabled &&
+          other.waterReminderStartHour == this.waterReminderStartHour &&
+          other.waterReminderEndHour == this.waterReminderEndHour &&
+          other.waterReminderIntervalMinutes ==
+              this.waterReminderIntervalMinutes);
 }
 
 class UsersCompanion extends UpdateCompanion<User> {
@@ -306,6 +540,11 @@ class UsersCompanion extends UpdateCompanion<User> {
   final Value<String?> gender;
   final Value<DateTime> createdAt;
   final Value<bool> isActive;
+  final Value<int> dailyWaterGoalMl;
+  final Value<bool> waterReminderEnabled;
+  final Value<int> waterReminderStartHour;
+  final Value<int> waterReminderEndHour;
+  final Value<int> waterReminderIntervalMinutes;
   const UsersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -313,6 +552,11 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.gender = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.dailyWaterGoalMl = const Value.absent(),
+    this.waterReminderEnabled = const Value.absent(),
+    this.waterReminderStartHour = const Value.absent(),
+    this.waterReminderEndHour = const Value.absent(),
+    this.waterReminderIntervalMinutes = const Value.absent(),
   });
   UsersCompanion.insert({
     this.id = const Value.absent(),
@@ -321,6 +565,11 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.gender = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.dailyWaterGoalMl = const Value.absent(),
+    this.waterReminderEnabled = const Value.absent(),
+    this.waterReminderStartHour = const Value.absent(),
+    this.waterReminderEndHour = const Value.absent(),
+    this.waterReminderIntervalMinutes = const Value.absent(),
   }) : name = Value(name);
   static Insertable<User> custom({
     Expression<int>? id,
@@ -329,6 +578,11 @@ class UsersCompanion extends UpdateCompanion<User> {
     Expression<String>? gender,
     Expression<DateTime>? createdAt,
     Expression<bool>? isActive,
+    Expression<int>? dailyWaterGoalMl,
+    Expression<bool>? waterReminderEnabled,
+    Expression<int>? waterReminderStartHour,
+    Expression<int>? waterReminderEndHour,
+    Expression<int>? waterReminderIntervalMinutes,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -337,6 +591,15 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (gender != null) 'gender': gender,
       if (createdAt != null) 'created_at': createdAt,
       if (isActive != null) 'is_active': isActive,
+      if (dailyWaterGoalMl != null) 'daily_water_goal_ml': dailyWaterGoalMl,
+      if (waterReminderEnabled != null)
+        'water_reminder_enabled': waterReminderEnabled,
+      if (waterReminderStartHour != null)
+        'water_reminder_start_hour': waterReminderStartHour,
+      if (waterReminderEndHour != null)
+        'water_reminder_end_hour': waterReminderEndHour,
+      if (waterReminderIntervalMinutes != null)
+        'water_reminder_interval_minutes': waterReminderIntervalMinutes,
     });
   }
 
@@ -347,6 +610,11 @@ class UsersCompanion extends UpdateCompanion<User> {
     Value<String?>? gender,
     Value<DateTime>? createdAt,
     Value<bool>? isActive,
+    Value<int>? dailyWaterGoalMl,
+    Value<bool>? waterReminderEnabled,
+    Value<int>? waterReminderStartHour,
+    Value<int>? waterReminderEndHour,
+    Value<int>? waterReminderIntervalMinutes,
   }) {
     return UsersCompanion(
       id: id ?? this.id,
@@ -355,6 +623,13 @@ class UsersCompanion extends UpdateCompanion<User> {
       gender: gender ?? this.gender,
       createdAt: createdAt ?? this.createdAt,
       isActive: isActive ?? this.isActive,
+      dailyWaterGoalMl: dailyWaterGoalMl ?? this.dailyWaterGoalMl,
+      waterReminderEnabled: waterReminderEnabled ?? this.waterReminderEnabled,
+      waterReminderStartHour:
+          waterReminderStartHour ?? this.waterReminderStartHour,
+      waterReminderEndHour: waterReminderEndHour ?? this.waterReminderEndHour,
+      waterReminderIntervalMinutes:
+          waterReminderIntervalMinutes ?? this.waterReminderIntervalMinutes,
     );
   }
 
@@ -379,6 +654,29 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (dailyWaterGoalMl.present) {
+      map['daily_water_goal_ml'] = Variable<int>(dailyWaterGoalMl.value);
+    }
+    if (waterReminderEnabled.present) {
+      map['water_reminder_enabled'] = Variable<bool>(
+        waterReminderEnabled.value,
+      );
+    }
+    if (waterReminderStartHour.present) {
+      map['water_reminder_start_hour'] = Variable<int>(
+        waterReminderStartHour.value,
+      );
+    }
+    if (waterReminderEndHour.present) {
+      map['water_reminder_end_hour'] = Variable<int>(
+        waterReminderEndHour.value,
+      );
+    }
+    if (waterReminderIntervalMinutes.present) {
+      map['water_reminder_interval_minutes'] = Variable<int>(
+        waterReminderIntervalMinutes.value,
+      );
+    }
     return map;
   }
 
@@ -390,7 +688,12 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('age: $age, ')
           ..write('gender: $gender, ')
           ..write('createdAt: $createdAt, ')
-          ..write('isActive: $isActive')
+          ..write('isActive: $isActive, ')
+          ..write('dailyWaterGoalMl: $dailyWaterGoalMl, ')
+          ..write('waterReminderEnabled: $waterReminderEnabled, ')
+          ..write('waterReminderStartHour: $waterReminderStartHour, ')
+          ..write('waterReminderEndHour: $waterReminderEndHour, ')
+          ..write('waterReminderIntervalMinutes: $waterReminderIntervalMinutes')
           ..write(')'))
         .toString();
   }
@@ -4974,6 +5277,307 @@ class AppointmentsCompanion extends UpdateCompanion<Appointment> {
   }
 }
 
+class $WaterIntakeLogsTable extends WaterIntakeLogs
+    with TableInfo<$WaterIntakeLogsTable, WaterIntakeLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WaterIntakeLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES users (id)',
+    ),
+  );
+  static const VerificationMeta _amountMlMeta = const VerificationMeta(
+    'amountMl',
+  );
+  @override
+  late final GeneratedColumn<int> amountMl = GeneratedColumn<int>(
+    'amount_ml',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _loggedAtMeta = const VerificationMeta(
+    'loggedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> loggedAt = GeneratedColumn<DateTime>(
+    'logged_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, userId, amountMl, loggedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'water_intake_logs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WaterIntakeLog> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('amount_ml')) {
+      context.handle(
+        _amountMlMeta,
+        amountMl.isAcceptableOrUnknown(data['amount_ml']!, _amountMlMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMlMeta);
+    }
+    if (data.containsKey('logged_at')) {
+      context.handle(
+        _loggedAtMeta,
+        loggedAt.isAcceptableOrUnknown(data['logged_at']!, _loggedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WaterIntakeLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WaterIntakeLog(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}user_id'],
+      )!,
+      amountMl: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_ml'],
+      )!,
+      loggedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}logged_at'],
+      )!,
+    );
+  }
+
+  @override
+  $WaterIntakeLogsTable createAlias(String alias) {
+    return $WaterIntakeLogsTable(attachedDatabase, alias);
+  }
+}
+
+class WaterIntakeLog extends DataClass implements Insertable<WaterIntakeLog> {
+  final int id;
+  final int userId;
+
+  /// Amount of water logged, in millilitres.
+  final int amountMl;
+  final DateTime loggedAt;
+  const WaterIntakeLog({
+    required this.id,
+    required this.userId,
+    required this.amountMl,
+    required this.loggedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['user_id'] = Variable<int>(userId);
+    map['amount_ml'] = Variable<int>(amountMl);
+    map['logged_at'] = Variable<DateTime>(loggedAt);
+    return map;
+  }
+
+  WaterIntakeLogsCompanion toCompanion(bool nullToAbsent) {
+    return WaterIntakeLogsCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      amountMl: Value(amountMl),
+      loggedAt: Value(loggedAt),
+    );
+  }
+
+  factory WaterIntakeLog.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WaterIntakeLog(
+      id: serializer.fromJson<int>(json['id']),
+      userId: serializer.fromJson<int>(json['userId']),
+      amountMl: serializer.fromJson<int>(json['amountMl']),
+      loggedAt: serializer.fromJson<DateTime>(json['loggedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'userId': serializer.toJson<int>(userId),
+      'amountMl': serializer.toJson<int>(amountMl),
+      'loggedAt': serializer.toJson<DateTime>(loggedAt),
+    };
+  }
+
+  WaterIntakeLog copyWith({
+    int? id,
+    int? userId,
+    int? amountMl,
+    DateTime? loggedAt,
+  }) => WaterIntakeLog(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    amountMl: amountMl ?? this.amountMl,
+    loggedAt: loggedAt ?? this.loggedAt,
+  );
+  WaterIntakeLog copyWithCompanion(WaterIntakeLogsCompanion data) {
+    return WaterIntakeLog(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      amountMl: data.amountMl.present ? data.amountMl.value : this.amountMl,
+      loggedAt: data.loggedAt.present ? data.loggedAt.value : this.loggedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WaterIntakeLog(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('amountMl: $amountMl, ')
+          ..write('loggedAt: $loggedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, userId, amountMl, loggedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WaterIntakeLog &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.amountMl == this.amountMl &&
+          other.loggedAt == this.loggedAt);
+}
+
+class WaterIntakeLogsCompanion extends UpdateCompanion<WaterIntakeLog> {
+  final Value<int> id;
+  final Value<int> userId;
+  final Value<int> amountMl;
+  final Value<DateTime> loggedAt;
+  const WaterIntakeLogsCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.amountMl = const Value.absent(),
+    this.loggedAt = const Value.absent(),
+  });
+  WaterIntakeLogsCompanion.insert({
+    this.id = const Value.absent(),
+    required int userId,
+    required int amountMl,
+    this.loggedAt = const Value.absent(),
+  }) : userId = Value(userId),
+       amountMl = Value(amountMl);
+  static Insertable<WaterIntakeLog> custom({
+    Expression<int>? id,
+    Expression<int>? userId,
+    Expression<int>? amountMl,
+    Expression<DateTime>? loggedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (amountMl != null) 'amount_ml': amountMl,
+      if (loggedAt != null) 'logged_at': loggedAt,
+    });
+  }
+
+  WaterIntakeLogsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? userId,
+    Value<int>? amountMl,
+    Value<DateTime>? loggedAt,
+  }) {
+    return WaterIntakeLogsCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      amountMl: amountMl ?? this.amountMl,
+      loggedAt: loggedAt ?? this.loggedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (amountMl.present) {
+      map['amount_ml'] = Variable<int>(amountMl.value);
+    }
+    if (loggedAt.present) {
+      map['logged_at'] = Variable<DateTime>(loggedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WaterIntakeLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('amountMl: $amountMl, ')
+          ..write('loggedAt: $loggedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4992,6 +5596,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MoodEntriesTable moodEntries = $MoodEntriesTable(this);
   late final $PeriodEntriesTable periodEntries = $PeriodEntriesTable(this);
   late final $AppointmentsTable appointments = $AppointmentsTable(this);
+  late final $WaterIntakeLogsTable waterIntakeLogs = $WaterIntakeLogsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5007,6 +5614,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     moodEntries,
     periodEntries,
     appointments,
+    waterIntakeLogs,
   ];
 }
 
@@ -5018,6 +5626,11 @@ typedef $$UsersTableCreateCompanionBuilder =
       Value<String?> gender,
       Value<DateTime> createdAt,
       Value<bool> isActive,
+      Value<int> dailyWaterGoalMl,
+      Value<bool> waterReminderEnabled,
+      Value<int> waterReminderStartHour,
+      Value<int> waterReminderEndHour,
+      Value<int> waterReminderIntervalMinutes,
     });
 typedef $$UsersTableUpdateCompanionBuilder =
     UsersCompanion Function({
@@ -5027,6 +5640,11 @@ typedef $$UsersTableUpdateCompanionBuilder =
       Value<String?> gender,
       Value<DateTime> createdAt,
       Value<bool> isActive,
+      Value<int> dailyWaterGoalMl,
+      Value<bool> waterReminderEnabled,
+      Value<int> waterReminderStartHour,
+      Value<int> waterReminderEndHour,
+      Value<int> waterReminderIntervalMinutes,
     });
 
 final class $$UsersTableReferences
@@ -5152,6 +5770,26 @@ final class $$UsersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$WaterIntakeLogsTable, List<WaterIntakeLog>>
+  _waterIntakeLogsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.waterIntakeLogs,
+    aliasName: $_aliasNameGenerator(db.users.id, db.waterIntakeLogs.userId),
+  );
+
+  $$WaterIntakeLogsTableProcessedTableManager get waterIntakeLogsRefs {
+    final manager = $$WaterIntakeLogsTableTableManager(
+      $_db,
+      $_db.waterIntakeLogs,
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _waterIntakeLogsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
@@ -5189,6 +5827,31 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dailyWaterGoalMl => $composableBuilder(
+    column: $table.dailyWaterGoalMl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get waterReminderEnabled => $composableBuilder(
+    column: $table.waterReminderEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get waterReminderStartHour => $composableBuilder(
+    column: $table.waterReminderStartHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get waterReminderEndHour => $composableBuilder(
+    column: $table.waterReminderEndHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get waterReminderIntervalMinutes => $composableBuilder(
+    column: $table.waterReminderIntervalMinutes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5341,6 +6004,31 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
     );
     return f(composer);
   }
+
+  Expression<bool> waterIntakeLogsRefs(
+    Expression<bool> Function($$WaterIntakeLogsTableFilterComposer f) f,
+  ) {
+    final $$WaterIntakeLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.waterIntakeLogs,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WaterIntakeLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.waterIntakeLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableOrderingComposer
@@ -5381,6 +6069,31 @@ class $$UsersTableOrderingComposer
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get dailyWaterGoalMl => $composableBuilder(
+    column: $table.dailyWaterGoalMl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get waterReminderEnabled => $composableBuilder(
+    column: $table.waterReminderEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get waterReminderStartHour => $composableBuilder(
+    column: $table.waterReminderStartHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get waterReminderEndHour => $composableBuilder(
+    column: $table.waterReminderEndHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get waterReminderIntervalMinutes => $composableBuilder(
+    column: $table.waterReminderIntervalMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UsersTableAnnotationComposer
@@ -5409,6 +6122,31 @@ class $$UsersTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<int> get dailyWaterGoalMl => $composableBuilder(
+    column: $table.dailyWaterGoalMl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get waterReminderEnabled => $composableBuilder(
+    column: $table.waterReminderEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get waterReminderStartHour => $composableBuilder(
+    column: $table.waterReminderStartHour,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get waterReminderEndHour => $composableBuilder(
+    column: $table.waterReminderEndHour,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get waterReminderIntervalMinutes => $composableBuilder(
+    column: $table.waterReminderIntervalMinutes,
+    builder: (column) => column,
+  );
 
   Expression<T> medicationPlansRefs<T extends Object>(
     Expression<T> Function($$MedicationPlansTableAnnotationComposer a) f,
@@ -5560,6 +6298,31 @@ class $$UsersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> waterIntakeLogsRefs<T extends Object>(
+    Expression<T> Function($$WaterIntakeLogsTableAnnotationComposer a) f,
+  ) {
+    final $$WaterIntakeLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.waterIntakeLogs,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WaterIntakeLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.waterIntakeLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableTableManager
@@ -5582,6 +6345,7 @@ class $$UsersTableTableManager
             bool moodEntriesRefs,
             bool periodEntriesRefs,
             bool appointmentsRefs,
+            bool waterIntakeLogsRefs,
           })
         > {
   $$UsersTableTableManager(_$AppDatabase db, $UsersTable table)
@@ -5603,6 +6367,11 @@ class $$UsersTableTableManager
                 Value<String?> gender = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<int> dailyWaterGoalMl = const Value.absent(),
+                Value<bool> waterReminderEnabled = const Value.absent(),
+                Value<int> waterReminderStartHour = const Value.absent(),
+                Value<int> waterReminderEndHour = const Value.absent(),
+                Value<int> waterReminderIntervalMinutes = const Value.absent(),
               }) => UsersCompanion(
                 id: id,
                 name: name,
@@ -5610,6 +6379,11 @@ class $$UsersTableTableManager
                 gender: gender,
                 createdAt: createdAt,
                 isActive: isActive,
+                dailyWaterGoalMl: dailyWaterGoalMl,
+                waterReminderEnabled: waterReminderEnabled,
+                waterReminderStartHour: waterReminderStartHour,
+                waterReminderEndHour: waterReminderEndHour,
+                waterReminderIntervalMinutes: waterReminderIntervalMinutes,
               ),
           createCompanionCallback:
               ({
@@ -5619,6 +6393,11 @@ class $$UsersTableTableManager
                 Value<String?> gender = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<int> dailyWaterGoalMl = const Value.absent(),
+                Value<bool> waterReminderEnabled = const Value.absent(),
+                Value<int> waterReminderStartHour = const Value.absent(),
+                Value<int> waterReminderEndHour = const Value.absent(),
+                Value<int> waterReminderIntervalMinutes = const Value.absent(),
               }) => UsersCompanion.insert(
                 id: id,
                 name: name,
@@ -5626,6 +6405,11 @@ class $$UsersTableTableManager
                 gender: gender,
                 createdAt: createdAt,
                 isActive: isActive,
+                dailyWaterGoalMl: dailyWaterGoalMl,
+                waterReminderEnabled: waterReminderEnabled,
+                waterReminderStartHour: waterReminderStartHour,
+                waterReminderEndHour: waterReminderEndHour,
+                waterReminderIntervalMinutes: waterReminderIntervalMinutes,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5641,6 +6425,7 @@ class $$UsersTableTableManager
                 moodEntriesRefs = false,
                 periodEntriesRefs = false,
                 appointmentsRefs = false,
+                waterIntakeLogsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5651,6 +6436,7 @@ class $$UsersTableTableManager
                     if (moodEntriesRefs) db.moodEntries,
                     if (periodEntriesRefs) db.periodEntries,
                     if (appointmentsRefs) db.appointments,
+                    if (waterIntakeLogsRefs) db.waterIntakeLogs,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5777,6 +6563,27 @@ class $$UsersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (waterIntakeLogsRefs)
+                        await $_getPrefetchedData<
+                          User,
+                          $UsersTable,
+                          WaterIntakeLog
+                        >(
+                          currentTable: table,
+                          referencedTable: $$UsersTableReferences
+                              ._waterIntakeLogsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UsersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).waterIntakeLogsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.userId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5804,6 +6611,7 @@ typedef $$UsersTableProcessedTableManager =
         bool moodEntriesRefs,
         bool periodEntriesRefs,
         bool appointmentsRefs,
+        bool waterIntakeLogsRefs,
       })
     >;
 typedef $$MedicationsTableCreateCompanionBuilder =
@@ -9686,6 +10494,308 @@ typedef $$AppointmentsTableProcessedTableManager =
       Appointment,
       PrefetchHooks Function({bool userId})
     >;
+typedef $$WaterIntakeLogsTableCreateCompanionBuilder =
+    WaterIntakeLogsCompanion Function({
+      Value<int> id,
+      required int userId,
+      required int amountMl,
+      Value<DateTime> loggedAt,
+    });
+typedef $$WaterIntakeLogsTableUpdateCompanionBuilder =
+    WaterIntakeLogsCompanion Function({
+      Value<int> id,
+      Value<int> userId,
+      Value<int> amountMl,
+      Value<DateTime> loggedAt,
+    });
+
+final class $$WaterIntakeLogsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $WaterIntakeLogsTable, WaterIntakeLog> {
+  $$WaterIntakeLogsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $UsersTable _userIdTable(_$AppDatabase db) => db.users.createAlias(
+    $_aliasNameGenerator(db.waterIntakeLogs.userId, db.users.id),
+  );
+
+  $$UsersTableProcessedTableManager get userId {
+    final $_column = $_itemColumn<int>('user_id')!;
+
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_userIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$WaterIntakeLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $WaterIntakeLogsTable> {
+  $$WaterIntakeLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountMl => $composableBuilder(
+    column: $table.amountMl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get loggedAt => $composableBuilder(
+    column: $table.loggedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$UsersTableFilterComposer get userId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WaterIntakeLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $WaterIntakeLogsTable> {
+  $$WaterIntakeLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountMl => $composableBuilder(
+    column: $table.amountMl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get loggedAt => $composableBuilder(
+    column: $table.loggedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$UsersTableOrderingComposer get userId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WaterIntakeLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WaterIntakeLogsTable> {
+  $$WaterIntakeLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get amountMl =>
+      $composableBuilder(column: $table.amountMl, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get loggedAt =>
+      $composableBuilder(column: $table.loggedAt, builder: (column) => column);
+
+  $$UsersTableAnnotationComposer get userId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WaterIntakeLogsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WaterIntakeLogsTable,
+          WaterIntakeLog,
+          $$WaterIntakeLogsTableFilterComposer,
+          $$WaterIntakeLogsTableOrderingComposer,
+          $$WaterIntakeLogsTableAnnotationComposer,
+          $$WaterIntakeLogsTableCreateCompanionBuilder,
+          $$WaterIntakeLogsTableUpdateCompanionBuilder,
+          (WaterIntakeLog, $$WaterIntakeLogsTableReferences),
+          WaterIntakeLog,
+          PrefetchHooks Function({bool userId})
+        > {
+  $$WaterIntakeLogsTableTableManager(
+    _$AppDatabase db,
+    $WaterIntakeLogsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WaterIntakeLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WaterIntakeLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WaterIntakeLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> userId = const Value.absent(),
+                Value<int> amountMl = const Value.absent(),
+                Value<DateTime> loggedAt = const Value.absent(),
+              }) => WaterIntakeLogsCompanion(
+                id: id,
+                userId: userId,
+                amountMl: amountMl,
+                loggedAt: loggedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int userId,
+                required int amountMl,
+                Value<DateTime> loggedAt = const Value.absent(),
+              }) => WaterIntakeLogsCompanion.insert(
+                id: id,
+                userId: userId,
+                amountMl: amountMl,
+                loggedAt: loggedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$WaterIntakeLogsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({userId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (userId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.userId,
+                                referencedTable:
+                                    $$WaterIntakeLogsTableReferences
+                                        ._userIdTable(db),
+                                referencedColumn:
+                                    $$WaterIntakeLogsTableReferences
+                                        ._userIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$WaterIntakeLogsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WaterIntakeLogsTable,
+      WaterIntakeLog,
+      $$WaterIntakeLogsTableFilterComposer,
+      $$WaterIntakeLogsTableOrderingComposer,
+      $$WaterIntakeLogsTableAnnotationComposer,
+      $$WaterIntakeLogsTableCreateCompanionBuilder,
+      $$WaterIntakeLogsTableUpdateCompanionBuilder,
+      (WaterIntakeLog, $$WaterIntakeLogsTableReferences),
+      WaterIntakeLog,
+      PrefetchHooks Function({bool userId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9713,4 +10823,6 @@ class $AppDatabaseManager {
       $$PeriodEntriesTableTableManager(_db, _db.periodEntries);
   $$AppointmentsTableTableManager get appointments =>
       $$AppointmentsTableTableManager(_db, _db.appointments);
+  $$WaterIntakeLogsTableTableManager get waterIntakeLogs =>
+      $$WaterIntakeLogsTableTableManager(_db, _db.waterIntakeLogs);
 }

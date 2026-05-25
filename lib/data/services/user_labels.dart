@@ -14,6 +14,7 @@ class UserLabels {
     required this.taken,
     required this.skip,
     required this.takenPast,
+    required this.drank,
   });
 
   /// "Bom vzel" / "Bom vzela" — future-tense first person.
@@ -29,6 +30,11 @@ class UserLabels {
   /// dose they *have already* taken.
   final String takenPast;
 
+  /// "Sem spil" / "Sem spila" — past-tense first person, for water.
+  /// Used on water-reminder notification action buttons where the user
+  /// confirms a glass they have just drunk.
+  final String drank;
+
   /// Fallback used when the database has no users yet (cold boot before
   /// onboarding finishes, etc.). Defaults to male form, matching the existing
   /// app voice.
@@ -36,6 +42,7 @@ class UserLabels {
     taken: 'Bom vzel',
     skip: 'Preskoči',
     takenPast: 'Sem vzel',
+    drank: 'Sem spil',
   );
 
   static UserLabels forGender(String? gender) {
@@ -44,6 +51,7 @@ class UserLabels {
       taken: female ? 'Bom vzela' : 'Bom vzel',
       skip: 'Preskoči',
       takenPast: female ? 'Sem vzela' : 'Sem vzel',
+      drank: female ? 'Sem spila' : 'Sem spil',
     );
   }
 

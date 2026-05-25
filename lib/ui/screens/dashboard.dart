@@ -18,12 +18,14 @@ import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/user_labels.dart';
+import '../../data/services/water_service.dart';
 import '../../ui/widgets/time_island.dart';
 import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/components/week_strip.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
+import '../../ui/components/water_logging_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -44,6 +46,10 @@ class DashboardScreenState extends State<DashboardScreen>
   DateTime _selectedDate = _today();
 
   Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
+  /// Stock projection keyed by intake id. Walked from today through the end
+  /// of the selected day, so cards on future days continue the count from
+  /// whatever's left after the in-between doses (not from today's stock).
+  Map<int, int> _projectedRemaining = {};
   Set<String> _activeDateKeys = <String>{};
   late IntakeLogService _intakeService;
   int _totalUserCount = 0;
@@ -241,9 +247,12 @@ class DashboardScreenState extends State<DashboardScreen>
       byTime.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
     );
 
+    final projection = await _computeProjectedRemaining(endOfDay: endOfDay);
+
     if (!mounted) return;
     setState(() {
       _groupedIntakes = sortedGrouped;
+      _projectedRemaining = projection;
     });
 
     // Keep activity dots in sync after any change to intakes/appointments.
@@ -261,6 +270,63 @@ class DashboardScreenState extends State<DashboardScreen>
   /// Back-compat shim — keep the existing public API used by speed-dial flows.
   Future<void> loadTodaysIntakes({bool autoScroll = true}) =>
       _loadIntakesForSelectedDate(autoScroll: autoScroll);
+
+  /// Per-intake "stock right before this dose" across the window
+  /// `[min(today, selectedDay), endOfDay)`. Walks intakes in time order:
+  ///   * Taken intakes are skipped from the map → the card hides the chip
+  ///     (the dose already happened; stock-after-this is meaningless).
+  ///   * Not-yet-taken intakes record the running stock *before* this dose,
+  ///     then decrement for the next one. So the first upcoming card shows
+  ///     current stock unchanged, the next shows current-1, etc.
+  /// Walks from today's start (or the selected day, whichever is earlier)
+  /// so navigating to tomorrow continues from today's leftover stock.
+  Future<Map<int, int>> _computeProjectedRemaining({
+    required DateTime endOfDay,
+  }) async {
+    final today = _today();
+    final projectionStart =
+        _selectedDate.isBefore(today) ? _selectedDate : today;
+
+    final intakes = await (db.select(db.medicationIntakeLogs)
+          ..where(
+              (t) => t.scheduledTime.isBiggerOrEqualValue(projectionStart))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..orderBy([(t) => OrderingTerm.asc(t.scheduledTime)]))
+        .get();
+    if (intakes.isEmpty) return const {};
+
+    final medIds = intakes.map((i) => i.medicationId).toSet().toList();
+    final planIds = intakes.map((i) => i.planId).toSet().toList();
+    final meds = await (db.select(db.medications)
+          ..where((t) => t.id.isIn(medIds)))
+        .get();
+    final plans = planIds.isEmpty
+        ? <MedicationPlan>[]
+        : await (db.select(db.medicationPlans)
+              ..where((t) => t.id.isIn(planIds)))
+            .get();
+    final medMap = {for (final m in meds) m.id: m};
+    final planMap = {for (final p in plans) p.id: p};
+
+    final medRunning = <int, double>{};
+    final result = <int, int>{};
+    for (final intake in intakes) {
+      final med = medMap[intake.medicationId];
+      if (med == null) continue;
+      // First time we see this med in the walk, seed the running stock from
+      // the current `dosagesRemaining` (which already reflects every dose
+      // the user has marked taken so far).
+      medRunning[med.id] ??= (med.dosagesRemaining ?? 0).toDouble();
+      if (intake.wasTaken) continue;
+
+      final plan = planMap[intake.planId];
+      final dosage = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
+      // Display stock BEFORE this dose, then decrement for the next one.
+      result[intake.id] = medRunning[med.id]!.toInt();
+      medRunning[med.id] = medRunning[med.id]! - dosage;
+    }
+    return result;
+  }
 
   void _scrollToNextIntake() {
     if (_groupedIntakes.isEmpty) return;
@@ -636,6 +702,45 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _onLogWater() async {
+    _toggleSpeedDial();
+
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+
+    final result = await showWaterLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+
+    try {
+      await WaterService(db).logIntake(
+        userId: userId,
+        amountMl: result['amountMl'] as int,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💧 ${result['amountMl']} ml zabeleženo'),
+            backgroundColor: const Color(0xFF38BDF8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _onLogMood() async {
     _toggleSpeedDial();
 
@@ -684,34 +789,10 @@ class DashboardScreenState extends State<DashboardScreen>
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    // Pre-compute running remaining count per intake
-    // Walk all intakes in time order, decrement per medication
-    final Map<int, int> _runningRemaining = {};
-    {
-      final Map<int, double> medRunning = {}; // medicationId → running count
-      for (final timeKey in _groupedIntakes.keys) {
-        for (final intakeData in _groupedIntakes[timeKey]!) {
-          // Skip appointment items
-          if (intakeData['isAppointment'] == true) continue;
-
-          final medication = intakeData['medication'] as Medication;
-          final plan = intakeData['plan'] as MedicationPlan?;
-          final intake = intakeData['intake'] as MedicationIntakeLog;
-          // Use intake's dosageAmount if set (for as-needed entries), otherwise plan's
-          final dosageAmount = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
-
-          // Initialize with medication's current remaining if first encounter
-          if (!medRunning.containsKey(medication.id)) {
-            medRunning[medication.id] = (medication.dosagesRemaining ?? 0)
-                .toDouble();
-          }
-
-          // Decrement and store for this intake
-          medRunning[medication.id] = medRunning[medication.id]! - dosageAmount;
-          _runningRemaining[intake.id] = medRunning[medication.id]!.toInt();
-        }
-      }
-    }
+    // Stock projection per intake is computed in _loadIntakesForSelectedDate
+    // (walks the window from today through end-of-selected-day so future days
+    // continue the count instead of restarting at current stock).
+    final projectedRemaining = _projectedRemaining;
 
     return Scaffold(
       body: Stack(
@@ -893,9 +974,11 @@ class DashboardScreenState extends State<DashboardScreen>
                                 final userName =
                                     _userNames[intake.userId] ?? 'Unknown';
 
-                                // Get pre-computed running remaining for this intake
-                                final remainingAfterDose =
-                                    _runningRemaining[intake.id] ?? 0;
+                                // Projected stock after this dose (or current
+                                // stock if this dose was already taken) — see
+                                // the projection comment near the top of build.
+                                final remaining =
+                                    projectedRemaining[intake.id] ?? 0;
 
                                 // Enable swipes only if time has passed (isPast)
                                 // For future medications, disable swiping
@@ -909,12 +992,12 @@ class DashboardScreenState extends State<DashboardScreen>
                                   medType: medication.medType,
                                   dosage:
                                       '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                  medicineRemaining: remainingAfterDose == 0
-                                      ? 'Zadnja ${getMedicationUnit(medication.medType, 1)}'
-                                      : remainingAfterDose > 1
-                                          ? 'še ${remainingAfterDose} ${getMedicationUnit(medication.medType, remainingAfterDose)}'
+                                  medicineRemaining: remaining > 1
+                                      ? 'še $remaining ${getMedicationUnit(medication.medType, remaining)}'
+                                      : remaining == 1
+                                          ? 'Zadnja ${getMedicationUnit(medication.medType, 1)}'
                                           : '',
-                                  pillCount: remainingAfterDose,
+                                  pillCount: remaining,
                                   showName: _totalUserCount > 1,
                                   username: userName,
                                   userId: intake.userId.toString(),
@@ -934,8 +1017,8 @@ class DashboardScreenState extends State<DashboardScreen>
                                           '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
                                       scheduledTime: intake.scheduledTime,
                                       dosageAmount: dosageAmount,
-                                      pillsRemaining: remainingAfterDose > 0
-                                          ? remainingAfterDose
+                                      pillsRemaining: remaining > 0
+                                          ? remaining
                                           : null,
                                       userName: userName,
                                       intakeAdvice: medication.intakeAdvice,
@@ -1014,7 +1097,19 @@ class DashboardScreenState extends State<DashboardScreen>
               if (!_isExpanded && _animation.value == 0) {
                 return const SizedBox.shrink();
               }
-              return Column(
+              // Cap the speed-dial column height so it can't grow past the
+              // screen — on shorter devices the topmost entry was being
+              // clipped (notably "Dodaj novo zdravilo"). `reverse: true`
+              // pins the items closest to the main FAB and lets the user
+              // scroll up to reach overflow.
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.55,
+                ),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  padding: EdgeInsets.zero,
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1141,6 +1236,49 @@ class DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                   ),
+                  // Option: Log water intake
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Zabeleži hidracijo',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'log_water',
+                              mini: true,
+                              onPressed: _onLogWater,
+                              backgroundColor: const Color(0xFF38BDF8),
+                              foregroundColor: Colors.white,
+                              child: const Icon(Symbols.water_drop),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   // Option: Add appointment
                   Transform.scale(
                     scale: _animation.value,
@@ -1183,6 +1321,8 @@ class DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                 ],
+                  ),
+                ),
               );
             },
           ),
