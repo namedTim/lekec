@@ -3,6 +3,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../services/tip_service.dart';
+import '../widgets/tip_celebration_overlay.dart';
 
 /// "Buy me a coffee" screen that lets the user pick a one-shot tip tier
 /// from the Play Store / App Store.
@@ -45,12 +46,28 @@ class _TipScreenState extends State<TipScreen> {
     if (!mounted) return;
     setState(() => _purchaseInProgressId = null);
     ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Hvala za podporo (${p.price})!'),
-        backgroundColor: Colors.green,
-      ),
+    TipCelebrationOverlay.show(
+      context,
+      title: p.title.isNotEmpty
+          ? p.title.replaceAll(RegExp(r'\s*\(.*\)$'), '')
+          : 'Podpora razvoju',
+      icon: _iconForTier(p.id),
     );
+  }
+
+  IconData _iconForTier(String id) {
+    switch (id) {
+      case 'tip_tier_1':
+        return Symbols.coffee;
+      case 'tip_tier_2':
+        return Symbols.bakery_dining;
+      case 'tip_tier_3':
+        return Symbols.lunch_dining;
+      case 'tip_tier_4':
+        return Symbols.restaurant;
+      default:
+        return Symbols.favorite;
+    }
   }
 
   void _handleError(String message) {
@@ -93,7 +110,16 @@ class _TipScreenState extends State<TipScreen> {
     final colors = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Podpri razvoj')),
+      appBar: AppBar(
+        title: const Text('Podpri razvoj'),
+        actions: [
+          const IconButton(
+            tooltip: 'Hvala za podporo',
+            icon: Icon(Symbols.celebration),
+            onPressed: null,
+          ),
+        ],
+      ),
       body: _buildBody(theme, colors),
     );
   }
