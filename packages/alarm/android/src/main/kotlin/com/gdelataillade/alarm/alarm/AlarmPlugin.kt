@@ -3,8 +3,6 @@ package com.gdelataillade.alarm.alarm
 import com.gdelataillade.alarm.generated.AlarmApi
 import com.gdelataillade.alarm.generated.AlarmTriggerApi
 import android.app.Activity
-import android.app.KeyguardManager
-import android.content.Context
 import android.os.Build
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
@@ -91,9 +89,12 @@ class AlarmPlugin : FlutterPlugin, ActivityAware {
             Log.d(TAG, "Making app visible on lock screen...")
             activity.setShowWhenLocked(true)
             activity.setTurnScreenOn(true)
-            val keyguardManager =
-                activity.applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(activity, null)
+            // Fork divergence: upstream also calls
+            // KeyguardManager.requestDismissKeyguard here, which forces a
+            // PIN/pattern prompt before the ring screen on secured devices.
+            // setShowWhenLocked is enough to draw the ring UI over the
+            // keyguard and let users tap the action buttons; if they want to
+            // reach the rest of the app they unlock themselves.
         } else {
             Log.d(TAG, "Reverting making app visible on lock screen...")
             activity.setShowWhenLocked(false)
