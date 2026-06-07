@@ -24,7 +24,10 @@ class TimeIsland extends StatefulWidget {
     this.greetingDuration = const Duration(seconds: 5),
     this.appointmentTitle,
     this.appointmentTime,
+    this.waterTodayMl,
+    this.waterGoalMl,
     this.rotationInterval = const Duration(seconds: 5),
+    this.onTap,
   });
 
   final String? medicationName;
@@ -37,13 +40,21 @@ class TimeIsland extends StatefulWidget {
   final Duration greetingDuration;
   final String? appointmentTitle;
   final DateTime? appointmentTime;
+  // Both must be non-null (and goal > 0) for the water view to participate
+  // in the rotation. Dashboard already gates this on a recent activity check,
+  // so users who never use the water feature don't see it here at all.
+  final int? waterTodayMl;
+  final int? waterGoalMl;
   final Duration rotationInterval;
+  // Tapping the island opens the expanded overview. When null the island is
+  // not interactive (and the tap affordance is hidden).
+  final VoidCallback? onTap;
 
   @override
   State<TimeIsland> createState() => _TimeIslandState();
 }
 
-enum _IslandView { greeting, meds, appointment }
+enum _IslandView { greeting, meds, appointment, water }
 
 class _TimeIslandState extends State<TimeIsland>
     with SingleTickerProviderStateMixin {
@@ -90,11 +101,25 @@ class _TimeIslandState extends State<TimeIsland>
       widget.appointmentTitle!.isNotEmpty &&
       widget.appointmentTime != null;
 
-  _IslandView _initialPostGreetingView() {
-    if (_hasMedication) return _IslandView.meds;
-    if (_hasAppointment) return _IslandView.appointment;
-    return _IslandView.meds;
+  bool get _hasWater =>
+      widget.waterTodayMl != null &&
+      widget.waterGoalMl != null &&
+      widget.waterGoalMl! > 0;
+
+  // Ordered rotation cycle. The meds view always participates and leads —
+  // medication is the most important card, and even when everything's taken it
+  // still shows the "all done" state. So water (and appointments) keep cycling
+  // alongside it instead of the island getting stuck on a single page.
+  List<_IslandView> get _rotationCycle {
+    final cycle = <_IslandView>[_IslandView.meds];
+    if (_hasAppointment) cycle.add(_IslandView.appointment);
+    if (_hasWater) cycle.add(_IslandView.water);
+    return cycle;
   }
+
+  // Meds lead after the greeting — they're the priority card and the meds view
+  // always has something to show (next dose, or "all taken").
+  _IslandView _initialPostGreetingView() => _IslandView.meds;
 
   void _scheduleGreetingDismiss() {
     _greetingTimer?.cancel();
@@ -110,13 +135,14 @@ class _TimeIslandState extends State<TimeIsland>
   void _scheduleRotation() {
     _rotationTimer?.cancel();
     if (_view == _IslandView.greeting) return;
-    if (!(_hasMedication && _hasAppointment)) return;
+    final cycle = _rotationCycle;
+    if (cycle.length < 2) return;
     _rotationTimer = Timer(widget.rotationInterval, () {
       if (!mounted) return;
       setState(() {
-        _view = _view == _IslandView.meds
-            ? _IslandView.appointment
-            : _IslandView.meds;
+        final idx = cycle.indexOf(_view);
+        final nextIdx = idx < 0 ? 0 : (idx + 1) % cycle.length;
+        _view = cycle[nextIdx];
       });
       _scheduleRotation();
       _syncPulse();
@@ -139,14 +165,16 @@ class _TimeIslandState extends State<TimeIsland>
         oldWidget.appointmentTitle != widget.appointmentTitle ||
             oldWidget.appointmentTime != widget.appointmentTime;
     final medChanged = oldWidget.medicationName != widget.medicationName;
-    if (apptChanged || medChanged) {
-      // If the currently shown view disappeared, fall back.
+    final waterChanged = oldWidget.waterTodayMl != widget.waterTodayMl ||
+        oldWidget.waterGoalMl != widget.waterGoalMl;
+    if (apptChanged || medChanged || waterChanged) {
+      // If the currently shown view lost its content, fall back to the meds
+      // view (which is always valid). The meds view itself never needs this —
+      // it always has something to show.
       if (_view == _IslandView.appointment && !_hasAppointment) {
-        setState(() => _view = _IslandView.meds);
-      } else if (_view == _IslandView.meds &&
-          !_hasMedication &&
-          _hasAppointment) {
-        setState(() => _view = _IslandView.appointment);
+        setState(() => _view = _initialPostGreetingView());
+      } else if (_view == _IslandView.water && !_hasWater) {
+        setState(() => _view = _initialPostGreetingView());
       }
       _scheduleRotation();
     }
@@ -304,12 +332,16 @@ class _TimeIslandState extends State<TimeIsland>
     final isGreeting =
         _view == _IslandView.greeting && widget.ownerName != null;
     final isAppointment = _view == _IslandView.appointment && _hasAppointment;
+    final isWater = _view == _IslandView.water && _hasWater;
     final medsStyle = _resolveStyle(colors);
     final greetingStyle = _resolveGreeting();
     final apptAccent = const Color(0xFF3B82F6);
+    const waterAccent = Color(0xFF38BDF8);
     final accent = isGreeting
         ? greetingStyle.accent
-        : (isAppointment ? apptAccent : medsStyle.accent);
+        : (isAppointment
+            ? apptAccent
+            : (isWater ? waterAccent : medsStyle.accent));
     final pulseEnabled =
         _view == _IslandView.meds && _isFinished && _hasMedication;
 
@@ -317,10 +349,16 @@ class _TimeIslandState extends State<TimeIsland>
       animation: _pulse,
       builder: (context, _) {
         final pulseAlpha = pulseEnabled ? (0.18 + 0.18 * _pulse.value) : 0.0;
-        return AnimatedContainer(
+        return GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            children: [
+              AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+          // Extra top padding leaves room for the tap-to-expand handle.
+          padding: EdgeInsets.fromLTRB(14, widget.onTap != null ? 16 : 12, 16, 12),
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(28),
@@ -363,8 +401,31 @@ class _TimeIslandState extends State<TimeIsland>
                   ? _buildGreeting(theme, greetingStyle)
                   : (isAppointment
                       ? _buildAppointmentView(theme, colors, apptAccent)
-                      : _buildMedsView(theme, colors, medsStyle)),
+                      : (isWater
+                          ? _buildWaterView(theme, colors, waterAccent)
+                          : _buildMedsView(theme, colors, medsStyle))),
             ),
+          ),
+              ),
+              // Tap-to-expand affordance: a small handle at the top centre so
+              // users can tell the island opens a fuller overview.
+              if (widget.onTap != null)
+                Positioned(
+                  top: 6,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      width: 28,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.onSurfaceVariant.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
@@ -468,6 +529,85 @@ class _TimeIslandState extends State<TimeIsland>
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
             value: _appointmentProgress(time),
+            minHeight: 5,
+            backgroundColor: accent.withOpacity(0.15),
+            valueColor: AlwaysStoppedAnimation<Color>(accent),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWaterView(
+    ThemeData theme,
+    ColorScheme colors,
+    Color accent,
+  ) {
+    final today = widget.waterTodayMl!;
+    final goal = widget.waterGoalMl!;
+    final progress = (today / goal).clamp(0.0, 1.0);
+    final percent = (progress * 100).round();
+    final hit = today >= goal;
+    final whenText = hit ? 'cilj ✓' : '$today / $goal ml';
+
+    return Column(
+      key: const ValueKey('water'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            _iconTile(icon: Symbols.water_drop, accent: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Hidracija danes',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hit ? 'Dnevni cilj dosežen' : '$percent %',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                whenText,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: progress,
             minHeight: 5,
             backgroundColor: accent.withOpacity(0.15),
             valueColor: AlwaysStoppedAnimation<Color>(accent),

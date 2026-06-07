@@ -239,21 +239,33 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               child: SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<ThemeMode>(
+                  // Compact styling so all three options fit on narrow phones:
+                  // no selected-check (it adds width and shifts the label),
+                  // smaller label font, tighter padding and density.
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    textStyle: theme.textTheme.labelMedium,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 10,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
                   segments: const [
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.system,
                       label: Text('Sistem'),
-                      icon: Icon(Symbols.brightness_auto),
+                      icon: Icon(Symbols.brightness_auto, size: 18),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.light,
                       label: Text('Svetla'),
-                      icon: Icon(Symbols.light_mode),
+                      icon: Icon(Symbols.light_mode, size: 18),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.dark,
                       label: Text('Temna'),
-                      icon: Icon(Symbols.dark_mode),
+                      icon: Icon(Symbols.dark_mode, size: 18),
                     ),
                   ],
                   selected: {themeMode.value ?? ThemeMode.system},

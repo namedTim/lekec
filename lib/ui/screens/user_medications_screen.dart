@@ -459,7 +459,16 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
           ..where((t) => t.id.equals(widget.userId)))
         .getSingleOrNull();
     if (user == null) return;
-    await NotificationService().scheduleWaterReminders(user);
+    // Goal-aware: also suppresses the rest of today's reminders when the user
+    // has already hit their goal (and resumes them if they fall back below it).
+    await NotificationService().refreshWaterRemindersForGoal(user);
+  }
+
+  /// Push the latest hydration figures to the dashboard time-island. The
+  /// dashboard stays alive in its tab branch, so this keeps the island in sync
+  /// the moment water is logged/changed from this settings page.
+  void _refreshDashboardWaterIsland() {
+    homePageKey.currentState?.refreshWaterIsland();
   }
 
   Future<void> _onLogWater() async {
@@ -481,6 +490,10 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
         );
         _loadWaterData();
       }
+      // Re-evaluate reminders (stop for today if the goal is now met) and keep
+      // the dashboard island in sync.
+      await _resyncWaterReminders();
+      _refreshDashboardWaterIsland();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -495,6 +508,9 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     try {
       await WaterService(db).deleteIntake(id);
       _loadWaterData();
+      // Dropping below the goal again should bring today's reminders back.
+      await _resyncWaterReminders();
+      _refreshDashboardWaterIsland();
     } catch (_) {}
   }
 
@@ -546,6 +562,10 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
     if (newGoal == null) return;
     await WaterService(db).setGoal(widget.userId, newGoal);
     _loadWaterData();
+    // A changed goal can flip the "goal reached" state, and the island shows
+    // the goal too — re-evaluate reminders and refresh the island.
+    await _resyncWaterReminders();
+    _refreshDashboardWaterIsland();
   }
 
   Future<void> _setReminderEnabled(bool enabled) async {
@@ -1055,38 +1075,34 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Tap-to-edit goal — filled blue chip so users notice
-                  // immediately that the goal is adjustable.
+                  // Tap-to-edit goal — explicit "Spremeni cilj" button with
+                  // an edit icon. Earlier the chip only said "Cilj 2000 ml"
+                  // and several users didn't realise it was tappable, so
+                  // we lead with the verb now and outline it clearly.
                   Material(
                     color: _waterBlue,
                     borderRadius: BorderRadius.circular(20),
-                    elevation: 1,
+                    elevation: 2,
                     child: InkWell(
                       onTap: _editWaterGoal,
                       borderRadius: BorderRadius.circular(20),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
-                              Symbols.flag,
+                              Symbols.edit,
                               size: 16,
                               color: Colors.white,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Cilj $goal ml',
+                              'Spremeni cilj',
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Symbols.edit,
-                              size: 15,
-                              color: Colors.white,
                             ),
                           ],
                         ),
@@ -1106,13 +1122,52 @@ class UserMedicationsScreenState extends ConsumerState<UserMedicationsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                percent >= 100
-                    ? '🎉 Cilj dosežen!'
-                    : 'Še $remaining ml do cilja ($percent %)',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+              // Inline goal-edit affordance: tappable text right under the bar
+              // so the "tap to change" hint sits next to where the user's eye
+              // already is when reading "Še X ml do cilja".
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      percent >= 100
+                          ? '🎉 Cilj dosežen!'
+                          : 'Še $remaining ml do cilja ($percent %)',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _editWaterGoal,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Cilj $goal ml',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: _waterBlue,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _waterBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Symbols.edit,
+                            size: 14,
+                            color: _waterBlue,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

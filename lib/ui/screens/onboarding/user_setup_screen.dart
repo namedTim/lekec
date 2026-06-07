@@ -25,6 +25,9 @@ class UserSetupScreen extends StatefulWidget {
 
 class _UserSetupScreenState extends State<UserSetupScreen> {
   final _familyNameController = TextEditingController();
+  // Caretaker's own name for the caregiver flow — becomes the prime user
+  // (users.first) so the dashboard greeting addresses them, not a patient.
+  final _caretakerNameController = TextEditingController();
   final _userNameController = TextEditingController();
   final _userNameFocusNode = FocusNode();
   final List<String> _userNames = [];
@@ -38,6 +41,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   void initState() {
     super.initState();
     _userNameController.addListener(_onNameChanged);
+    _caretakerNameController.addListener(() => setState(() {}));
   }
 
   void _onNameChanged() {
@@ -53,6 +57,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   @override
   void dispose() {
     _familyNameController.dispose();
+    _caretakerNameController.dispose();
     _userNameController.dispose();
     _userNameFocusNode.dispose();
     super.dispose();
@@ -113,11 +118,14 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   }
 
   bool get _canContinue {
-    if (widget.userType == UserType.personal) {
-      return _userNames.isNotEmpty;
-    } else {
-      return _userNames.isNotEmpty;
+    if (widget.userType == UserType.caregiver) {
+      // Caretaker's own name (becomes prime user for greetings) AND at least
+      // one patient. Without the caretaker the "Dober dan, X" greeting would
+      // address a patient instead of the actual app user.
+      return _caretakerNameController.text.trim().isNotEmpty &&
+          _userNames.isNotEmpty;
     }
+    return _userNames.isNotEmpty;
   }
 
   @override
@@ -176,6 +184,37 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
+                    ],
+
+                    // Caretaker name (only for caregiver type). Captured up
+                    // front so the caretaker becomes users.first — the
+                    // dashboard greeting and time-island owner name both
+                    // pull from that row.
+                    if (widget.userType == UserType.caregiver) ...[
+                      TextField(
+                        controller: _caretakerNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: 'Vaše ime (negovalec)',
+                          hintText: 'npr. Marija',
+                          prefixIcon: const Icon(Symbols.support_agent),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Zdaj pa dodajte še paciente, za katere skrbite:',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
 
                     // User Name Input
@@ -424,15 +463,33 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
               child: FilledButton(
                 onPressed: _canContinue
                     ? () {
+                        // For caregiver flow, the caretaker is inserted at
+                        // index 0 so they become users.first (the row the
+                        // dashboard greeting reads). Age/gender are left
+                        // null — the caretaker isn't being tracked as a
+                        // patient, they just need a name for the greeting.
+                        final names = widget.userType == UserType.caregiver
+                            ? [
+                                _caretakerNameController.text.trim(),
+                                ..._userNames,
+                              ]
+                            : List<String>.from(_userNames);
+                        final ages = widget.userType == UserType.caregiver
+                            ? <int?>[null, ..._userAges]
+                            : List<int?>.from(_userAges);
+                        final genders =
+                            widget.userType == UserType.caregiver
+                                ? <String?>[null, ..._userGenders]
+                                : List<String?>.from(_userGenders);
                         widget.onNext(
                           widget.userType == UserType.family
                               ? _familyNameController.text.trim().isEmpty
                                     ? null
                                     : _familyNameController.text.trim()
                               : null,
-                          _userNames,
-                          _userAges,
-                          _userGenders,
+                          names,
+                          ages,
+                          genders,
                         );
                       }
                     : null,
@@ -464,7 +521,10 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
       case UserType.family:
         return 'Kdo bo uporabljal aplikacijo?';
       case UserType.caregiver:
-        return 'Dodajte osebe, za katere skrbite';
+        final name = _caretakerNameController.text.trim();
+        return name.isEmpty
+            ? 'Najprej vnesite svoje ime'
+            : 'Odlično, $name! Dodajte še paciente.';
     }
   }
 
@@ -488,7 +548,7 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
       case UserType.family:
         return 'Dodajte družinske člane, ki bodo uporabljali aplikacijo';
       case UserType.caregiver:
-        return 'Dodajte imena oseb, katerim pomagate pri jemanju zdravil';
+        return 'Pozdrav v aplikaciji bo namenjen vam, paciente dodate spodaj';
     }
   }
 

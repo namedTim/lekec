@@ -494,6 +494,49 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
                       ),
                     ),
                   ),
+                  // Log water intake
+                  Transform.scale(
+                    scale: _animation.value,
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _animation.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Zabeleži hidracijo',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FloatingActionButton(
+                              heroTag: 'meds_log_water',
+                              mini: true,
+                              onPressed: _onLogWater,
+                              backgroundColor: const Color(0xFF38BDF8),
+                              foregroundColor: Colors.white,
+                              child: const Icon(Symbols.water_drop),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   // Add appointment
                   Transform.scale(
                     scale: _animation.value,

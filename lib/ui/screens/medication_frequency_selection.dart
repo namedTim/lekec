@@ -82,6 +82,21 @@ class _MedicationFrequencySelectionScreenState
           'extractedData': widget.extractedData,
         },
       );
+    } else if (_selectedFrequency == FrequencyOption.twiceDaily) {
+      // Twice daily reuses the "multiple times" picker locked to 2 slots, so
+      // the user enters both intake times explicitly (instead of the second
+      // being auto-derived as first + 12h).
+      context.push(
+        '/add-medication/advanced-planning/multiple-times/times',
+        extra: {
+          'name': widget.medicationName,
+          'medTypeIndex': widget.medType.index,
+          'timesPerDay': 2,
+          'intakeAdvice': widget.intakeAdvice,
+          'userId': widget.userId,
+          'extractedData': widget.extractedData,
+        },
+      );
     } else {
       context.push(
         '/add-medication/simple-planning',
@@ -115,13 +130,11 @@ class _MedicationFrequencySelectionScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
               Text(
                 'Kako pogosto boste jemali ${widget.medicationName}?',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
-                textAlign: TextAlign.center,
               ),
               // Show AI suggestion hint if available
               if (widget.extractedData?.dosageFrequency?.rawText != null) ...[
@@ -134,7 +147,6 @@ class _MedicationFrequencySelectionScreenState
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Symbols.auto_awesome,
@@ -148,35 +160,32 @@ class _MedicationFrequencySelectionScreenState
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onPrimaryContainer,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 48),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: FrequencyOption.values.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final option = FrequencyOption.values[index];
-                    return _FrequencyOptionButton(
-                      label: _getFrequencyLabel(option),
-                      isSelected: _selectedFrequency == option,
-                      isSuggestedByAI: _isSuggestedByAI(option),
-                      onTap: () {
-                        setState(() {
-                          _selectedFrequency = option;
-                        });
-                      },
-                    );
+              const SizedBox(height: 32),
+              // Options laid out at their natural height (mirrors the advanced
+              // planning screen) so the spacing scales the same on every device
+              // — the flexible Spacer below absorbs leftover height instead of
+              // a scroll viewport stretching the list.
+              for (final option in FrequencyOption.values) ...[
+                _FrequencyOptionButton(
+                  label: _getFrequencyLabel(option),
+                  isSelected: _selectedFrequency == option,
+                  isSuggestedByAI: _isSuggestedByAI(option),
+                  onTap: () {
+                    setState(() {
+                      _selectedFrequency = option;
+                    });
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
+                if (option != FrequencyOption.values.last)
+                  const SizedBox(height: 16),
+              ],
+              const Spacer(),
               FilledButton(
                 onPressed: _handleNext,
                 style: FilledButton.styleFrom(

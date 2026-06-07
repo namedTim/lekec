@@ -87,12 +87,13 @@ class NotificationActionService {
         // Refresh the dashboard if it is currently on screen.
         homePageKey.currentState?.loadTodaysIntakes();
       }
-      // Water totals don't render on the dashboard, but the user-medications
-      // (Voda) page does — it reloads on resume anyway, so no explicit refresh
-      // is needed here.
+      // The dashboard time-island shows the prime user's hydration, so refresh
+      // it after a water action. The user-medications (Voda) page reloads on
+      // resume on its own.
       if (touchedWater) {
+        homePageKey.currentState?.refreshWaterIsland();
         developer.log(
-          'Applied water actions; user page will refresh on next view',
+          'Applied water actions; refreshed dashboard island',
           name: 'NotificationActionService',
         );
       }
@@ -118,6 +119,13 @@ class NotificationActionService {
         final water = WaterService(db);
         final amount = await water.getLastIntakeAmount(userId);
         await water.logIntake(userId: userId, amountMl: amount);
+        // Stop nagging for the rest of today if this push met the goal.
+        final user = await (db.select(db.users)
+              ..where((u) => u.id.equals(userId)))
+            .getSingleOrNull();
+        if (user != null) {
+          await NotificationService().refreshWaterRemindersForGoal(user);
+        }
         return true;
       case 'water_skip':
         return false;

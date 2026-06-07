@@ -225,7 +225,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   /// Compact digit-style label, e.g. "2h", "1h 30min", "45min".
   String _offsetLabel() {
     final m = _reminderMinutesBefore;
-    if (m <= 0) return '0min';
+    if (m <= 0) return 'ob terminu';
     final h = m ~/ 60;
     final min = m % 60;
     if (h == 0) return '${min}min';
@@ -318,7 +318,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       },
     );
 
-    if (selected != null && selected > 0) {
+    if (selected != null && selected >= 0) {
       setState(() => _reminderMinutesBefore = selected);
     }
   }

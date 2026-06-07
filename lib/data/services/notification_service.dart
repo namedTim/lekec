@@ -8,11 +8,12 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../helpers/medication_unit_helper.dart';
-import '../../main.dart' show homePageKey, rootNavigatorKey;
+import '../../main.dart' show db, homePageKey, rootNavigatorKey;
 import 'package:go_router/go_router.dart';
 import 'package:alarm/alarm.dart';
 import 'pending_action_queue.dart';
 import 'user_labels.dart';
+import 'water_service.dart';
 
 /// Handles notification action button taps that arrive while the app is
 /// terminated. Two flavours of reminder route here:
@@ -1048,7 +1049,12 @@ class NotificationService {
   ///
   /// When `waterReminderEnabled` is false this just cancels — call
   /// [cancelWaterReminders] directly if you don't have a user row handy.
-  Future<void> scheduleWaterReminders(User user) async {
+  ///
+  /// When [skipToday] is true, every slot's first occurrence is pushed to
+  /// tomorrow (the daily repeat then continues as normal). Used once the user
+  /// has already hit today's goal so they aren't nagged for the rest of the
+  /// day — see [refreshWaterRemindersForGoal].
+  Future<void> scheduleWaterReminders(User user, {bool skipToday = false}) async {
     if (!_initialized) await initialize();
 
     await cancelWaterReminders(user.id);
@@ -1074,6 +1080,21 @@ class NotificationService {
     }
 
     final labels = UserLabels.forGender(user.gender);
+
+    // Disambiguate notifications when more than one user is active — otherwise
+    // "Spij kozarec vode" gives no clue *which* person should drink.
+    final activeUserCount = await (db.select(db.users)
+          ..where((u) => u.isActive.equals(true)))
+        .get()
+        .then((rows) => rows.length);
+    final isMultiUser = activeUserCount > 1;
+    final title = isMultiUser
+        ? '${user.name} — čas za vodo 💧'
+        : 'Čas za vodo 💧';
+    final body = isMultiUser
+        ? '${user.name}, spij kozarec vode'
+        : 'Spij kozarec vode';
+
     final androidDetails = AndroidNotificationDetails(
       'medication_reminders',
       'Opomniki za zdravila',
@@ -1140,7 +1161,7 @@ class NotificationService {
         hour,
         minute,
       );
-      if (!fireAt.isAfter(tzNow)) {
+      if (skipToday || !fireAt.isAfter(tzNow)) {
         fireAt = fireAt.add(const Duration(days: 1));
       }
 
@@ -1148,8 +1169,8 @@ class NotificationService {
       try {
         await _notifications.zonedSchedule(
           id,
-          'Čas za vodo 💧',
-          'Spij kozarec vode',
+          title,
+          body,
           fireAt,
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -1185,6 +1206,29 @@ class NotificationService {
     for (int slot = 0; slot < _waterSlotsPerUser; slot++) {
       await _notifications.cancel(_waterReminderId(userId, slot));
     }
+  }
+
+  /// (Re)schedule [user]'s water reminders against today's progress: once the
+  /// daily goal is met the remaining reminders are pushed to tomorrow so the
+  /// user isn't nagged after they're done; otherwise today's normal schedule
+  /// is (re)applied. Disabled reminders are just cancelled.
+  ///
+  /// Call this after any change that can affect today's total or the goal —
+  /// logging/deleting an intake, a "Sem spil" tap, or editing the goal — so the
+  /// OS schedule tracks the user's actual intake. Idempotent.
+  Future<void> refreshWaterRemindersForGoal(User user) async {
+    if (!user.waterReminderEnabled) {
+      await cancelWaterReminders(user.id);
+      return;
+    }
+    final total = await WaterService(db).getTodayTotal(user.id);
+    final goalReached = total >= user.dailyWaterGoalMl;
+    await scheduleWaterReminders(user, skipToday: goalReached);
+    developer.log(
+      'Water reminders for user ${user.id}: total=$total goal=${user.dailyWaterGoalMl} '
+      'goalReached=$goalReached (skipToday=$goalReached)',
+      name: 'NotificationService',
+    );
   }
 
   /// Trigger a test alarm in 1 minute

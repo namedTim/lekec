@@ -69,6 +69,19 @@ class _MultipleTimesSelectTimesScreenState
       }
     }
 
+    // Twice-daily fallback: if the AI only returned a single time, derive the
+    // second dose 12h later so both slots come pre-filled. (The server prompt
+    // may not yet return two suggested times for 2×/day meds — this keeps the
+    // flow usable until it does; the user can still adjust either slot.)
+    if (widget.timesPerDay == 2 && _times[0] != null && _times[1] == null) {
+      final first = _times[0]!;
+      _times[1] = TimeOfDay(
+        hour: (first.hour + 12) % 24,
+        minute: first.minute,
+      );
+      _aiSuggestedTimes[1] = _aiSuggestedTimes[0];
+    }
+
     // Also auto-fill dosage amount if available
     final amountPerDose = widget.extractedData?.dosageFrequency?.amountPerDose;
     if (amountPerDose != null && amountPerDose > 0) {

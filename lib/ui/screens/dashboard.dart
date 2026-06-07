@@ -26,6 +26,7 @@ import '../../ui/components/week_strip.dart';
 import '../../ui/widgets/empty_state_card.dart';
 import '../../ui/components/mood_logging_sheet.dart';
 import '../../ui/components/water_logging_sheet.dart';
+import '../../ui/components/island_details_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.title});
@@ -59,7 +60,14 @@ class DashboardScreenState extends State<DashboardScreen>
   // Time Island state
   Map<String, dynamic>? _nextMedication;
   Appointment? _nextAppointment;
+  // Prime-user water stats shown in the time-island when the user has logged
+  // water in the last 40h. Null = panel hidden (either no prime user yet or
+  // they're not actively using the hydration feature).
+  int? _primeWaterTodayMl;
+  int? _primeWaterGoalMl;
+  int? _primeUserId;
   Timer? _islandUpdateTimer;
+  Timer? _waterRefreshTimer;
   Timer? _dayChangeTimer;
 
   List<AlarmSettings> alarms = [];
@@ -146,7 +154,35 @@ class DashboardScreenState extends State<DashboardScreen>
         _totalUserCount = users.length;
         _userNames = {for (var user in users) user.id: user.name};
         _ownerName = users.isNotEmpty ? users.first.name : null;
+        _primeUserId = users.isNotEmpty ? users.first.id : null;
+        _primeWaterGoalMl =
+            users.isNotEmpty ? users.first.dailyWaterGoalMl : null;
       });
+    }
+    await _loadPrimeWaterIfActive();
+  }
+
+  /// Refresh the prime user's "today" hydration total — but only surface it
+  /// in the island if they logged something in the last 40h. The 40h window
+  /// (vs 24h) keeps the panel visible the morning after a late entry without
+  /// keeping it around forever for one-off loggers.
+  Future<void> _loadPrimeWaterIfActive() async {
+    final uid = _primeUserId;
+    if (uid == null) {
+      if (mounted) setState(() => _primeWaterTodayMl = null);
+      return;
+    }
+    final service = WaterService(db);
+    final lastAt = await service.getLastIntakeTime(uid);
+    final active = lastAt != null &&
+        DateTime.now().difference(lastAt) < const Duration(hours: 40);
+    if (!active) {
+      if (mounted) setState(() => _primeWaterTodayMl = null);
+      return;
+    }
+    final today = await service.getTodayTotal(uid);
+    if (mounted) {
+      setState(() => _primeWaterTodayMl = today);
     }
   }
 
@@ -155,6 +191,7 @@ class DashboardScreenState extends State<DashboardScreen>
     _animationController.dispose();
     _scrollController.dispose();
     _islandUpdateTimer?.cancel();
+    _waterRefreshTimer?.cancel();
     _dayChangeTimer?.cancel();
     super.dispose();
   }
@@ -183,6 +220,13 @@ class DashboardScreenState extends State<DashboardScreen>
     // Update every second to keep island fresh
     _islandUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateTimeIsland();
+    });
+    // The water panel only needs a periodic re-read (vs every second) — once
+    // a minute is enough to keep "today's total" and the 40h activity window
+    // honest without hammering the DB.
+    _waterRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      _loadPrimeWaterIfActive();
     });
   }
 
@@ -270,6 +314,21 @@ class DashboardScreenState extends State<DashboardScreen>
   /// Back-compat shim — keep the existing public API used by speed-dial flows.
   Future<void> loadTodaysIntakes({bool autoScroll = true}) =>
       _loadIntakesForSelectedDate(autoScroll: autoScroll);
+
+  /// Full refresh of everything the time-island (and its expanded overview)
+  /// shows: the prime user's water goal + today's total, plus the next
+  /// medication and appointment. Call this from any screen that adds a med,
+  /// logs water, or otherwise changes island data — from the dashboard FAB,
+  /// the profile/Voda page, or a notification action. Safe to call when the
+  /// dashboard is alive in another tab branch but off-screen.
+  Future<void> refreshIsland() async {
+    await loadUserData(); // users + prime water goal/total
+    await _updateTimeIsland(); // next medication + appointment
+  }
+
+  /// Back-compat alias — older callers refresh "the water island"; that now
+  /// means the same full island refresh.
+  Future<void> refreshWaterIsland() => refreshIsland();
 
   /// Per-intake "stock right before this dose" across the window
   /// `[min(today, selectedDay), endOfDay)`. Walks intakes in time order:
@@ -727,6 +786,9 @@ class DashboardScreenState extends State<DashboardScreen>
           ),
         );
       }
+      await refreshIsland();
+      // Stop nagging once today's goal is met (and resume normally otherwise).
+      await _refreshWaterRemindersForUser(userId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -739,6 +801,24 @@ class DashboardScreenState extends State<DashboardScreen>
         );
       }
     }
+  }
+
+  /// Open the expanded island overview (water for the prime user, meds and
+  /// appointments for everyone). Refreshes the island figures afterwards in
+  /// case the user logged something from inside the sheet.
+  Future<void> _showIslandDetails() async {
+    await showIslandDetailsSheet(context: context, db: db);
+    if (!mounted) return;
+    await refreshIsland();
+  }
+
+  /// Re-evaluate a user's water reminders against today's goal after a log.
+  Future<void> _refreshWaterRemindersForUser(int userId) async {
+    final user = await (db.select(db.users)
+          ..where((t) => t.id.equals(userId)))
+        .getSingleOrNull();
+    if (user == null) return;
+    await NotificationService().refreshWaterRemindersForGoal(user);
   }
 
   void _onLogMood() async {
@@ -819,7 +899,10 @@ class DashboardScreenState extends State<DashboardScreen>
                           appointmentTitle: _nextAppointment?.title,
                           appointmentTime:
                               _nextAppointment?.appointmentTime,
+                          waterTodayMl: _primeWaterTodayMl,
+                          waterGoalMl: _primeWaterGoalMl,
                           controller: controller,
+                          onTap: _showIslandDetails,
                         )
                       : TimeIsland(
                           totalDuration: const Duration(minutes: 30),
@@ -829,7 +912,10 @@ class DashboardScreenState extends State<DashboardScreen>
                           appointmentTitle: _nextAppointment?.title,
                           appointmentTime:
                               _nextAppointment?.appointmentTime,
+                          waterTodayMl: _primeWaterTodayMl,
+                          waterGoalMl: _primeWaterGoalMl,
                           controller: controller,
+                          onTap: _showIslandDetails,
                         ),
                 ),
               ),

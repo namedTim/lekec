@@ -23,72 +23,90 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Nastavitev'), centerTitle: true),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 16),
+        // Scroll the cards + headline so users running Android's "Largest"
+        // font scale can still reach every option (previously the bottom
+        // "Negovalec" card and Continue button were clipped off-screen
+        // when Spacer ran out of room). The Continue button stays pinned
+        // outside the scroll view so it's always reachable.
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
 
-              Text(
-                'Kako boste uporabljali Lekec?',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+                    Text(
+                      'Kako boste uporabljali Lekec?',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'To nam pomaga prilagoditi aplikacijo vašim potrebam',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Personal Use Option
+                    _UserTypeCard(
+                      icon: Symbols.person,
+                      title: 'Osebna uporaba',
+                      description: 'Sledim svojim zdravilom',
+                      isSelected: _selectedType == UserType.personal,
+                      onTap: () =>
+                          setState(() => _selectedType = UserType.personal),
+                      colors: colors,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Family Use Option
+                    _UserTypeCard(
+                      icon: Symbols.family_restroom,
+                      title: 'Družinska uporaba',
+                      description: 'Upravljam zdravila za družinske člane',
+                      isSelected: _selectedType == UserType.family,
+                      onTap: () =>
+                          setState(() => _selectedType = UserType.family),
+                      colors: colors,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Caregiver Option
+                    _UserTypeCard(
+                      icon: Symbols.medical_services,
+                      title: 'Negovalec / Zdravstveni delavec',
+                      description:
+                          'Pomagam starejšim ali več osebam pri jemanju zdravil',
+                      isSelected: _selectedType == UserType.caregiver,
+                      onTap: () =>
+                          setState(() => _selectedType = UserType.caregiver),
+                      colors: colors,
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                textAlign: TextAlign.center,
               ),
+            ),
 
-              const SizedBox(height: 12),
-
-              Text(
-                'To nam pomaga prilagoditi aplikacijo vašim potrebam',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 32),
-
-              // Personal Use Option
-              _UserTypeCard(
-                icon: Symbols.person,
-                title: 'Osebna uporaba',
-                description: 'Sledim svojim zdravilom',
-                isSelected: _selectedType == UserType.personal,
-                onTap: () => setState(() => _selectedType = UserType.personal),
-                colors: colors,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Family Use Option
-              _UserTypeCard(
-                icon: Symbols.family_restroom,
-                title: 'Družinska uporaba',
-                description: 'Upravljam zdravila za družinske člane',
-                isSelected: _selectedType == UserType.family,
-                onTap: () => setState(() => _selectedType = UserType.family),
-                colors: colors,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Caregiver Option
-              _UserTypeCard(
-                icon: Symbols.medical_services,
-                title: 'Negovalec / Zdravstveni delavec',
-                description:
-                    'Pomagam starejšim ali več osebam pri jemanju zdravil',
-                isSelected: _selectedType == UserType.caregiver,
-                onTap: () => setState(() => _selectedType = UserType.caregiver),
-                colors: colors,
-              ),
-
-              const Spacer(),
-
-              // Continue Button
-              FilledButton(
+            // Continue Button — pinned outside the scroll view so it never
+            // disappears, even at the largest system font scale.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: FilledButton(
                 onPressed: _selectedType != null
                     ? () => widget.onNext(_selectedType!)
                     : null,
@@ -104,10 +122,8 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-
-              const SizedBox(height: 32),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

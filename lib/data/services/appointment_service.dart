@@ -357,6 +357,7 @@ class AppointmentService {
 /// Slovenian "čez X" / "X prej" phrase for the alarm offset.
 /// E.g., 30 → "čez 30 minut", 120 → "čez 2 uri", 1440 → "čez 1 dan".
 String formatRelativeOffset(int minutes) {
+  if (minutes <= 0) return 'zdaj';
   if (minutes < 60) {
     return 'čez $minutes ${_minutesWord(minutes)}';
   }

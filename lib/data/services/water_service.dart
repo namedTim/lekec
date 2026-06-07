@@ -59,6 +59,19 @@ class WaterService {
     return (row.read(sumExp) ?? 0).toInt();
   }
 
+  /// Timestamp of the most recent intake for [userId], or null if none.
+  /// Used by the dashboard's time-island to decide whether the user is
+  /// actively logging hydration (and therefore wants to see today's progress
+  /// inline) — after a long quiet stretch the panel hides itself again.
+  Future<DateTime?> getLastIntakeTime(int userId) async {
+    final last = await (_db.select(_db.waterIntakeLogs)
+          ..where((t) => t.userId.equals(userId))
+          ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return last?.loggedAt;
+  }
+
   /// Most recently logged intake amount for [userId], in millilitres.
   /// Used by the water-reminder notification's "Sem spil" button so a tap
   /// re-logs the same size the user picked last time. Falls back to 200 ml
