@@ -528,6 +528,10 @@ class NotificationService {
               ..where((log) => log.scheduledTime.isBiggerThanValue(now))
               ..where((log) => log.scheduledTime.isSmallerThanValue(weekAhead))
               ..where((log) => log.wasTaken.equals(false))
+              // Skip intakes the user has already acted on (taken or
+              // dismissed/skipped) — takenTime is set for any action — so a
+              // cancelled reminder is never re-created here.
+              ..where((log) => log.takenTime.isNull())
               ..orderBy([(log) => OrderingTerm(expression: log.scheduledTime)]))
             .get();
 

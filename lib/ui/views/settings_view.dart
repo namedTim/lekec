@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 import '../../features/core/providers/theme_provider.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../database/drift_database.dart';
@@ -581,14 +582,25 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       return;
     }
 
-    final downloadsDir = Directory('/storage/emulated/0/Download');
-    final exportPath = p.join(downloadsDir.path, 'lekec_backup.sqlite');
-    await dbFile.copy(exportPath);
+    try {
+      // Copy to a temp location the OS share sheet can read, then share it.
+      // Writing directly to /storage/emulated/0/Download fails on Android 10+
+      // (scoped storage) in release builds, which is why nothing exported.
+      final tmpDir = await getTemporaryDirectory();
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final exportFile = File(p.join(tmpDir.path, 'lekec_backup_$stamp.sqlite'));
+      await dbFile.copy(exportFile.path);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Izvoženo v Downloads/lekec_backup.sqlite')),
+      await Share.shareXFiles(
+        [XFile(exportFile.path, mimeType: 'application/x-sqlite3')],
+        subject: 'Lekec backup',
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Izvoz ni uspel: $e')),
+        );
+      }
     }
   }
 

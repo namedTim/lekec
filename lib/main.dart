@@ -447,12 +447,13 @@ Future<void> main() async {
       NotificationActionService(db).drainPendingActions();
     });
 
-    // Kill-warning notification disabled for now — re-enable by uncommenting
-    // this together with `warningNotificationOnKill` in NotificationService.
-    // await Alarm.setWarningNotificationOnKill(
-    //   "Lekec opozorilo",
-    //   "Pustite aplikacijo zagnano v ozadju, da zanesljivo prejmete opozorila o zdravilih.",
-    // ).timeout(const Duration(seconds: 3), onTimeout: () {});
+    // Kill-warning notification is disabled app-wide (all alarms are set with
+    // warningNotificationOnKill: false). Alarms persisted by older builds may
+    // still carry the flag and keep the on-kill service running, so tear it
+    // down explicitly on every launch. Re-enable the feature by restoring
+    // setWarningNotificationOnKill here and the flags in NotificationService.
+    await Alarm.disableWarningNotificationOnKill()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
   } catch (e, st) {
     Logger('main').severe('Critical startup error', e, st);
   }

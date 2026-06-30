@@ -342,6 +342,58 @@ class IntakeLogService {
         );
   }
 
+  /// Create a one-time *future* reminder: an inactive plan plus a not-yet-taken
+  /// intake log scheduled at [scheduledTime]. Unlike [createOneTimeEntry] (which
+  /// records an intake already taken now), this leaves the log open so the
+  /// notification/alarm pipeline reminds the user at the chosen time. The caller
+  /// is responsible for (re)scheduling notifications afterwards. Returns the
+  /// intake log id, which is also the alarm id used by the scheduler.
+  Future<int> createOneTimeReminder({
+    required int medicationId,
+    required int userId,
+    required double dosageAmount,
+    required DateTime scheduledTime,
+  }) async {
+    // Inactive plan so it doesn't show in the meds list, mirroring
+    // createOneTimeEntry. startDate is the reminder time itself.
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
+          MedicationPlansCompanion.insert(
+            userId: userId,
+            medicationId: medicationId,
+            startDate: scheduledTime,
+            dosageAmount: dosageAmount,
+            isActive: const drift.Value(false),
+          ),
+        );
+
+    // 'oneTime' rule is ignored by the schedule generator, so the single log
+    // below is the only entry this plan ever produces.
+    await db
+        .into(db.medicationScheduleRules)
+        .insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: 'oneTime',
+            isActive: const drift.Value(false),
+          ),
+        );
+
+    return db
+        .into(db.medicationIntakeLogs)
+        .insert(
+          MedicationIntakeLogsCompanion(
+            userId: drift.Value(userId),
+            medicationId: drift.Value(medicationId),
+            planId: drift.Value(planId),
+            scheduledTime: drift.Value(scheduledTime),
+            wasTaken: const drift.Value(false),
+            dosageAmount: drift.Value(dosageAmount),
+          ),
+        );
+  }
+
   /// Log an as-needed ("po potrebi") intake with custom time and quantity
   Future<void> logAsNeededIntake({
     required int planId,

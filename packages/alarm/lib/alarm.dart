@@ -169,6 +169,15 @@ class Alarm {
     if (android) await AndroidAlarm().setWarningNotificationOnKill(title, body);
   }
 
+  /// Stop the on-kill warning notification service (Android-only).
+  ///
+  /// Call this when the "alarms may not ring / app was killed" notification is
+  /// disabled app-wide, to immediately tear down a service that an alarm
+  /// persisted by an older build may have left running. No-op on iOS.
+  static Future<void> disableWarningNotificationOnKill() async {
+    if (android) await AndroidAlarm().disableWarningNotificationOnKill();
+  }
+
   /// Stops alarm.
   static Future<bool> stop(int id) async {
     await AlarmStorage.unsaveAlarm(id);

@@ -246,6 +246,10 @@ class _MedicationPresetsPanelState extends State<MedicationPresetsPanel>
   late AnimationController _controller;
   late Animation<double> _heightFactor;
 
+  /// Identifies the expandable content so a drag can measure its full height
+  /// and map finger movement onto the 0..1 expand progress.
+  final GlobalKey _contentKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -280,15 +284,39 @@ class _MedicationPresetsPanelState extends State<MedicationPresetsPanel>
     super.dispose();
   }
 
-  void _toggleExpanded() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
-    });
+  void _toggleExpanded() => _setExpanded(!_isExpanded);
+
+  /// Animate to [expand] from the controller's current value (so it works both
+  /// from a tap and after a partial drag).
+  void _setExpanded(bool expand) {
+    setState(() => _isExpanded = expand);
+    if (expand) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  /// Move the expand progress to follow the finger. Dragging up (negative
+  /// delta) opens the panel; dragging down closes it.
+  void _onDragUpdate(DragUpdateDetails details) {
+    final extent = _contentKey.currentContext?.size?.height ?? 300.0;
+    if (extent <= 0) return;
+    _controller.value =
+        (_controller.value - details.primaryDelta! / extent).clamp(0.0, 1.0);
+  }
+
+  /// Snap open or closed based on fling velocity, else on whether the panel is
+  /// past the halfway point.
+  void _onDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final bool expand;
+    if (velocity.abs() > 200) {
+      expand = velocity < 0; // fast upward swipe opens
+    } else {
+      expand = _controller.value >= 0.5;
+    }
+    _setExpanded(expand);
   }
 
   Future<void> _selectPreset(MedicationPreset preset) async {
@@ -327,6 +355,8 @@ class _MedicationPresetsPanelState extends State<MedicationPresetsPanel>
           // Handle bar and header
           GestureDetector(
             onTap: _toggleExpanded,
+            onVerticalDragUpdate: _onDragUpdate,
+            onVerticalDragEnd: _onDragEnd,
             behavior: HitTestBehavior.opaque,
             child: Container(
               width: double.infinity,
@@ -390,6 +420,7 @@ class _MedicationPresetsPanelState extends State<MedicationPresetsPanel>
               );
             },
             child: Container(
+              key: _contentKey,
               constraints: const BoxConstraints(maxHeight: 350),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),

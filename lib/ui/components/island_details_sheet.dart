@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../data/services/appointment_service.dart';
+import '../../data/services/medication_service.dart';
 import '../../data/services/water_service.dart';
 
 /// Expanded view of the dashboard time-island. Opened by tapping the island.
@@ -35,6 +37,9 @@ class _IslandStats {
   final List<_ApptStat> appointments;
   final bool multiUser;
 
+  /// Count of critical (alarm) reminders still scheduled to ring later today.
+  final int criticalPendingToday;
+
   const _IslandStats({
     required this.primeUserName,
     required this.waterTodayMl,
@@ -42,6 +47,7 @@ class _IslandStats {
     required this.medStats,
     required this.appointments,
     required this.multiUser,
+    required this.criticalPendingToday,
   });
 }
 
@@ -68,7 +74,7 @@ class _IslandDetailsSheet extends StatefulWidget {
 }
 
 class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
-  late final Future<_IslandStats> _future = _load();
+  late Future<_IslandStats> _future = _load();
 
   Future<_IslandStats> _load() async {
     final db = widget.db;
@@ -113,6 +119,21 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
       medStats.add(_UserMedStat(u.name, takenByUser[u.id] ?? 0, total));
     }
 
+    // ── Critical reminders still pending later today ─────────────────────
+    final criticalMedIds = (await (db.select(db.medications)
+              ..where((m) => m.criticalReminder.equals(true))
+              ..where((m) => m.status.equalsValue(MedicationStatus.active)))
+            .get())
+        .map((m) => m.id)
+        .toSet();
+    final criticalPendingToday = todaysIntakes
+        .where((i) =>
+            i.scheduledTime.isAfter(now) &&
+            !i.wasTaken &&
+            i.takenTime == null &&
+            criticalMedIds.contains(i.medicationId))
+        .length;
+
     // ── Upcoming appointments (all users, next few) ──────────────────────
     final upcoming = await AppointmentService(db).getUpcomingAppointments();
     final appointments = upcoming
@@ -131,7 +152,50 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
       medStats: medStats,
       appointments: appointments,
       multiUser: users.length > 1,
+      criticalPendingToday: criticalPendingToday,
     );
+  }
+
+  /// Cancel all of today's remaining critical reminders, then refresh the sheet.
+  Future<void> _stopTodaysCriticalReminders() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Symbols.alarm_off, size: 48),
+        title: const Text('Ustavi kritične opomnike'),
+        content: const Text(
+          'Vsi kritični opomniki, ki naj bi zazvonili še danes, bodo '
+          'preklicani in ne bodo zazvonili. Jutri se ponastavijo.\n\n'
+          'Ali želite nadaljevati?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Prekliči'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Ustavi'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final stopped = await MedicationService(widget.db).stopTodaysCriticalReminders();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          stopped == 0
+              ? 'Ni kritičnih opomnikov za ustaviti'
+              : 'Ustavljenih kritičnih opomnikov: $stopped',
+        ),
+      ),
+    );
+    // Reload the sheet so the button/count reflect the change.
+    setState(() => _future = _load());
   }
 
   @override
@@ -168,6 +232,31 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
                     ),
                   ),
                   _buildMedsCard(theme, s),
+                  const SizedBox(height: 12),
+                  // Always shown so the action is discoverable; disabled when
+                  // there's nothing scheduled to ring later today.
+                  OutlinedButton.icon(
+                    onPressed: s.criticalPendingToday > 0
+                        ? _stopTodaysCriticalReminders
+                        : null,
+                    icon: const Icon(Symbols.alarm_off),
+                    label: Text(
+                      s.criticalPendingToday > 0
+                          ? 'Ustavi kritične opomnike do konca dneva '
+                              '(${s.criticalPendingToday})'
+                          : 'Ni kritičnih opomnikov za danes',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      side: BorderSide(
+                        color: theme.colorScheme.error.withOpacity(0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   _buildAppointmentsCard(theme, s),
                   const SizedBox(height: 16),

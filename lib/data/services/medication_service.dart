@@ -104,6 +104,49 @@ class MedicationService {
         .go();
   }
 
+  /// Cancel every critical reminder still scheduled to ring later today.
+  ///
+  /// For each not-yet-handled critical intake remaining today: stops any alarm
+  /// already registered and marks the intake as handled (sets takenTime, leaves
+  /// wasTaken false) so [NotificationService.scheduleAllUpcomingNotifications]
+  /// won't recreate its alarm. The cancellation is permanent — it does not
+  /// re-ring — and resets naturally tomorrow (only today's window is affected).
+  /// Returns the number of reminders stopped.
+  Future<int> stopTodaysCriticalReminders() async {
+    final now = DateTime.now();
+    final endOfDay =
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+
+    // Which medications use critical (alarm) reminders.
+    final criticalMedIds = (await (db.select(db.medications)
+              ..where((m) => m.criticalReminder.equals(true))
+              ..where((m) => m.status.equalsValue(MedicationStatus.active)))
+            .get())
+        .map((m) => m.id)
+        .toList();
+    if (criticalMedIds.isEmpty) return 0;
+
+    // Today's remaining, not-yet-acted-on critical intakes.
+    final intakes = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.scheduledTime.isBiggerThanValue(now))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..where((t) => t.wasTaken.equals(false))
+          ..where((t) => t.takenTime.isNull())
+          ..where((t) => t.medicationId.isIn(criticalMedIds)))
+        .get();
+
+    for (final intake in intakes) {
+      // Cancel any alarm already registered for this intake.
+      await Alarm.stop(intake.id);
+      // Mark as handled so the scheduler never re-creates it.
+      await (db.update(db.medicationIntakeLogs)
+            ..where((t) => t.id.equals(intake.id)))
+          .write(MedicationIntakeLogsCompanion(takenTime: drift.Value(now)));
+    }
+
+    return intakes.length;
+  }
+
   /// Load all medications with their plan details and schedule info
   Future<List<Map<String, dynamic>>> loadMedicationsWithDetails() async {
     final query =

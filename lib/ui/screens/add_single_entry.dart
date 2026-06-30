@@ -165,14 +165,11 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
                       height: 56,
                       width: 56,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
-                        icon: Icon(
-                          Symbols.photo_camera,
-                          color: theme.colorScheme.primary,
-                        ),
+                        icon: const Icon(Symbols.photo_camera),
                         tooltip: 'Zajemi s kamero',
                         onPressed: _openCameraScanner,
                       ),

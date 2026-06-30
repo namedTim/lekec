@@ -189,11 +189,13 @@ class AlarmApiImpl(private val context: Context) : AlarmApi {
     }
 
     private fun updateWarningNotificationState() {
-        if (AlarmStorage(context).getSavedAlarms().any { it.warningNotificationOnKill } ) {
-            turnOnWarningNotificationOnKill(context)
-        } else {
-            turnOffWarningNotificationOnKill(context)
-        }
+        // Lekec: the "Your alarms may not ring / app was killed" notification is
+        // intentionally disabled app-wide. All alarms are set with
+        // warningNotificationOnKill = false, but alarms persisted by older builds
+        // may still carry the flag as true and would otherwise re-enable the
+        // on-kill foreground service here. Force it off unconditionally so a
+        // legacy saved alarm can never resurrect the notification.
+        turnOffWarningNotificationOnKill(context)
     }
 
     private fun turnOnWarningNotificationOnKill(context: Context) {
