@@ -6,12 +6,15 @@ import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import 'interval_planning.dart';
+import '../../services/gemini_medication_service.dart';
+import '../../utils/time_parse.dart';
 import '../../features/meds/providers/medications_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../components/hinted_scroll_view.dart';
 import '../components/quantity_selector.dart';
 import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -20,6 +23,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
   final int intervalValue;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const IntervalConfigureScreen({
     super.key,
@@ -29,6 +33,7 @@ class IntervalConfigureScreen extends ConsumerStatefulWidget {
     required this.intervalValue,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -43,6 +48,28 @@ class _IntervalConfigureScreenState
   double _dosageAmount = 1;
   bool _isSaving = false;
   bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
+
+  @override
+  void initState() {
+    super.initState();
+    final freq = widget.extractedData?.dosageFrequency;
+    if (freq == null) return;
+    // Recommended start time (first suggested/AI-derived time).
+    final times = freq.suggestedTimes;
+    if (times != null && times.isNotEmpty) {
+      final t = parseTimeOfDay(times.first);
+      if (t != null) _startTime = t;
+    }
+    // Dose per intake.
+    final amount = freq.amountPerDose;
+    if (amount != null && amount > 0) _dosageAmount = amount;
+    // Treatment duration → stop condition.
+    final duration = freq.durationDays;
+    if (duration != null && duration > 0) {
+      _stopCondition = StopCondition.afterDays(duration);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +302,15 @@ class _IntervalConfigureScreenState
                 onChanged: (value) => setState(() => _criticalReminder = value),
               ),
 
+              const SizedBox(height: 16),
+
+              // Konec jemanja card
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+
               const SizedBox(height: 24),
 
               FilledButton(
@@ -343,6 +379,7 @@ class _IntervalConfigureScreenState
         isHourInterval: widget.intervalType == IntervalType.hours,
         intervalValue: widget.intervalValue,
         startTime: startTime,
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
       );
 
       // Generate schedule for the new plan

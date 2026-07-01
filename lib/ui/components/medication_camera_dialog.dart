@@ -15,7 +15,7 @@ class MedicationCameraDialog extends StatefulWidget {
 enum _CapturePhase { camera, captured, processing, done, error }
 
 class _MedicationCameraDialogState extends State<MedicationCameraDialog>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isInitialized = false;
@@ -24,6 +24,19 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
   String _processingStep = '';
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // Determinate progress (0.0 -> 1.0) shown in the processing card. The quick
+  // pre-flight phases occupy 0.0-0.10; the long AI extraction call animates
+  // from 0.10 toward 0.95 (never reaching it before the result arrives), and
+  // completion snaps it to 1.0.
+  late AnimationController _progressController;
+  double _progress = 0.0;
+
+  // Expected average duration of extractMedicationInfo(). The bar decelerates
+  // toward 0.95 over this window and stays capped there if the call runs long.
+  static const Duration _extractExpectedDuration = Duration(milliseconds: 13000);
+  static const double _extractStart = 0.10;
+  static const double _extractCeiling = 0.95;
 
   @override
   void initState() {
@@ -35,7 +48,25 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _progressController = AnimationController(
+      vsync: this,
+      duration: _extractExpectedDuration,
+    )..addListener(_onExtractProgressTick);
     _initializeCamera();
+  }
+
+  /// Maps the linear controller value through a decelerating curve so the bar
+  /// eases toward [_extractCeiling] and slows as it approaches it.
+  void _onExtractProgressTick() {
+    if (!mounted) return;
+    final eased = Curves.easeOut.transform(_progressController.value);
+    final value = _extractStart + (_extractCeiling - _extractStart) * eased;
+    setState(() => _progress = value.clamp(0.0, _extractCeiling));
+  }
+
+  void _setProgress(double value) {
+    if (!mounted) return;
+    setState(() => _progress = value.clamp(0.0, 1.0));
   }
 
   Future<void> _initializeCamera() async {
@@ -69,10 +100,33 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
     }
   }
 
+  /// Shows a transient error overlay, then returns to the camera so the user
+  /// can retry.
+  Future<void> _failTransiently(String message) async {
+    _pulseController.stop();
+    _progressController.stop();
+    _progressController.reset();
+    if (!mounted) return;
+    setState(() {
+      _phase = _CapturePhase.error;
+      _errorMessage = message;
+      _progress = 0.0;
+    });
+    await Future.delayed(const Duration(seconds: 3));
+    if (mounted) {
+      setState(() {
+        _phase = _CapturePhase.camera;
+        _errorMessage = null;
+      });
+    }
+  }
+
   Future<void> _captureAndProcess() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
     }
+
+    final geminiService = GeminiMedicationService();
 
     try {
       // Phase 1: Capture
@@ -87,6 +141,7 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
       setState(() {
         _phase = _CapturePhase.processing;
         _processingStep = 'Preverjam internetno povezavo...';
+        _progress = 0.02;
       });
       _pulseController.repeat(reverse: true);
 
@@ -97,38 +152,40 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
           throw const SocketException('No internet');
         }
       } on SocketException {
-        _pulseController.stop();
-        setState(() {
-          _phase = _CapturePhase.error;
-          _errorMessage = 'Ni internetne povezave.\nAI zajem potrebuje internet.';
-        });
-        await Future.delayed(const Duration(seconds: 3));
-        if (mounted) {
-          setState(() {
-            _phase = _CapturePhase.camera;
-            _errorMessage = null;
-          });
-        }
+        await _failTransiently(
+          'Ni internetne povezave.\nAI zajem potrebuje internet.',
+        );
         return;
       } on TimeoutException {
-        _pulseController.stop();
+        await _failTransiently(
+          'Ni internetne povezave.\nAI zajem potrebuje internet.',
+        );
+        return;
+      }
+
+      // Phase 2b: Confirm the AI service is actually reachable before we
+      // commit to uploading the photo (otherwise a down server hangs until the
+      // long extract timeout). Fails fast with a clear warning.
+      if (mounted) {
         setState(() {
-          _phase = _CapturePhase.error;
-          _errorMessage = 'Ni internetne povezave.\nAI zajem potrebuje internet.';
+          _processingStep = 'Preverjam dosegljivost storitve...';
+          _progress = 0.05;
         });
-        await Future.delayed(const Duration(seconds: 3));
-        if (mounted) {
-          setState(() {
-            _phase = _CapturePhase.camera;
-            _errorMessage = null;
-          });
-        }
+      }
+      final reachable = await geminiService.isServiceReachable();
+      if (!reachable) {
+        await _failTransiently(
+          'Storitev trenutno ni dosegljiva.\nPoskusite znova kasneje.',
+        );
         return;
       }
 
       // Phase 3: Prepare image
       if (mounted) {
-        setState(() => _processingStep = 'Pripravljam sliko...');
+        setState(() {
+          _processingStep = 'Pripravljam sliko...';
+          _progress = 0.08;
+        });
       }
       await Future.delayed(const Duration(milliseconds: 300));
 
@@ -136,17 +193,28 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
 
       // Phase 4: AI analysis
       if (mounted) {
-        setState(() => _processingStep = 'Pošiljam AI-ju za analizo...');
+        setState(() {
+          _processingStep = 'Pošiljam AI-ju za analizo...';
+          _progress = _extractStart;
+        });
       }
       await Future.delayed(const Duration(milliseconds: 200));
-
-      final geminiService = GeminiMedicationService();
 
       if (mounted) {
         setState(() => _processingStep = 'AI analizira zdravilo...');
       }
 
+      // Drive the determinate bar from _extractStart toward _extractCeiling
+      // over the expected duration while we await the long extraction call.
+      _progressController
+        ..reset()
+        ..forward();
+
       final result = await geminiService.extractMedicationInfo(imageFile);
+
+      // Result arrived: stop the timed fill and complete the bar.
+      _progressController.stop();
+      _setProgress(1.0);
 
       if (mounted) {
         setState(() => _processingStep = 'Izpolnjujem podatke...');
@@ -163,26 +231,16 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
         Navigator.of(context).pop(result);
       }
     } catch (e) {
-      _pulseController.stop();
-      setState(() {
-        _phase = _CapturePhase.error;
-        _errorMessage = 'Ni uspelo. Poskusite znova.';
-      });
-
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _phase = _CapturePhase.camera;
-          _errorMessage = null;
-        });
-      }
+      await _failTransiently('Ni uspelo. Poskusite znova.');
     }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _progressController
+      ..removeListener(_onExtractProgressTick)
+      ..dispose();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -193,14 +251,14 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
     final colors = theme.colorScheme;
 
     return Dialog(
-      backgroundColor: Colors.black,
+      backgroundColor: colors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: Container(
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height * 0.55,
-        color: Colors.black,
+        color: colors.surface,
         child: Stack(
           children: [
             // Camera / Status area - full height
@@ -214,102 +272,86 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
                   // Overlay for captured/processing/done states
                   if (_phase == _CapturePhase.captured)
                     Container(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.black.withValues(alpha: 0.55),
                       child: Center(
                         child: Icon(
                           Symbols.check_circle,
                           size: 72,
-                          color: Colors.green.shade400,
+                          color: colors.primary,
                         ),
                       ),
                     ),
 
                   if (_phase == _CapturePhase.processing)
-                    Container(
-                      color: Colors.black.withOpacity(0.75),
-                      child: Center(
-                        child: AnimatedBuilder(
-                          animation: _pulseAnimation,
-                          builder: (context, child) {
-                            return Transform.scale(
-                              scale: _pulseAnimation.value,
-                              child: child,
-                            );
-                          },
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: colors.primary.withOpacity(0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Symbols.auto_awesome,
-                                  size: 48,
-                                  color: colors.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Analiziram...',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _processingStep,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: 160,
-                                child: LinearProgressIndicator(
-                                  borderRadius: BorderRadius.circular(4),
-                                  color: colors.primary,
-                                  backgroundColor: Colors.white24,
-                                ),
-                              ),
-                            ],
-                          ),
+                    _ScrimCard(
+                      child: AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) => Transform.scale(
+                          scale: _pulseAnimation.value,
+                          child: child,
                         ),
-                      ),
-                    ),
-
-                  if (_phase == _CapturePhase.done)
-                    Container(
-                      color: Colors.black.withOpacity(0.75),
-                      child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.15),
+                                color: colors.primaryContainer,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Symbols.check_circle,
-                                size: 56,
-                                color: Colors.green,
+                              child: Icon(
+                                Symbols.auto_awesome,
+                                size: 44,
+                                color: colors.onPrimaryContainer,
                               ),
                             ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Analiziram...',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: colors.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _processingStep,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Zaključeno!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
+                            SizedBox(
+                              width: 160,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween<double>(
+                                  begin: 0.0,
+                                  end: _progress,
+                                ),
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOut,
+                                builder: (context, value, _) => Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    LinearProgressIndicator(
+                                      value: value,
+                                      borderRadius: BorderRadius.circular(4),
+                                      color: colors.primary,
+                                      backgroundColor:
+                                          colors.surfaceContainerHighest,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${(value * 100).round()} %',
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                        color: colors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -317,24 +359,61 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
                       ),
                     ),
 
-                  if (_phase == _CapturePhase.error && _errorMessage != null)
-                    Container(
-                      color: Colors.black.withOpacity(0.75),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Symbols.error, size: 56, color: colors.error),
-                            const SizedBox(height: 16),
-                            Text(
-                              _errorMessage!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
+                  if (_phase == _CapturePhase.done)
+                    _ScrimCard(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: colors.primaryContainer,
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
+                            child: Icon(
+                              Symbols.check_circle,
+                              size: 52,
+                              color: colors.onPrimaryContainer,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Zaključeno!',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colors.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  if (_phase == _CapturePhase.error && _errorMessage != null)
+                    _ScrimCard(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: colors.errorContainer,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Symbols.warning,
+                              size: 48,
+                              color: colors.onErrorContainer,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.onSurface,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -348,11 +427,11 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
               right: 0,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.black, Colors.black.withOpacity(0)],
+                    colors: [Colors.black54, Colors.transparent],
                   ),
                 ),
                 child: Row(
@@ -378,9 +457,9 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Symbols.close, color: Colors.white70),
+                      icon: const Icon(Symbols.close, color: Colors.white),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.white12,
+                        backgroundColor: Colors.black26,
                       ),
                     ),
                   ],
@@ -398,32 +477,45 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Usmerite kamero na škatlo ali nalepko',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 13,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
                       ),
-                      textAlign: TextAlign.center,
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Usmerite kamero na škatlo ali nalepko',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     GestureDetector(
                       onTap: _captureAndProcess,
                       child: Container(
-                        width: 68,
-                        height: 68,
+                        width: 70,
+                        height: 70,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white,
+                          color: colors.primary,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.9),
                             width: 4,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Symbols.photo_camera,
                           size: 30,
-                          color: Colors.black,
+                          color: colors.onPrimary,
                         ),
                       ),
                     ),
@@ -438,8 +530,8 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
 
   Widget _buildPreviewArea(ColorScheme colors) {
     if (!_isInitialized || _cameraController == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+      return Center(
+        child: CircularProgressIndicator(color: colors.primary),
       );
     }
 
@@ -456,6 +548,33 @@ class _MedicationCameraDialogState extends State<MedicationCameraDialog>
             height: cameraAspect,
             child: CameraPreview(_cameraController!),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A dark scrim over the camera feed with a centered themed card, used for the
+/// processing / done / error states so they read consistently in light & dark.
+class _ScrimCard extends StatelessWidget {
+  const _ScrimCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      color: Colors.black.withValues(alpha: 0.6),
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: child,
         ),
       ),
     );

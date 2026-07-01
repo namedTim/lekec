@@ -10,6 +10,7 @@ import '../components/hinted_scroll_view.dart';
 import '../components/quantity_selector.dart';
 import '../components/step_progress_indicator.dart';
 import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../data/services/notification_service.dart';
@@ -51,6 +52,7 @@ class _SimpleMedicationPlanningScreenState
   bool _isSaving = false;
   bool _isTimeAiSuggested = false;
   bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
 
   @override
   void initState() {
@@ -77,6 +79,11 @@ class _SimpleMedicationPlanningScreenState
           _firstIntakeTime = time;
           _isTimeAiSuggested = true;
         }
+      }
+      // Pre-fill the stop condition from the AI-extracted treatment duration.
+      final durationDays = widget.extractedData!.dosageFrequency?.durationDays;
+      if (durationDays != null && durationDays > 0) {
+        _stopCondition = StopCondition.afterDays(durationDays);
       }
     }
   }
@@ -235,6 +242,7 @@ class _SimpleMedicationPlanningScreenState
         userId: widget.userId,
         medicationId: medicationId,
         startDate: _startDate ?? DateTime.now(),
+        endDate: resolveEndDate(_stopCondition, _startDate ?? DateTime.now()),
         dosageAmount: _quantity,
         initialQuantity: _initialQuantity.toDouble(),
         ruleType: ruleType,
@@ -404,6 +412,14 @@ class _SimpleMedicationPlanningScreenState
                       ? '$_initialQuantity'
                       : 'Izberite količino',
                   onTap: _selectInitialQuantity,
+                ),
+                const SizedBox(height: 16),
+
+                // Stop date (optional end of plan)
+                StopDateCard(
+                  condition: _stopCondition,
+                  startDate: _startDate ?? DateTime.now(),
+                  onChanged: (c) => setState(() => _stopCondition = c),
                 ),
                 const SizedBox(height: 16),
               ] else ...[

@@ -7,6 +7,7 @@ import '../../database/drift_database.dart';
 import '../widgets/medication_details_card.dart';
 import '../widgets/appointment_card.dart';
 import '../components/confirmation_dialog.dart';
+import '../components/speed_dial_item.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/water_service.dart';
 import '../components/mood_logging_sheet.dart';
@@ -365,218 +366,38 @@ class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProvide
               if (_animation.value == 0) {
                 return const SizedBox.shrink();
               }
-              final theme = Theme.of(context);
-              final colors = theme.colorScheme;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Add new medication
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Dodaj novo zdravilo',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'meds_add_medication',
-                              mini: true,
-                              onPressed: _onAddNewMedication,
-                              child: const Icon(Symbols.pill),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+              return SpeedDialPanel(
+                animation: _animation,
+                items: [
+                  SpeedDialItem(
+                    label: 'Dodaj novo zdravilo',
+                    icon: Symbols.pill,
+                    accent: SpeedDialAccent.meds,
+                    onPressed: _onAddNewMedication,
                   ),
-                  // Add single entry
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Dodaj enkraten vnos zdravila',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'meds_add_entry',
-                              mini: true,
-                              onPressed: _onAddSingleEntry,
-                              child: const Icon(Symbols.add),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  SpeedDialItem(
+                    label: 'Dodaj enkraten vnos zdravila',
+                    icon: Symbols.add,
+                    accent: SpeedDialAccent.entry,
+                    onPressed: _onAddSingleEntry,
                   ),
-                  // Log mood
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Zabeleži razpoloženje',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'meds_log_mood',
-                              mini: true,
-                              onPressed: _onLogMood,
-                              child: const Icon(Symbols.mood),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  SpeedDialItem(
+                    label: 'Zabeleži razpoloženje',
+                    icon: Symbols.mood,
+                    accent: SpeedDialAccent.mood,
+                    onPressed: _onLogMood,
                   ),
-                  // Log water intake
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Zabeleži hidracijo',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'meds_log_water',
-                              mini: true,
-                              onPressed: _onLogWater,
-                              backgroundColor: const Color(0xFF38BDF8),
-                              foregroundColor: Colors.white,
-                              child: const Icon(Symbols.water_drop),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  SpeedDialItem(
+                    label: 'Zabeleži hidracijo',
+                    icon: Symbols.water_drop,
+                    accent: SpeedDialAccent.water,
+                    onPressed: _onLogWater,
                   ),
-                  // Add appointment
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Dodaj termin',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'meds_add_appointment',
-                              mini: true,
-                              onPressed: _onAddAppointment,
-                              child: const Icon(Symbols.calendar_add_on),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  SpeedDialItem(
+                    label: 'Dodaj termin',
+                    icon: Symbols.calendar_add_on,
+                    accent: SpeedDialAccent.appointment,
+                    onPressed: _onAddAppointment,
                   ),
                 ],
               );

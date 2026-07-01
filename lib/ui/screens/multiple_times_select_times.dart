@@ -11,6 +11,7 @@ import '../../main.dart' show homePageKey;
 import '../../services/gemini_medication_service.dart';
 import '../components/quantity_selector.dart';
 import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -43,6 +44,7 @@ class _MultipleTimesSelectTimesScreenState
   double _dosageAmount = 1;
   bool _isSaving = false;
   bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
 
   @override
   void initState() {
@@ -92,6 +94,12 @@ class _MultipleTimesSelectTimesScreenState
     final quantityInBox = widget.extractedData?.quantityInBox;
     if (quantityInBox != null && quantityInBox > 0) {
       _initialQuantity = quantityInBox;
+    }
+
+    // Pre-fill the stop condition from the AI-extracted treatment duration.
+    final durationDays = widget.extractedData?.dosageFrequency?.durationDays;
+    if (durationDays != null && durationDays > 0) {
+      _stopCondition = StopCondition.afterDays(durationDays);
     }
   }
 
@@ -480,6 +488,14 @@ class _MultipleTimesSelectTimesScreenState
               ),
               const SizedBox(height: 16),
 
+              // Stop date (optional end of plan)
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+              const SizedBox(height: 16),
+
               // Critical Reminder Recap
               CriticalReminderRecap(
                 enabled: _criticalReminder,
@@ -552,6 +568,7 @@ class _MultipleTimesSelectTimesScreenState
         userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
         dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         ruleType: 'daily',

@@ -207,6 +207,7 @@ final _router = GoRouter(
           medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -223,6 +224,7 @@ final _router = GoRouter(
           intervalValue: extra['intervalValue'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -265,6 +267,7 @@ final _router = GoRouter(
           medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -279,6 +282,7 @@ final _router = GoRouter(
           selectedDays: List<int>.from(extra['selectedDays'] as List),
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -292,6 +296,7 @@ final _router = GoRouter(
           medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -307,6 +312,7 @@ final _router = GoRouter(
           pauseDays: extra['pauseDays'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
           userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 
 enum IntervalType { hours, days }
 
@@ -11,6 +12,7 @@ class IntervalPlanningScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const IntervalPlanningScreen({
     super.key,
@@ -18,6 +20,7 @@ class IntervalPlanningScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -29,6 +32,17 @@ class _IntervalPlanningScreenState
     extends ConsumerState<IntervalPlanningScreen> {
   IntervalType _selectedType = IntervalType.hours;
   int _intervalValue = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the interval from the AI-extracted "na X ur" value when present.
+    final hours = widget.extractedData?.dosageFrequency?.intervalHours;
+    if (hours != null && hours >= 1 && hours <= 24) {
+      _selectedType = IntervalType.hours;
+      _intervalValue = hours;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +223,7 @@ class _IntervalPlanningScreenState
         'intervalValue': _intervalValue,
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,
+        'extractedData': widget.extractedData,
       },
     );
   }

@@ -211,18 +211,15 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: colors.surface,
+        foregroundColor: colors.onSurface,
         leading: IconButton(
           icon: const Icon(Symbols.close),
           onPressed: () => Navigator.of(context).pop(null),
         ),
-        title: const Text(
-          'Skeniraj nalepko',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Skeniraj nalepko'),
       ),
       body: _error != null
           ? Center(
@@ -243,7 +240,7 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
               ),
             )
           : !_isInitialized
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: colors.primary))
           : Stack(
               children: [
                 // Camera preview - full screen
@@ -282,8 +279,8 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
                       height: 80,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.8),
-                          width: 2,
+                          color: colors.primary,
+                          width: 2.5,
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -296,13 +293,25 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
                   left: 0,
                   right: 0,
                   top: MediaQuery.of(context).size.height * 0.25,
-                  child: Text(
-                    'Poravnajte ime zdravila v okvir',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Poravnajte ime zdravila v okvir',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colors.onSurface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -321,24 +330,32 @@ class _LabelScannerScreenState extends State<LabelScannerScreen> {
                         height: 72,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _isProcessing ? Colors.grey : Colors.white,
+                          color: _isProcessing
+                              ? colors.surfaceContainerHighest
+                              : colors.primary,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.9),
                             width: 4,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
                         child: _isProcessing
-                            ? const Padding(
-                                padding: EdgeInsets.all(20),
+                            ? Padding(
+                                padding: const EdgeInsets.all(20),
                                 child: CircularProgressIndicator(
                                   strokeWidth: 3,
-                                  color: Colors.black,
+                                  color: colors.primary,
                                 ),
                               )
                             : Icon(
                                 Symbols.photo_camera,
                                 size: 32,
-                                color: Colors.black,
+                                color: colors.onPrimary,
                               ),
                       ),
                     ),
@@ -358,7 +375,7 @@ class _LabelOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.5);
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.5);
 
     // Draw full overlay
     final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);

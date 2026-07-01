@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 import '../components/hinted_scroll_view.dart';
 
 class CyclicPlanningScreen extends ConsumerStatefulWidget {
@@ -11,6 +12,7 @@ class CyclicPlanningScreen extends ConsumerStatefulWidget {
   final MedicationType medType;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const CyclicPlanningScreen({
     super.key,
@@ -18,6 +20,7 @@ class CyclicPlanningScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -28,6 +31,17 @@ class CyclicPlanningScreen extends ConsumerStatefulWidget {
 class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
   final _takingDaysController = TextEditingController(text: '10');
   final _pauseDaysController = TextEditingController(text: '20');
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the cycle from the AI-extracted "N dni jemanja, M dni pavze".
+    final freq = widget.extractedData?.dosageFrequency;
+    final on = freq?.cyclicDaysOn;
+    final off = freq?.cyclicDaysOff;
+    if (on != null && on > 0) _takingDaysController.text = '$on';
+    if (off != null && off > 0) _pauseDaysController.text = '$off';
+  }
 
   @override
   void dispose() {
@@ -198,6 +212,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
         'pauseDays': pauseDays,
         'intakeAdvice': widget.intakeAdvice,
         'userId': widget.userId,
+        'extractedData': widget.extractedData,
       },
     );
   }

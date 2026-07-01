@@ -376,6 +376,83 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     }
   }
 
+  Future<void> _showScanHelpDialog() async {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    Widget buildRow({
+      required IconData icon,
+      required String title,
+      required String description,
+    }) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: colors.onPrimaryContainer, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Samodejno izpolnjevanje'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            buildRow(
+              icon: Icons.document_scanner_outlined,
+              title: 'Skeniraj ime (OCR)',
+              description:
+                  'S kamero prebere samo ime zdravila z nalepke in ga vpiše v polje. Deluje brez interneta.',
+            ),
+            const SizedBox(height: 20),
+            buildRow(
+              icon: Icons.auto_awesome_outlined,
+              title: 'AI zajem',
+              description:
+                  'S sliko škatlice z umetno inteligenco prebere vse podrobnosti — ime, vrsto in odmerjanje. Potrebuje internetno povezavo.',
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Razumem'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedUserId == null) {
@@ -487,6 +564,17 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                         icon: const Icon(Icons.auto_awesome_outlined),
                         tooltip: 'AI zajem (vse podrobnosti)',
                         onPressed: _openCameraDialog,
+                      ),
+                    ),
+                    SizedBox(
+                      height: 56,
+                      child: IconButton(
+                        icon: const Icon(Symbols.help_outline),
+                        iconSize: 20,
+                        visualDensity: VisualDensity.compact,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        tooltip: 'Kaj počneta gumba?',
+                        onPressed: _showScanHelpDialog,
                       ),
                     ),
                   ],

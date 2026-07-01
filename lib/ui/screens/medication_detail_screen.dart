@@ -15,6 +15,7 @@ import '../../data/services/intake_log_service.dart';
 import '../../data/services/intake_schedule_generator.dart';
 import '../components/log_intake_sheet.dart';
 import '../components/quantity_selector.dart';
+import '../components/stop_date_selector.dart';
 
 class MedicationDetailScreen extends StatefulWidget {
   final int medicationId;
@@ -62,6 +63,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   late String? _intakeAdvice;
   late bool _isAsNeeded;
   late String _frequencyLabel;
+  DateTime? _planStartDate;
+  DateTime? _planEndDate;
 
   @override
   void initState() {
@@ -73,6 +76,23 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     _intakeAdvice = widget.intakeAdvice;
     _isAsNeeded = widget.isAsNeeded;
     _frequencyLabel = widget.frequency;
+    _loadPlan();
+  }
+
+  /// Loads the plan's start/end dates so the "Konec jemanja" card can display
+  /// and edit the stop date. The detail screen otherwise gets its data through
+  /// constructor params, so this is the only place the plan row is read.
+  Future<void> _loadPlan() async {
+    if (widget.planId == null) return;
+    final plan = await (db.select(db.medicationPlans)
+          ..where((p) => p.id.equals(widget.planId!)))
+        .getSingleOrNull();
+    if (plan != null && mounted) {
+      setState(() {
+        _planStartDate = plan.startDate;
+        _planEndDate = plan.endDate;
+      });
+    }
   }
 
   Future<void> _editInventory() async {
@@ -172,6 +192,67 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _editEndDate() async {
+    if (widget.planId == null) return;
+    final plan = await (db.select(db.medicationPlans)
+          ..where((p) => p.id.equals(widget.planId!)))
+        .getSingleOrNull();
+    if (plan == null || !mounted) return;
+
+    // Round-trip the stored end date as an absolute "on date" condition.
+    final current = plan.endDate == null
+        ? const StopCondition.never()
+        : StopCondition.onDate(plan.endDate);
+
+    final result = await showStopConditionSheet(
+      context,
+      initial: current,
+      startDate: plan.startDate,
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final newEnd = resolveEndDate(result, plan.startDate);
+      await (db.update(
+        db.medicationPlans,
+      )..where((t) => t.id.equals(widget.planId!))).write(
+        MedicationPlansCompanion(endDate: drift.Value(newEnd)),
+      );
+
+      // Re-generate intakes so shortening/extending the plan is reflected, then
+      // refresh notifications for the changed schedule.
+      final scheduleGenerator = IntakeScheduleGenerator(db);
+      await scheduleGenerator.regeneratePlanSchedule(widget.planId!);
+
+      final notificationService = NotificationService();
+      await notificationService.scheduleAllUpcomingNotifications(db);
+
+      setState(() {
+        _planStartDate = plan.startDate;
+        _planEndDate = newEnd;
+      });
+
+      widget.onRefresh();
+      homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Konec jemanja posodobljen'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -713,6 +794,26 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                   onTap: widget.planId != null ? _editDosage : null,
                   child: Text(
                     '$dosageCount ${getMedicationUnit(widget.medType, dosageCount)}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Stop Date Card
+                _EditableDetailCard(
+                  icon: Symbols.event_busy,
+                  title: 'Konec jemanja',
+                  onTap: widget.planId != null ? _editEndDate : null,
+                  child: Text(
+                    _planEndDate == null || _planStartDate == null
+                        ? 'Brez konca'
+                        : stopConditionLabel(
+                            StopCondition.onDate(_planEndDate),
+                            _planStartDate!,
+                          ),
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

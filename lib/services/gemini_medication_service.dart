@@ -39,6 +39,9 @@ class DosageFrequency {
   /// Suggested times of day for taking medication (e.g., ["08:00", "14:00", "20:00"])
   final List<String>? suggestedTimes;
 
+  /// Total treatment duration in days (e.g., 10 for "Trajanje zdravljenja: 10 dni")
+  final int? durationDays;
+
   DosageFrequency({
     this.timesPerDay,
     this.amountPerDose,
@@ -50,6 +53,7 @@ class DosageFrequency {
     this.specificDays,
     this.rawText,
     this.suggestedTimes,
+    this.durationDays,
   });
 
   static int? _safeInt(dynamic value) {
@@ -81,6 +85,7 @@ class DosageFrequency {
       rawText: json['rawText'] as String?,
       suggestedTimes: (json['suggestedTimes'] as List<dynamic>?)
           ?.cast<String>(),
+      durationDays: _safeInt(json['durationDays']),
     );
   }
 
@@ -95,28 +100,65 @@ class DosageFrequency {
     'specificDays': specificDays,
     'rawText': rawText,
     'suggestedTimes': suggestedTimes,
+    'durationDays': durationDays,
   };
 
-  /// Converts to the app's FrequencyOption enum
+  /// Whether a clear fixed daily-times schedule is available. When the AI gives
+  /// both a concrete [timesPerDay] and explicit [suggestedTimes], we prefer the
+  /// fixed-times path (once/twice/multiple daily) over an interval schedule so
+  /// the recommended times and dose actually get pre-filled.
+  bool get _hasFixedTimes =>
+      timesPerDay != null &&
+      suggestedTimes != null &&
+      suggestedTimes!.isNotEmpty;
+
+  /// Converts to the app's FrequencyOption enum.
+  ///
+  /// Precedence: asNeeded first; then, when a fixed-times schedule is present
+  /// (timesPerDay + suggestedTimes), route purely by timesPerDay. Cyclic and
+  /// specificDays still win when timesPerDay is null, and intervalHours only
+  /// forces moreOptions when timesPerDay is null.
   FrequencyOption? toFrequencyOption() {
     if (isAsNeeded) return FrequencyOption.asNeeded;
-    if (isCyclic || intervalHours != null || specificDays != null) {
-      return FrequencyOption.moreOptions;
+    // Only let interval/cyclic/specificDays decide when there is no clear
+    // fixed daily-times schedule (i.e. timesPerDay is null / no suggestedTimes).
+    if (timesPerDay == null || suggestedTimes == null || suggestedTimes!.isEmpty) {
+      if (isCyclic || intervalHours != null || specificDays != null) {
+        return FrequencyOption.moreOptions;
+      }
+    } else {
+      // Fixed-times schedule present: cyclic/specificDays still take priority
+      // when applicable, otherwise fall through to timesPerDay routing below.
+      if (isCyclic || (specificDays != null && specificDays!.isNotEmpty)) {
+        return FrequencyOption.moreOptions;
+      }
     }
     if (timesPerDay == 1) return FrequencyOption.onceDaily;
     if (timesPerDay == 2) return FrequencyOption.twiceDaily;
-    if (timesPerDay != null && timesPerDay! > 2)
+    if (timesPerDay != null && timesPerDay! > 2) {
       return FrequencyOption.moreOptions;
+    }
     return null;
   }
 
-  /// Converts to AdvancedScheduleType if applicable
+  /// Converts to AdvancedScheduleType if applicable.
+  ///
+  /// Precedence: a fixed multiple-times schedule (timesPerDay > 2 with
+  /// suggestedTimes) wins over intervalHours so the times get pre-filled.
+  /// Cyclic and specificDays keep priority; intervalHours only maps to interval
+  /// when there is no fixed daily-times schedule (timesPerDay null / no times).
   AdvancedScheduleType? toAdvancedScheduleType() {
-    if (intervalHours != null) return AdvancedScheduleType.interval;
+    // Cyclic and specific-days keep top priority (consistent with
+    // toFrequencyOption). A fixed multiple-times schedule then wins over
+    // intervalHours so the recommended times get pre-filled.
     if (isCyclic) return AdvancedScheduleType.cyclic;
     if (specificDays != null && specificDays!.isNotEmpty) {
       return AdvancedScheduleType.specificDays;
     }
+    if (_hasFixedTimes && timesPerDay! > 2) {
+      return AdvancedScheduleType.multipleTimes;
+    }
+    if (intervalHours != null) return AdvancedScheduleType.interval;
     if (timesPerDay != null && timesPerDay! > 2) {
       return AdvancedScheduleType.multipleTimes;
     }
@@ -217,8 +259,11 @@ class MedicationExtractionResult {
     } else if (lowerType.contains('puff') || lowerType.contains('vdih')) {
       return MedicationType.puffs;
     } else if (lowerType.contains('sirup') ||
+        lowerType.contains('suspenz') ||
+        lowerType.contains('raztop') ||
         lowerType.contains('ml') ||
         lowerType.contains('mililiter')) {
+      // Liquid forms (syrup, suspension, solution) are dosed in milliliters.
       return MedicationType.milliliters;
     } else if (lowerType.contains('gram') &&
         !lowerType.contains('mili') &&
@@ -266,6 +311,27 @@ class MedicationExtractionResult {
 class GeminiMedicationService {
   GeminiMedicationService();
 
+  /// Quickly probes whether the LekecAPI backend is reachable before we commit
+  /// to uploading an image (which otherwise hangs until the long extract
+  /// timeout). Returns true if the server answers within [timeout] with any
+  /// non-server-error status (so a reachable-but-unrouted /health still counts
+  /// as "up"). Network/DNS failures and timeouts return false.
+  Future<bool> isServiceReachable({
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    try {
+      final uri = Uri.parse('${ApiKeys.lekecApiBaseUrl}/api/v1/health');
+      final response = await http
+          .get(uri, headers: {'X-API-Key': ApiKeys.lekecApiKey})
+          .timeout(timeout);
+      // < 500 means the server responded (200 healthy, or 401/404 still proves
+      // the host is up and we shouldn't false-alarm "unreachable").
+      return response.statusCode < 500;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<MedicationExtractionResult> extractMedicationInfo(
     File imageFile,
   ) async {
@@ -274,8 +340,15 @@ class GeminiMedicationService {
         '${ApiKeys.lekecApiBaseUrl}/api/v1/ai/extract-medication',
       );
 
+      // Send the device's local time so the server can recommend sensible
+      // start times when the label doesn't specify any.
+      final now = DateTime.now();
+      final clientTime =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
       final request = http.MultipartRequest('POST', uri)
         ..headers['X-API-Key'] = ApiKeys.lekecApiKey
+        ..fields['client_time'] = clientTime
         ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
 
       final streamed = await request.send().timeout(

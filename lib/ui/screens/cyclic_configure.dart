@@ -5,12 +5,15 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../../utils/time_parse.dart';
 import '../../features/meds/providers/medications_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../components/hinted_scroll_view.dart';
 import '../components/quantity_selector.dart';
 import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class CyclicConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -19,6 +22,7 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
   final int pauseDays;
   final String intakeAdvice;
   final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const CyclicConfigureScreen({
     super.key,
@@ -28,6 +32,7 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
     required this.pauseDays,
     required this.intakeAdvice,
     required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -41,6 +46,27 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
   double _dosageAmount = 1;
   bool _isSaving = false;
   bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
+
+  @override
+  void initState() {
+    super.initState();
+    final freq = widget.extractedData?.dosageFrequency;
+    if (freq == null) return;
+    // Recommended intake times (start hours) from the label / AI.
+    for (final s in freq.suggestedTimes ?? const <String>[]) {
+      final t = parseTimeOfDay(s);
+      if (t != null) _times.add(t);
+    }
+    // Dose per intake.
+    final amount = freq.amountPerDose;
+    if (amount != null && amount > 0) _dosageAmount = amount;
+    // Treatment duration → stop condition.
+    final duration = freq.durationDays;
+    if (duration != null && duration > 0) {
+      _stopCondition = StopCondition.afterDays(duration);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,6 +330,14 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Stop date (optional end of plan)
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+              const SizedBox(height: 16),
+
               // Critical Reminder Recap
               CriticalReminderRecap(
                 enabled: _criticalReminder,
@@ -376,6 +410,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
         userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
         dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         cycleDaysOn: widget.takingDays,
