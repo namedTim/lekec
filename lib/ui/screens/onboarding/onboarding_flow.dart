@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../database/drift_database.dart';
-import '../../../database/tables/onboarding_settings.dart';
 import '../../../features/core/providers/database_provider.dart';
 import 'package:drift/drift.dart' as drift;
 import 'welcome_screen.dart';
-import 'user_type_selection_screen.dart';
 import 'user_setup_screen.dart';
 import 'app_guide_screen.dart';
 import 'permissions_screen.dart';
@@ -21,8 +19,6 @@ class OnboardingFlow extends ConsumerStatefulWidget {
 
 class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   int _currentStep = 0;
-  UserType? _selectedUserType;
-  String? _familyName;
   List<String> _userNames = [];
   List<int?> _userAges = [];
   List<String?> _userGenders = [];
@@ -33,16 +29,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     });
   }
 
-  void _handleUserTypeSelection(UserType userType) {
+  void _handleUserSetup(List<String> userNames, List<int?> userAges, List<String?> userGenders) {
     setState(() {
-      _selectedUserType = userType;
-      _currentStep++;
-    });
-  }
-
-  void _handleUserSetup(String? familyName, List<String> userNames, List<int?> userAges, List<String?> userGenders) {
-    setState(() {
-      _familyName = familyName;
       _userNames = userNames;
       _userAges = userAges;
       _userGenders = userGenders;
@@ -72,12 +60,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
       final users = await db.select(db.users).get();
       final defaultUser = users.isNotEmpty ? users.first : null;
 
-      // Save onboarding settings
+      // Save onboarding settings. userType/familyName are intentionally left
+      // unset — the app never reads them, so onboarding no longer collects them.
       await db.into(db.onboardingSettings).insert(
             OnboardingSettingsCompanion.insert(
               isCompleted: const drift.Value(true),
-              userType: drift.Value(_selectedUserType),
-              familyName: drift.Value(_familyName),
               completedAt: drift.Value(DateTime.now()),
             ),
           );
@@ -114,27 +101,17 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
       children: [
         // Step 0: Welcome
         WelcomeScreen(onNext: _nextStep),
-        
-        // Step 1: User Type Selection
-        UserTypeSelectionScreen(onNext: _handleUserTypeSelection),
-        
-        // Step 2: User Setup
-        if (_selectedUserType != null)
-          UserSetupScreen(
-            userType: _selectedUserType!,
-            onNext: _handleUserSetup,
-          )
-        else
-          const SizedBox.shrink(),
-        
-        // Step 3: App Guide
+
+        // Step 1: User Setup (add people — first person is the app owner)
+        UserSetupScreen(onNext: _handleUserSetup),
+
+        // Step 2: App Guide
         AppGuideScreen(
           userName: _userNames.isNotEmpty ? _userNames.first : null,
-          userType: _selectedUserType,
           onComplete: _nextStep,
         ),
 
-        // Step 4: Permissions explainer (primes the user before
+        // Step 3: Permissions explainer (primes the user before
         // the system permission dialogs fire).
         PermissionsScreen(onComplete: _completeOnboarding),
       ],

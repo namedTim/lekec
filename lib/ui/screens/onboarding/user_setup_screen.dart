@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import '../../../database/tables/onboarding_settings.dart';
 import '../../../utils/gender_guesser.dart';
 
 class UserSetupScreen extends StatefulWidget {
-  final UserType userType;
+  /// Reports the people to create. The first entry is the app owner (the row
+  /// the dashboard greeting reads); any further entries are additional people
+  /// (family members, patients, …) the user chose to add.
   final Function(
-    String? familyName,
     List<String> userNames,
     List<int?> userAges,
     List<String?> userGenders,
@@ -15,7 +15,6 @@ class UserSetupScreen extends StatefulWidget {
 
   const UserSetupScreen({
     super.key,
-    required this.userType,
     required this.onNext,
   });
 
@@ -24,10 +23,6 @@ class UserSetupScreen extends StatefulWidget {
 }
 
 class _UserSetupScreenState extends State<UserSetupScreen> {
-  final _familyNameController = TextEditingController();
-  // Caretaker's own name for the caregiver flow — becomes the prime user
-  // (users.first) so the dashboard greeting addresses them, not a patient.
-  final _caretakerNameController = TextEditingController();
   final _userNameController = TextEditingController();
   final _userNameFocusNode = FocusNode();
   final List<String> _userNames = [];
@@ -41,7 +36,6 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
   void initState() {
     super.initState();
     _userNameController.addListener(_onNameChanged);
-    _caretakerNameController.addListener(() => setState(() {}));
   }
 
   void _onNameChanged() {
@@ -56,8 +50,6 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
 
   @override
   void dispose() {
-    _familyNameController.dispose();
-    _caretakerNameController.dispose();
     _userNameController.dispose();
     _userNameFocusNode.dispose();
     super.dispose();
@@ -117,16 +109,9 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
     });
   }
 
-  bool get _canContinue {
-    if (widget.userType == UserType.caregiver) {
-      // Caretaker's own name (becomes prime user for greetings) AND at least
-      // one patient. Without the caretaker the "Dober dan, X" greeting would
-      // address a patient instead of the actual app user.
-      return _caretakerNameController.text.trim().isNotEmpty &&
-          _userNames.isNotEmpty;
-    }
-    return _userNames.isNotEmpty;
-  }
+  // The first person added is the app owner (greeting target); at least one
+  // person is required to continue.
+  bool get _canContinue => _userNames.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -169,54 +154,6 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Family Name (only for family type)
-                    if (widget.userType == UserType.family) ...[
-                      TextField(
-                        controller: _familyNameController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: InputDecoration(
-                          labelText: 'Priimek družine (neobvezno)',
-                          hintText: 'npr. Novak',
-                          prefixIcon: const Icon(Symbols.family_restroom),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // Caretaker name (only for caregiver type). Captured up
-                    // front so the caretaker becomes users.first — the
-                    // dashboard greeting and time-island owner name both
-                    // pull from that row.
-                    if (widget.userType == UserType.caregiver) ...[
-                      TextField(
-                        controller: _caretakerNameController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: InputDecoration(
-                          labelText: 'Vaše ime (negovalec)',
-                          hintText: 'npr. Marija',
-                          prefixIcon: const Icon(Symbols.support_agent),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Zdaj pa dodajte še paciente, za katere skrbite:',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-
                     // User Name Input
                     TextField(
                       controller: _userNameController,
@@ -224,13 +161,9 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                       textCapitalization: TextCapitalization.words,
                       decoration: InputDecoration(
                         labelText: _getInputLabel(),
-                        hintText: widget.userType == UserType.personal
-                            ? (_userNames.isEmpty
-                                  ? 'Vnesite svoje ime'
-                                  : 'Vnesite še eno ime')
-                            : widget.userType == UserType.family
-                            ? 'Ime'
-                            : 'Ime',
+                        hintText: _userNames.isEmpty
+                            ? 'Vnesite svoje ime'
+                            : 'Vnesite še eno ime',
                         prefixIcon: const Icon(Symbols.person_add),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -352,9 +285,8 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Info box for personal mode after first user added
-                    if (widget.userType == UserType.personal &&
-                        _userNames.isNotEmpty) ...[
+                    // Once the owner is added, hint that more people can be added
+                    if (_userNames.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -463,33 +395,10 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
               child: FilledButton(
                 onPressed: _canContinue
                     ? () {
-                        // For caregiver flow, the caretaker is inserted at
-                        // index 0 so they become users.first (the row the
-                        // dashboard greeting reads). Age/gender are left
-                        // null — the caretaker isn't being tracked as a
-                        // patient, they just need a name for the greeting.
-                        final names = widget.userType == UserType.caregiver
-                            ? [
-                                _caretakerNameController.text.trim(),
-                                ..._userNames,
-                              ]
-                            : List<String>.from(_userNames);
-                        final ages = widget.userType == UserType.caregiver
-                            ? <int?>[null, ..._userAges]
-                            : List<int?>.from(_userAges);
-                        final genders =
-                            widget.userType == UserType.caregiver
-                                ? <String?>[null, ..._userGenders]
-                                : List<String?>.from(_userGenders);
                         widget.onNext(
-                          widget.userType == UserType.family
-                              ? _familyNameController.text.trim().isEmpty
-                                    ? null
-                                    : _familyNameController.text.trim()
-                              : null,
-                          names,
-                          ages,
-                          genders,
+                          List<String>.from(_userNames),
+                          List<int?>.from(_userAges),
+                          List<String?>.from(_userGenders),
                         );
                       }
                     : null,
@@ -512,45 +421,16 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
     );
   }
 
-  String _getTitle() {
-    switch (widget.userType) {
-      case UserType.personal:
-        return _userNames.isEmpty
-            ? 'Vnesite vaše ime'
-            : 'Odlično, ${_userNames[0]}!';
-      case UserType.family:
-        return 'Kdo bo uporabljal aplikacijo?';
-      case UserType.caregiver:
-        final name = _caretakerNameController.text.trim();
-        return name.isEmpty
-            ? 'Najprej vnesite svoje ime'
-            : 'Odlično, $name! Dodajte še paciente.';
-    }
-  }
+  String _getTitle() => _userNames.isEmpty
+      ? 'Vnesite vaše ime'
+      : 'Odlično, ${_userNames[0]}!';
 
-  String _getInputLabel() {
-    switch (widget.userType) {
-      case UserType.personal:
-        return _userNames.isEmpty ? 'Vaše ime' : 'Ime dodatne osebe';
-      case UserType.family:
-        return 'Ime člana družine';
-      case UserType.caregiver:
-        return 'Ime pacienta';
-    }
-  }
+  String _getInputLabel() =>
+      _userNames.isEmpty ? 'Vaše ime' : 'Ime dodatne osebe';
 
-  String _getSubtitle() {
-    switch (widget.userType) {
-      case UserType.personal:
-        return _userNames.isEmpty
-            ? 'Vnesite svoje ime za personalizirano izkušnjo'
-            : 'Če želite, lahko dodate še druge osebe';
-      case UserType.family:
-        return 'Dodajte družinske člane, ki bodo uporabljali aplikacijo';
-      case UserType.caregiver:
-        return 'Pozdrav v aplikaciji bo namenjen vam, paciente dodate spodaj';
-    }
-  }
+  String _getSubtitle() => _userNames.isEmpty
+      ? 'Vnesite svoje ime za personalizirano izkušnjo'
+      : 'Če želite, lahko dodate še druge osebe (npr. družinski člani ali osebe, za katere skrbite)';
 
   Widget? _buildUserSubtitle(int index) {
     final parts = <String>[];

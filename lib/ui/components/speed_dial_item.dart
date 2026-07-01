@@ -13,7 +13,7 @@ class _AccentColors {
 }
 
 const Map<SpeedDialAccent, _AccentColors> _lightAccents = {
-  SpeedDialAccent.meds: _AccentColors(Color(0xFFE4DFFF), Color(0xFF463E9E)),
+  SpeedDialAccent.meds: _AccentColors(Color(0xFFCDEFCF), Color(0xFF135C2A)),
   SpeedDialAccent.entry: _AccentColors(Color(0xFFBFF1E4), Color(0xFF00513F)),
   SpeedDialAccent.mood: _AccentColors(Color(0xFFFFE6A8), Color(0xFF6F4E00)),
   SpeedDialAccent.water: _AccentColors(Color(0xFFC7E6FF), Color(0xFF0A4B76)),
@@ -24,7 +24,7 @@ const Map<SpeedDialAccent, _AccentColors> _lightAccents = {
 };
 
 const Map<SpeedDialAccent, _AccentColors> _darkAccents = {
-  SpeedDialAccent.meds: _AccentColors(Color(0xFF463E9E), Color(0xFFE4DFFF)),
+  SpeedDialAccent.meds: _AccentColors(Color(0xFF135C2A), Color(0xFFB4E9B9)),
   SpeedDialAccent.entry: _AccentColors(Color(0xFF00513F), Color(0xFFA2E8D5)),
   SpeedDialAccent.mood: _AccentColors(Color(0xFF5E4200), Color(0xFFFFD978)),
   SpeedDialAccent.water: _AccentColors(Color(0xFF0E486F), Color(0xFFBBE0FF)),

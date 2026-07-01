@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import '../../../database/tables/onboarding_settings.dart';
 
 class AppGuideScreen extends StatefulWidget {
   final String? userName;
-  final UserType? userType;
   final VoidCallback onComplete;
 
   const AppGuideScreen({
     super.key,
     this.userName,
-    this.userType,
     required this.onComplete,
   });
 
@@ -47,8 +44,7 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final greeting =
-        widget.userType == UserType.personal && widget.userName != null
+    final greeting = widget.userName != null
         ? 'Pozdravljeni, ${widget.userName}!'
         : null;
 
@@ -156,13 +152,13 @@ class _AppGuideScreenState extends State<AppGuideScreen> {
                     colors: colors,
                   ),
                   _GuidePage(
-                    icon: Symbols.calendar_month,
-                    title: 'Spremljanje menstruacije',
+                    icon: Symbols.water_drop,
+                    title: 'Spremljanje hidracije',
                     description:
-                        'Zabeležite začetek in konec menstruacije ter intenzivnost. '
-                        'Aplikacija samodejno izračuna povprečno dolžino cikla '
-                        'in naslednji predvideni datum. '
-                        'Na voljo za uporabnice z nastavljenim ženskim spolom.',
+                        'Beležite popito vodo čez dan in spremljajte napredek '
+                        'proti dnevnemu cilju. '
+                        'Nastavite lahko opomnike za pitje, cilj pa se prilagodi '
+                        'vsakemu uporabniku.',
                     colors: colors,
                   ),
                 ],
