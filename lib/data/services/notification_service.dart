@@ -93,14 +93,27 @@ class NotificationService {
       showBadge: true,
     );
 
+    // Separate channel for "running low on stock" warnings so the user can
+    // tune/silence them independently of the (more urgent) dose reminders.
+    const lowStockChannel = AndroidNotificationChannel(
+      'medication_low_stock',
+      'Zaloga zdravil',
+      description: 'Opozorila, ko zmanjkuje zdravil',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+
     final androidPlugin = _notifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
 
     if (androidPlugin != null) {
-      // Create the notification channel
+      // Create the notification channels
       await androidPlugin.createNotificationChannel(androidChannel);
+      await androidPlugin.createNotificationChannel(lowStockChannel);
       developer.log(
         'Created Android notification channel',
         name: 'NotificationService',
@@ -624,6 +637,64 @@ class NotificationService {
     );
 
     developer.log('Showed test notification', name: 'NotificationService');
+  }
+
+  /// Notification id space for low-stock warnings. Kept well clear of the
+  /// intake ids and the water base (950000) so they never collide.
+  static const int _lowStockIdBase = 970000;
+
+  /// Shows a "running low / out of stock" notification for a medication.
+  ///
+  /// Uses a stable per-medication id so a newer warning replaces the older one
+  /// rather than stacking. [remainingLabel] should be a ready-to-show quantity
+  /// like "2 tableti" or "3 ml"; [isOut] flips the copy to the depleted state.
+  Future<void> showLowStockNotification({
+    required int medicationId,
+    required String medName,
+    required String remainingLabel,
+    required bool isOut,
+  }) async {
+    if (!_initialized) await initialize();
+
+    const androidDetails = AndroidNotificationDetails(
+      'medication_low_stock',
+      'Zaloga zdravil',
+      channelDescription: 'Opozorila, ko zmanjkuje zdravil',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/launcher_icon',
+      playSound: true,
+      enableVibration: true,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final title = isOut ? '$medName je zmanjkalo' : '$medName kmalu zmanjka';
+    final body = isOut
+        ? 'Zaloga je prazna. Dopolnite jo, da opomniki ostanejo točni.'
+        : 'Ostane le še $remainingLabel. Razmislite o dopolnitvi zaloge.';
+
+    // Non-numeric payload: _onNotificationTap ignores it (only intake ids
+    // navigate), so tapping simply opens the app without mis-routing.
+    await _notifications.show(
+      _lowStockIdBase + medicationId,
+      title,
+      body,
+      notificationDetails,
+      payload: 'lowstock:$medicationId',
+    );
+
+    developer.log(
+      'Showed low-stock notification for $medName (out=$isOut)',
+      name: 'NotificationService',
+    );
   }
 
   /// Schedule a test notification 10 seconds from now

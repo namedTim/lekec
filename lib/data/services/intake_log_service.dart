@@ -1,11 +1,47 @@
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
+import '../../utils/medication_utils.dart';
+import 'notification_service.dart';
 
 class IntakeLogService {
   final AppDatabase db;
 
   IntakeLogService(this.db);
+
+  /// A medication is considered "running low" once its remaining stock drops to
+  /// this many doses or fewer (matches the low-stock card in the island sheet).
+  static const int _lowStockDoseMultiple = 3;
+
+  /// Fires a low-stock notification when a decrement pushes the remaining stock
+  /// across the warning threshold (or empties it). Only notifies on the
+  /// downward crossing, so it triggers once per refill cycle rather than on
+  /// every dose. Fire-and-forget: a notification failure never blocks the write.
+  void _maybeNotifyLowStock({
+    required Medication medication,
+    required double oldRemaining,
+    required double newRemaining,
+    required double dosageAmount,
+  }) {
+    final dose = dosageAmount > 0 ? dosageAmount : 1.0;
+    final threshold = dose * _lowStockDoseMultiple;
+    final ranOut = newRemaining <= 0 && oldRemaining > 0;
+    final crossedLow = newRemaining <= threshold && oldRemaining > threshold;
+    if (!ranOut && !crossedLow) return;
+
+    final count = newRemaining <= 0 ? 0 : newRemaining.ceil();
+    final unit = getMedicationUnit(medication.medType, count);
+    final numStr = newRemaining == newRemaining.roundToDouble()
+        ? newRemaining.toInt().toString()
+        : newRemaining.toString();
+
+    NotificationService().showLowStockNotification(
+      medicationId: medication.id,
+      medName: medication.name,
+      remainingLabel: '$numStr $unit',
+      isOut: newRemaining <= 0,
+    );
+  }
 
   /// Get the next medication that needs to be taken
   /// Returns medication info, time until next dose, and if it's overdue
@@ -272,12 +308,19 @@ class IntakeLogService {
         medication != null &&
         medication.dosagesRemaining != null) {
       // Prevent negative values - clamp at 0
-      final newRemaining = (medication.dosagesRemaining! - plan.dosageAmount)
+      final oldRemaining = medication.dosagesRemaining!;
+      final newRemaining = (oldRemaining - plan.dosageAmount)
           .clamp(0.0, double.infinity);
       await (db.update(
         db.medications,
       )..where((t) => t.id.equals(medication.id))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+      );
+      _maybeNotifyLowStock(
+        medication: medication,
+        oldRemaining: oldRemaining,
+        newRemaining: newRemaining,
+        dosageAmount: plan.dosageAmount,
       );
     }
 
@@ -423,7 +466,8 @@ class IntakeLogService {
     )..where((t) => t.id.equals(medicationId))).getSingleOrNull();
 
     if (medication != null && medication.dosagesRemaining != null) {
-      final newRemaining = (medication.dosagesRemaining! - dosageAmount).clamp(
+      final oldRemaining = medication.dosagesRemaining!;
+      final newRemaining = (oldRemaining - dosageAmount).clamp(
         0.0,
         double.infinity,
       );
@@ -431,6 +475,12 @@ class IntakeLogService {
         db.medications,
       )..where((t) => t.id.equals(medicationId))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+      );
+      _maybeNotifyLowStock(
+        medication: medication,
+        oldRemaining: oldRemaining,
+        newRemaining: newRemaining,
+        dosageAmount: dosageAmount,
       );
     }
   }

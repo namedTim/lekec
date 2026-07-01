@@ -326,4 +326,93 @@ class MedicationService {
 
     return result;
   }
+
+  /// Returns the active medications whose remaining stock has dropped to the
+  /// low-stock threshold (~3 doses) or fewer, out-of-stock first. Powers the
+  /// "Zaloga zdravil" card in the island detail sheet.
+  Future<List<LowStockMed>> getLowStockMedications() async {
+    final rows =
+        await (db.select(db.medications)
+              ..where((m) => m.status.equalsValue(MedicationStatus.active))
+              ..where((m) => m.dosagesRemaining.isNotNull()))
+            .join([
+              drift.innerJoin(
+                db.medicationPlans,
+                db.medicationPlans.medicationId.equalsExp(db.medications.id) &
+                    db.medicationPlans.isActive.equals(true),
+              ),
+              drift.leftOuterJoin(
+                db.users,
+                db.users.id.equalsExp(db.medicationPlans.userId),
+              ),
+            ])
+            .get();
+
+    // A medication can have several active plans (e.g. one per user). Collapse
+    // to one entry per medication, keeping the largest dose so the threshold
+    // reflects the heaviest regimen, plus one owner name for display.
+    final byMed = <int, LowStockMed>{};
+    for (final row in rows) {
+      final med = row.readTable(db.medications);
+      final remaining = med.dosagesRemaining;
+      if (remaining == null) continue;
+      final plan = row.readTableOrNull(db.medicationPlans);
+      final user = row.readTableOrNull(db.users);
+      final dose = plan?.dosageAmount ?? 1.0;
+      final existing = byMed[med.id];
+      byMed[med.id] = LowStockMed(
+        medicationId: med.id,
+        name: med.name,
+        medType: med.medType,
+        remaining: remaining,
+        doseAmount: existing == null
+            ? dose
+            : (dose > existing.doseAmount ? dose : existing.doseAmount),
+        ownerName: existing?.ownerName ?? user?.name,
+      );
+    }
+
+    final result = byMed.values.where((m) => m.remaining <= m.threshold).toList()
+      ..sort((a, b) {
+        if (a.isOut != b.isOut) return a.isOut ? -1 : 1; // out first
+        return a.remaining.compareTo(b.remaining); // then least left
+      });
+    return result;
+  }
+
+  /// Overwrites a medication's remaining stock (used by the refill action).
+  Future<void> setRemainingStock(int medicationId, double remaining) async {
+    await (db.update(
+      db.medications,
+    )..where((t) => t.id.equals(medicationId))).write(
+      MedicationsCompanion(
+        dosagesRemaining: drift.Value(remaining.clamp(0.0, double.infinity)),
+      ),
+    );
+  }
+}
+
+/// A medication that is running low (or out), as surfaced in the island sheet.
+class LowStockMed {
+  final int medicationId;
+  final String name;
+  final MedicationType medType;
+  final double remaining;
+  final double doseAmount;
+
+  /// Owning user's name — shown only in multi-user setups.
+  final String? ownerName;
+
+  const LowStockMed({
+    required this.medicationId,
+    required this.name,
+    required this.medType,
+    required this.remaining,
+    required this.doseAmount,
+    this.ownerName,
+  });
+
+  /// Warn once stock is at ~3 doses or fewer (mirrors IntakeLogService).
+  double get threshold => (doseAmount > 0 ? doseAmount : 1.0) * 3;
+  bool get isOut => remaining <= 0;
 }

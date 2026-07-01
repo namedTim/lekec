@@ -7,11 +7,14 @@ import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../data/services/appointment_service.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/water_service.dart';
+import '../../utils/medication_utils.dart';
+import 'quantity_selector.dart';
 
 /// Expanded view of the dashboard time-island. Opened by tapping the island.
 /// Shows, at a glance:
 ///   * Hidracija — today's water for the prime (first active) user vs. goal.
-///   * Zdravila danes — today's taken/total per active user.
+///   * Zaloga zdravil — medications running low / out of stock, with a refill
+///     shortcut.
 ///   * Prihajajoči termini — the next few appointments across all users.
 Future<void> showIslandDetailsSheet({
   required BuildContext context,
@@ -33,7 +36,7 @@ class _IslandStats {
   final String? primeUserName;
   final int waterTodayMl;
   final int waterGoalMl;
-  final List<_UserMedStat> medStats;
+  final List<LowStockMed> lowStock;
   final List<_ApptStat> appointments;
   final bool multiUser;
 
@@ -44,18 +47,11 @@ class _IslandStats {
     required this.primeUserName,
     required this.waterTodayMl,
     required this.waterGoalMl,
-    required this.medStats,
+    required this.lowStock,
     required this.appointments,
     required this.multiUser,
     required this.criticalPendingToday,
   });
-}
-
-class _UserMedStat {
-  final String userName;
-  final int taken;
-  final int total;
-  const _UserMedStat(this.userName, this.taken, this.total);
 }
 
 class _ApptStat {
@@ -95,7 +91,7 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
       waterGoal = (await water.getSettings(prime.id)).goalMl;
     }
 
-    // ── Meds today, per user (taken / total) ─────────────────────────────
+    // ── Medications running low / out of stock ───────────────────────────
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -104,20 +100,7 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
               t.scheduledTime.isBiggerOrEqualValue(startOfDay) &
               t.scheduledTime.isSmallerThanValue(endOfDay)))
         .get();
-    final totalByUser = <int, int>{};
-    final takenByUser = <int, int>{};
-    for (final intake in todaysIntakes) {
-      totalByUser[intake.userId] = (totalByUser[intake.userId] ?? 0) + 1;
-      if (intake.wasTaken) {
-        takenByUser[intake.userId] = (takenByUser[intake.userId] ?? 0) + 1;
-      }
-    }
-    final medStats = <_UserMedStat>[];
-    for (final u in users) {
-      final total = totalByUser[u.id] ?? 0;
-      if (total == 0) continue; // skip users with nothing scheduled today
-      medStats.add(_UserMedStat(u.name, takenByUser[u.id] ?? 0, total));
-    }
+    final lowStock = await MedicationService(db).getLowStockMedications();
 
     // ── Critical reminders still pending later today ─────────────────────
     final criticalMedIds = (await (db.select(db.medications)
@@ -149,7 +132,7 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
       primeUserName: prime?.name,
       waterTodayMl: waterToday,
       waterGoalMl: waterGoal,
-      medStats: medStats,
+      lowStock: lowStock,
       appointments: appointments,
       multiUser: users.length > 1,
       criticalPendingToday: criticalPendingToday,
@@ -378,84 +361,125 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
   }
 
   Widget _buildMedsCard(ThemeData theme, _IslandStats s) {
-    const accent = Color(0xFF22C55E);
+    const accent = Color(0xFF22C55E); // green — the meds/stock section icon
     final colors = theme.colorScheme;
 
     return _sectionCard(
       theme: theme,
       icon: Symbols.medication,
       accent: accent,
-      title: 'Zdravila danes',
-      child: s.medStats.isEmpty
-          ? Text(
-              'Ni načrtovanih zdravil za danes',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+      title: 'Zaloga zdravil',
+      child: s.lowStock.isEmpty
+          ? Row(
+              children: [
+                const Icon(
+                  Symbols.check_circle,
+                  size: 18,
+                  color: Color(0xFF22C55E),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Zaloga vseh zdravil zadostuje',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             )
           : Column(
               children: [
-                for (final m in s.medStats) ...[
-                  _medRow(theme, s, m, accent),
-                  if (m != s.medStats.last) const SizedBox(height: 12),
+                for (final m in s.lowStock) ...[
+                  _lowStockRow(theme, s, m),
+                  if (m != s.lowStock.last)
+                    Divider(
+                      height: 20,
+                      color: colors.outlineVariant.withOpacity(0.4),
+                    ),
                 ],
               ],
             ),
     );
   }
 
-  Widget _medRow(
-    ThemeData theme,
-    _IslandStats s,
-    _UserMedStat m,
-    Color accent,
-  ) {
+  Widget _lowStockRow(ThemeData theme, _IslandStats s, LowStockMed m) {
     final colors = theme.colorScheme;
-    final done = m.total > 0 && m.taken >= m.total;
-    final progress = m.total == 0 ? 0.0 : (m.taken / m.total).clamp(0.0, 1.0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final isOut = m.isOut;
+    final statusColor = isOut ? colors.error : const Color(0xFFF59E0B);
+
+    final count = isOut ? 0 : m.remaining.ceil();
+    final unit = getMedicationUnit(m.medType, count);
+    final numStr = m.remaining == m.remaining.roundToDouble()
+        ? m.remaining.toInt().toString()
+        : m.remaining.toStringAsFixed(1);
+    final remainingText = isOut ? 'Zmanjkalo' : 'Še $numStr $unit';
+    final showOwner = s.multiUser && (m.ownerName?.isNotEmpty ?? false);
+
+    return Row(
       children: [
-        Row(
-          children: [
-            if (s.multiUser) ...[
-              Expanded(
-                child: Text(
-                  m.userName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+        Icon(
+          isOut ? Symbols.error : Symbols.warning,
+          size: 20,
+          color: statusColor,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                m.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ] else
-              const Spacer(),
-            Text(
-              done ? 'vse vzeto' : '${m.taken} / ${m.total} vzeto',
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: done ? accent : colors.onSurfaceVariant,
+              Text(
+                showOwner ? '$remainingText · ${m.ownerName}' : remainingText,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: statusColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            if (done) ...[
-              const SizedBox(width: 6),
-              Icon(Symbols.check_circle, size: 18, color: accent),
             ],
-          ],
+          ),
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 6,
-            backgroundColor: accent.withOpacity(0.15),
-            valueColor: AlwaysStoppedAnimation<Color>(accent),
+        const SizedBox(width: 8),
+        TextButton.icon(
+          onPressed: () => _refillStock(m),
+          icon: const Icon(Symbols.add_circle, size: 18),
+          label: const Text('Dopolni'),
+          style: TextButton.styleFrom(
+            foregroundColor: colors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
         ),
       ],
     );
+  }
+
+  /// Opens the quantity picker to overwrite a medication's remaining stock,
+  /// then refreshes the sheet so the row updates (or drops off the list).
+  Future<void> _refillStock(LowStockMed m) async {
+    final suggested = m.remaining > 0 ? m.remaining : m.doseAmount * 10;
+    final newValue = await showQuantitySelector(
+      context,
+      initialValue: suggested <= 0 ? 1 : suggested,
+      minValue: 0,
+      maxValue: 99999,
+      step: 1,
+      label: 'Nova zaloga — ${m.name}',
+    );
+    if (newValue == null) return;
+
+    await MedicationService(widget.db).setRemainingStock(m.medicationId, newValue);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Zaloga posodobljena: ${m.name}')),
+    );
+    setState(() => _future = _load());
   }
 
   Widget _buildAppointmentsCard(ThemeData theme, _IslandStats s) {
