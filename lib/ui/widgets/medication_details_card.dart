@@ -252,7 +252,7 @@ class MedicationDetailsCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '$pillsRemaining preostalo',
+                          'še $pillsRemaining ${getMedicationUnit(medType, pillsRemaining)}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
