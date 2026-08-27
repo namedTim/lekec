@@ -18,9 +18,11 @@ import '../../data/services/appointment_service.dart';
 import '../../data/services/intake_log_service.dart';
 import '../../data/services/mood_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/server_message_service.dart';
 import '../../data/services/user_labels.dart';
 import '../../data/services/water_service.dart';
 import '../../ui/widgets/time_island.dart';
+import '../../ui/widgets/server_message_banner.dart';
 import '../../ui/widgets/appointment_card.dart';
 import '../../ui/components/time_slot.dart';
 import '../../ui/components/week_strip.dart';
@@ -71,6 +73,12 @@ class DashboardScreenState extends State<DashboardScreen>
   Timer? _waterRefreshTimer;
   Timer? _dayChangeTimer;
 
+  // Server messages (obvestila): mirrors the local cache; drives the island
+  // bell/badge and the one-off banner (newest unread).
+  late final ServerMessageService _messageService;
+  StreamSubscription<List<ServerMessage>>? _messagesSub;
+  List<ServerMessage> _serverMessages = const [];
+
   List<AlarmSettings> alarms = [];
 
   @override
@@ -92,6 +100,14 @@ class DashboardScreenState extends State<DashboardScreen>
     _startIslandUpdateTimer();
     _startDayChangeTimer();
     loadAlarms();
+    _messageService = ServerMessageService(db);
+    _messagesSub = _messageService.watchAll().listen((rows) {
+      if (!mounted) return;
+      setState(() => _serverMessages = rows);
+    });
+    // Runs once per launch (this screen lives in an indexed-stack branch).
+    // Fire-and-forget: offline or a failing server changes nothing visible.
+    _messageService.syncFromServer(force: true);
   }
 
   Future<void> _loadActivityWindow() async {
@@ -194,6 +210,7 @@ class DashboardScreenState extends State<DashboardScreen>
     _islandUpdateTimer?.cancel();
     _waterRefreshTimer?.cancel();
     _dayChangeTimer?.cancel();
+    _messagesSub?.cancel();
     super.dispose();
   }
 
@@ -813,6 +830,22 @@ class DashboardScreenState extends State<DashboardScreen>
     await refreshIsland();
   }
 
+  int get _unreadMessageCount =>
+      _serverMessages.where((m) => m.seenAt == null).length;
+
+  /// Newest unread server message, shown once as a dashboard banner.
+  ServerMessage? get _bannerMessage {
+    for (final m in _serverMessages) {
+      if (m.seenAt == null) return m;
+    }
+    return null;
+  }
+
+  Future<void> _onBannerAction(ServerMessage m) async {
+    await openServerMessageAction(context, m);
+    await _messageService.markSeen(m.id);
+  }
+
   /// Re-evaluate a user's water reminders against today's goal after a log.
   Future<void> _refreshWaterRemindersForUser(int userId) async {
     final user = await (db.select(db.users)
@@ -901,6 +934,9 @@ class DashboardScreenState extends State<DashboardScreen>
                           waterGoalMl: _primeWaterGoalMl,
                           controller: controller,
                           onTap: _showIslandDetails,
+                          hasMessages: _serverMessages.isNotEmpty,
+                          unreadMessageCount: _unreadMessageCount,
+                          onMessagesTap: _showIslandDetails,
                         )
                       : TimeIsland(
                           totalDuration: const Duration(minutes: 30),
@@ -914,9 +950,23 @@ class DashboardScreenState extends State<DashboardScreen>
                           waterGoalMl: _primeWaterGoalMl,
                           controller: controller,
                           onTap: _showIslandDetails,
+                          hasMessages: _serverMessages.isNotEmpty,
+                          unreadMessageCount: _unreadMessageCount,
+                          onMessagesTap: _showIslandDetails,
                         ),
                 ),
               ),
+              // One-off banner for the newest unread server message. Gone for
+              // good once dismissed/acted on; still listed in the island sheet.
+              if (_bannerMessage != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: ServerMessageBanner(
+                    message: _bannerMessage!,
+                    onDismiss: () => _messageService.markSeen(_bannerMessage!.id),
+                    onAction: () => _onBannerAction(_bannerMessage!),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: WeekStrip(

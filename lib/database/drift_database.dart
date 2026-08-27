@@ -16,6 +16,7 @@ import 'tables/mood_entries.dart';
 import 'tables/period_entries.dart';
 import 'tables/appointments.dart';
 import 'tables/water_intake_logs.dart';
+import 'tables/server_messages.dart';
 
 part 'drift_database.g.dart';
 
@@ -32,13 +33,14 @@ part 'drift_database.g.dart';
     PeriodEntries,
     Appointments,
     WaterIntakeLogs,
+    ServerMessages,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration {
@@ -126,6 +128,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(users, users.waterReminderStartHour);
           await m.addColumn(users, users.waterReminderEndHour);
           await m.addColumn(users, users.waterReminderIntervalMinutes);
+        }
+        if (from < 18) {
+          // Local cache of server messages (obvestila) + seen state.
+          await m.createTable(serverMessages);
         }
       },
     );

@@ -28,6 +28,9 @@ class TimeIsland extends StatefulWidget {
     this.waterGoalMl,
     this.rotationInterval = const Duration(seconds: 5),
     this.onTap,
+    this.hasMessages = false,
+    this.unreadMessageCount = 0,
+    this.onMessagesTap,
   });
 
   final String? medicationName;
@@ -49,6 +52,11 @@ class TimeIsland extends StatefulWidget {
   // Tapping the island opens the expanded overview. When null the island is
   // not interactive (and the tap affordance is hidden).
   final VoidCallback? onTap;
+  // Server messages (obvestila). The bell is shown only while there is at
+  // least one message cached; the badge carries the unread count.
+  final bool hasMessages;
+  final int unreadMessageCount;
+  final VoidCallback? onMessagesTap;
 
   @override
   State<TimeIsland> createState() => _TimeIslandState();
@@ -344,6 +352,7 @@ class _TimeIslandState extends State<TimeIsland>
             : (isWater ? waterAccent : medsStyle.accent));
     final pulseEnabled =
         _view == _IslandView.meds && _isFinished && _hasMedication;
+    final showBell = widget.hasMessages && widget.onMessagesTap != null;
 
     return AnimatedBuilder(
       animation: _pulse,
@@ -358,7 +367,13 @@ class _TimeIslandState extends State<TimeIsland>
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
           // Extra top padding leaves room for the tap-to-expand handle.
-          padding: EdgeInsets.fromLTRB(14, widget.onTap != null ? 16 : 12, 16, 12),
+          // Extra right padding makes room for the messages bell.
+          padding: EdgeInsets.fromLTRB(
+            14,
+            widget.onTap != null ? 16 : 12,
+            showBell ? 54 : 16,
+            12,
+          ),
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(28),
@@ -422,6 +437,20 @@ class _TimeIslandState extends State<TimeIsland>
                         color: colors.onSurfaceVariant.withOpacity(0.35),
                         borderRadius: BorderRadius.circular(2),
                       ),
+                    ),
+                  ),
+                ),
+              // Messages bell: opens the island sheet (messages section first).
+              if (showBell)
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  right: 4,
+                  child: Center(
+                    child: _MessagesBell(
+                      unreadCount: widget.unreadMessageCount,
+                      accent: accent,
+                      onTap: widget.onMessagesTap!,
                     ),
                   ),
                 ),
@@ -749,6 +778,66 @@ class _TimeIslandState extends State<TimeIsland>
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Bell icon with an unread-count badge, used inside the island.
+class _MessagesBell extends StatelessWidget {
+  const _MessagesBell({
+    required this.unreadCount,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final int unreadCount;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasUnread = unreadCount > 0;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          onPressed: onTap,
+          tooltip: 'Sporočila',
+          icon: Icon(
+            hasUnread ? Symbols.notifications_unread : Symbols.notifications,
+            size: 24,
+            color: hasUnread ? accent : colors.onSurfaceVariant,
+            fill: hasUnread ? 1 : 0,
+          ),
+        ),
+        if (hasUnread)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                decoration: BoxDecoration(
+                  color: colors.error,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: colors.surface, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  unreadCount > 9 ? '9+' : '$unreadCount',
+                  style: TextStyle(
+                    color: colors.onError,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

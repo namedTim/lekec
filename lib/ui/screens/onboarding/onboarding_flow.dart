@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../database/drift_database.dart';
 import '../../../features/core/providers/database_provider.dart';
 import 'package:drift/drift.dart' as drift;
+import '../../../data/services/server_message_service.dart';
 import 'welcome_screen.dart';
 import 'user_setup_screen.dart';
 import 'app_guide_screen.dart';
@@ -68,6 +69,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
               completedAt: drift.Value(DateTime.now()),
             ),
           );
+
+      // Greet the new user with a locally generated message; everything else
+      // in server_messages comes live from the server.
+      await ServerMessageService(db).insertWelcomeMessage();
 
       // Update app settings with default user if available
       final appSettings = await (db.select(db.appSettings)..limit(1)).getSingleOrNull();

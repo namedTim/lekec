@@ -6,12 +6,16 @@ import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart' show MedicationStatus;
 import '../../data/services/appointment_service.dart';
 import '../../data/services/medication_service.dart';
+import '../../data/services/server_message_service.dart';
 import '../../data/services/water_service.dart';
 import '../../utils/medication_utils.dart';
+import '../screens/messages_screen.dart';
 import 'quantity_selector.dart';
 
 /// Expanded view of the dashboard time-island. Opened by tapping the island.
 /// Shows, at a glance:
+///   * Sporočila — a compact entry point to the message list (hidden when
+///     there are none), with an unread count.
 ///   * Hidracija — today's water for the prime (first active) user vs. goal.
 ///   * Zaloga zdravil — medications running low / out of stock, with a refill
 ///     shortcut.
@@ -43,6 +47,11 @@ class _IslandStats {
   /// Count of critical (alarm) reminders still scheduled to ring later today.
   final int criticalPendingToday;
 
+  /// Message counts for the compact "Sporočila" row. The messages themselves
+  /// live on [MessagesScreen], reached by tapping the row.
+  final int messageCount;
+  final int unreadMessageCount;
+
   const _IslandStats({
     required this.primeUserName,
     required this.waterTodayMl,
@@ -51,6 +60,8 @@ class _IslandStats {
     required this.appointments,
     required this.multiUser,
     required this.criticalPendingToday,
+    required this.messageCount,
+    required this.unreadMessageCount,
   });
 }
 
@@ -128,6 +139,10 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
             ))
         .toList();
 
+    // ── Server messages (obvestila) ──────────────────────────────────────
+    final messages = await ServerMessageService(db).getAll();
+    final unreadMessages = messages.where((m) => m.seenAt == null).length;
+
     return _IslandStats(
       primeUserName: prime?.name,
       waterTodayMl: waterToday,
@@ -136,6 +151,8 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
       appointments: appointments,
       multiUser: users.length > 1,
       criticalPendingToday: criticalPendingToday,
+      messageCount: messages.length,
+      unreadMessageCount: unreadMessages,
     );
   }
 
@@ -181,6 +198,16 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
     setState(() => _future = _load());
   }
 
+  /// Open the full message list. Everything is marked seen there, so reload
+  /// on the way back.
+  Future<void> _openAllMessages() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => MessagesScreen(db: widget.db)),
+    );
+    if (!mounted) return;
+    setState(() => _future = _load());
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -214,6 +241,11 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
                       ),
                     ),
                   ),
+                  // Hidden entirely when there are no messages.
+                  if (s.messageCount > 0) ...[
+                    _buildMessagesCard(theme, s),
+                    const SizedBox(height: 16),
+                  ],
                   _buildMedsCard(theme, s),
                   const SizedBox(height: 12),
                   // Always shown so the action is discoverable; disabled when
@@ -295,6 +327,90 @@ class _IslandDetailsSheetState extends State<_IslandDetailsSheet> {
           const SizedBox(height: 14),
           child,
         ],
+      ),
+    );
+  }
+
+  /// Slovenian neuter agreement for "novo sporočilo" counts.
+  static String _novaLabel(int n) {
+    switch (n % 100) {
+      case 1:
+        return 'novo';
+      case 2:
+        return 'novi';
+      case 3:
+      case 4:
+        return 'nova';
+      default:
+        return 'novih';
+    }
+  }
+
+  Widget _buildMessagesCard(ThemeData theme, _IslandStats s) {
+    final colors = theme.colorScheme;
+    final accent = colors.primary;
+    final unread = s.unreadMessageCount;
+    // Deliberately just an entry point — no message preview, so the sheet
+    // stays slim. The messages themselves live on MessagesScreen.
+    return Material(
+      color: colors.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: _openAllMessages,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colors.outlineVariant.withOpacity(0.4)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Symbols.campaign, size: 22, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Sporočila',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (unread > 0) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$unread ${_novaLabel(unread)}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Icon(
+                Symbols.chevron_right,
+                size: 22,
+                color: colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

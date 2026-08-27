@@ -5578,6 +5578,491 @@ class WaterIntakeLogsCompanion extends UpdateCompanion<WaterIntakeLog> {
   }
 }
 
+class $ServerMessagesTable extends ServerMessages
+    with TableInfo<$ServerMessagesTable, ServerMessage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServerMessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('text'),
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlLabelMeta = const VerificationMeta(
+    'urlLabel',
+  );
+  @override
+  late final GeneratedColumn<String> urlLabel = GeneratedColumn<String>(
+    'url_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _receivedAtMeta = const VerificationMeta(
+    'receivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> receivedAt = GeneratedColumn<DateTime>(
+    'received_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _seenAtMeta = const VerificationMeta('seenAt');
+  @override
+  late final GeneratedColumn<DateTime> seenAt = GeneratedColumn<DateTime>(
+    'seen_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    body,
+    kind,
+    url,
+    urlLabel,
+    receivedAt,
+    seenAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'server_messages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ServerMessage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    if (data.containsKey('url_label')) {
+      context.handle(
+        _urlLabelMeta,
+        urlLabel.isAcceptableOrUnknown(data['url_label']!, _urlLabelMeta),
+      );
+    }
+    if (data.containsKey('received_at')) {
+      context.handle(
+        _receivedAtMeta,
+        receivedAt.isAcceptableOrUnknown(data['received_at']!, _receivedAtMeta),
+      );
+    }
+    if (data.containsKey('seen_at')) {
+      context.handle(
+        _seenAtMeta,
+        seenAt.isAcceptableOrUnknown(data['seen_at']!, _seenAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ServerMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServerMessage(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+      urlLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url_label'],
+      ),
+      receivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}received_at'],
+      )!,
+      seenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}seen_at'],
+      ),
+    );
+  }
+
+  @override
+  $ServerMessagesTable createAlias(String alias) {
+    return $ServerMessagesTable(attachedDatabase, alias);
+  }
+}
+
+class ServerMessage extends DataClass implements Insertable<ServerMessage> {
+  final int id;
+  final String title;
+  final String body;
+
+  /// 'text' | 'link' | 'tip' — see [ServerMessageKind].
+  final String kind;
+
+  /// http(s) URL for kind == 'link'.
+  final String? url;
+
+  /// Button caption for link/tip kinds.
+  final String? urlLabel;
+  final DateTime receivedAt;
+  final DateTime? seenAt;
+  const ServerMessage({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.kind,
+    this.url,
+    this.urlLabel,
+    required this.receivedAt,
+    this.seenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['title'] = Variable<String>(title);
+    map['body'] = Variable<String>(body);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    if (!nullToAbsent || urlLabel != null) {
+      map['url_label'] = Variable<String>(urlLabel);
+    }
+    map['received_at'] = Variable<DateTime>(receivedAt);
+    if (!nullToAbsent || seenAt != null) {
+      map['seen_at'] = Variable<DateTime>(seenAt);
+    }
+    return map;
+  }
+
+  ServerMessagesCompanion toCompanion(bool nullToAbsent) {
+    return ServerMessagesCompanion(
+      id: Value(id),
+      title: Value(title),
+      body: Value(body),
+      kind: Value(kind),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      urlLabel: urlLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(urlLabel),
+      receivedAt: Value(receivedAt),
+      seenAt: seenAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seenAt),
+    );
+  }
+
+  factory ServerMessage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServerMessage(
+      id: serializer.fromJson<int>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      body: serializer.fromJson<String>(json['body']),
+      kind: serializer.fromJson<String>(json['kind']),
+      url: serializer.fromJson<String?>(json['url']),
+      urlLabel: serializer.fromJson<String?>(json['urlLabel']),
+      receivedAt: serializer.fromJson<DateTime>(json['receivedAt']),
+      seenAt: serializer.fromJson<DateTime?>(json['seenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'title': serializer.toJson<String>(title),
+      'body': serializer.toJson<String>(body),
+      'kind': serializer.toJson<String>(kind),
+      'url': serializer.toJson<String?>(url),
+      'urlLabel': serializer.toJson<String?>(urlLabel),
+      'receivedAt': serializer.toJson<DateTime>(receivedAt),
+      'seenAt': serializer.toJson<DateTime?>(seenAt),
+    };
+  }
+
+  ServerMessage copyWith({
+    int? id,
+    String? title,
+    String? body,
+    String? kind,
+    Value<String?> url = const Value.absent(),
+    Value<String?> urlLabel = const Value.absent(),
+    DateTime? receivedAt,
+    Value<DateTime?> seenAt = const Value.absent(),
+  }) => ServerMessage(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    body: body ?? this.body,
+    kind: kind ?? this.kind,
+    url: url.present ? url.value : this.url,
+    urlLabel: urlLabel.present ? urlLabel.value : this.urlLabel,
+    receivedAt: receivedAt ?? this.receivedAt,
+    seenAt: seenAt.present ? seenAt.value : this.seenAt,
+  );
+  ServerMessage copyWithCompanion(ServerMessagesCompanion data) {
+    return ServerMessage(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      body: data.body.present ? data.body.value : this.body,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      url: data.url.present ? data.url.value : this.url,
+      urlLabel: data.urlLabel.present ? data.urlLabel.value : this.urlLabel,
+      receivedAt: data.receivedAt.present
+          ? data.receivedAt.value
+          : this.receivedAt,
+      seenAt: data.seenAt.present ? data.seenAt.value : this.seenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServerMessage(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('kind: $kind, ')
+          ..write('url: $url, ')
+          ..write('urlLabel: $urlLabel, ')
+          ..write('receivedAt: $receivedAt, ')
+          ..write('seenAt: $seenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, title, body, kind, url, urlLabel, receivedAt, seenAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServerMessage &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.body == this.body &&
+          other.kind == this.kind &&
+          other.url == this.url &&
+          other.urlLabel == this.urlLabel &&
+          other.receivedAt == this.receivedAt &&
+          other.seenAt == this.seenAt);
+}
+
+class ServerMessagesCompanion extends UpdateCompanion<ServerMessage> {
+  final Value<int> id;
+  final Value<String> title;
+  final Value<String> body;
+  final Value<String> kind;
+  final Value<String?> url;
+  final Value<String?> urlLabel;
+  final Value<DateTime> receivedAt;
+  final Value<DateTime?> seenAt;
+  const ServerMessagesCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.url = const Value.absent(),
+    this.urlLabel = const Value.absent(),
+    this.receivedAt = const Value.absent(),
+    this.seenAt = const Value.absent(),
+  });
+  ServerMessagesCompanion.insert({
+    this.id = const Value.absent(),
+    required String title,
+    required String body,
+    this.kind = const Value.absent(),
+    this.url = const Value.absent(),
+    this.urlLabel = const Value.absent(),
+    this.receivedAt = const Value.absent(),
+    this.seenAt = const Value.absent(),
+  }) : title = Value(title),
+       body = Value(body);
+  static Insertable<ServerMessage> custom({
+    Expression<int>? id,
+    Expression<String>? title,
+    Expression<String>? body,
+    Expression<String>? kind,
+    Expression<String>? url,
+    Expression<String>? urlLabel,
+    Expression<DateTime>? receivedAt,
+    Expression<DateTime>? seenAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (body != null) 'body': body,
+      if (kind != null) 'kind': kind,
+      if (url != null) 'url': url,
+      if (urlLabel != null) 'url_label': urlLabel,
+      if (receivedAt != null) 'received_at': receivedAt,
+      if (seenAt != null) 'seen_at': seenAt,
+    });
+  }
+
+  ServerMessagesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? title,
+    Value<String>? body,
+    Value<String>? kind,
+    Value<String?>? url,
+    Value<String?>? urlLabel,
+    Value<DateTime>? receivedAt,
+    Value<DateTime?>? seenAt,
+  }) {
+    return ServerMessagesCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      kind: kind ?? this.kind,
+      url: url ?? this.url,
+      urlLabel: urlLabel ?? this.urlLabel,
+      receivedAt: receivedAt ?? this.receivedAt,
+      seenAt: seenAt ?? this.seenAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (urlLabel.present) {
+      map['url_label'] = Variable<String>(urlLabel.value);
+    }
+    if (receivedAt.present) {
+      map['received_at'] = Variable<DateTime>(receivedAt.value);
+    }
+    if (seenAt.present) {
+      map['seen_at'] = Variable<DateTime>(seenAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServerMessagesCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('kind: $kind, ')
+          ..write('url: $url, ')
+          ..write('urlLabel: $urlLabel, ')
+          ..write('receivedAt: $receivedAt, ')
+          ..write('seenAt: $seenAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5599,6 +6084,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WaterIntakeLogsTable waterIntakeLogs = $WaterIntakeLogsTable(
     this,
   );
+  late final $ServerMessagesTable serverMessages = $ServerMessagesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5615,6 +6101,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     periodEntries,
     appointments,
     waterIntakeLogs,
+    serverMessages,
   ];
 }
 
@@ -10796,6 +11283,261 @@ typedef $$WaterIntakeLogsTableProcessedTableManager =
       WaterIntakeLog,
       PrefetchHooks Function({bool userId})
     >;
+typedef $$ServerMessagesTableCreateCompanionBuilder =
+    ServerMessagesCompanion Function({
+      Value<int> id,
+      required String title,
+      required String body,
+      Value<String> kind,
+      Value<String?> url,
+      Value<String?> urlLabel,
+      Value<DateTime> receivedAt,
+      Value<DateTime?> seenAt,
+    });
+typedef $$ServerMessagesTableUpdateCompanionBuilder =
+    ServerMessagesCompanion Function({
+      Value<int> id,
+      Value<String> title,
+      Value<String> body,
+      Value<String> kind,
+      Value<String?> url,
+      Value<String?> urlLabel,
+      Value<DateTime> receivedAt,
+      Value<DateTime?> seenAt,
+    });
+
+class $$ServerMessagesTableFilterComposer
+    extends Composer<_$AppDatabase, $ServerMessagesTable> {
+  $$ServerMessagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get urlLabel => $composableBuilder(
+    column: $table.urlLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get seenAt => $composableBuilder(
+    column: $table.seenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ServerMessagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ServerMessagesTable> {
+  $$ServerMessagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get urlLabel => $composableBuilder(
+    column: $table.urlLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get seenAt => $composableBuilder(
+    column: $table.seenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ServerMessagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ServerMessagesTable> {
+  $$ServerMessagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get urlLabel =>
+      $composableBuilder(column: $table.urlLabel, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get seenAt =>
+      $composableBuilder(column: $table.seenAt, builder: (column) => column);
+}
+
+class $$ServerMessagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ServerMessagesTable,
+          ServerMessage,
+          $$ServerMessagesTableFilterComposer,
+          $$ServerMessagesTableOrderingComposer,
+          $$ServerMessagesTableAnnotationComposer,
+          $$ServerMessagesTableCreateCompanionBuilder,
+          $$ServerMessagesTableUpdateCompanionBuilder,
+          (
+            ServerMessage,
+            BaseReferences<_$AppDatabase, $ServerMessagesTable, ServerMessage>,
+          ),
+          ServerMessage,
+          PrefetchHooks Function()
+        > {
+  $$ServerMessagesTableTableManager(
+    _$AppDatabase db,
+    $ServerMessagesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServerMessagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServerMessagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServerMessagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> urlLabel = const Value.absent(),
+                Value<DateTime> receivedAt = const Value.absent(),
+                Value<DateTime?> seenAt = const Value.absent(),
+              }) => ServerMessagesCompanion(
+                id: id,
+                title: title,
+                body: body,
+                kind: kind,
+                url: url,
+                urlLabel: urlLabel,
+                receivedAt: receivedAt,
+                seenAt: seenAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String title,
+                required String body,
+                Value<String> kind = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> urlLabel = const Value.absent(),
+                Value<DateTime> receivedAt = const Value.absent(),
+                Value<DateTime?> seenAt = const Value.absent(),
+              }) => ServerMessagesCompanion.insert(
+                id: id,
+                title: title,
+                body: body,
+                kind: kind,
+                url: url,
+                urlLabel: urlLabel,
+                receivedAt: receivedAt,
+                seenAt: seenAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ServerMessagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ServerMessagesTable,
+      ServerMessage,
+      $$ServerMessagesTableFilterComposer,
+      $$ServerMessagesTableOrderingComposer,
+      $$ServerMessagesTableAnnotationComposer,
+      $$ServerMessagesTableCreateCompanionBuilder,
+      $$ServerMessagesTableUpdateCompanionBuilder,
+      (
+        ServerMessage,
+        BaseReferences<_$AppDatabase, $ServerMessagesTable, ServerMessage>,
+      ),
+      ServerMessage,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10825,4 +11567,6 @@ class $AppDatabaseManager {
       $$AppointmentsTableTableManager(_db, _db.appointments);
   $$WaterIntakeLogsTableTableManager get waterIntakeLogs =>
       $$WaterIntakeLogsTableTableManager(_db, _db.waterIntakeLogs);
+  $$ServerMessagesTableTableManager get serverMessages =>
+      $$ServerMessagesTableTableManager(_db, _db.serverMessages);
 }

@@ -43,6 +43,7 @@ import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
 import 'features/core/providers/onboarding_provider.dart';
 import 'database/tables/medications.dart';
+import 'data/services/server_message_service.dart';
 import 'services/gemini_medication_service.dart';
 import 'services/permission.dart';
 import 'ui/theme/app_theme.dart';
@@ -600,6 +601,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Future<void> _refreshSchedulesOnResume() async {
     // Pick up any notification action taps made while backgrounded.
     await NotificationActionService(db).drainPendingActions();
+    // Re-check server messages (throttled inside; silent when offline).
+    ServerMessageService(db).syncFromServer();
     try {
       final generator = IntakeScheduleGenerator(db);
       await generator.generateScheduledIntakes().timeout(
