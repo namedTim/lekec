@@ -6,6 +6,8 @@ import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
 import '../../features/meds/providers/medications_provider.dart';
+import '../../data/services/notification_service.dart';
+import '../../features/core/providers/database_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../../services/gemini_medication_service.dart';
@@ -577,6 +579,8 @@ class _MultipleTimesSelectTimesScreenState
 
       // Generate schedule
       await scheduleGenerator.generateScheduledIntakes();
+      await NotificationService()
+          .scheduleAllUpcomingNotifications(ref.read(databaseProvider));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

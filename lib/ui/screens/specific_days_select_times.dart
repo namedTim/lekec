@@ -8,6 +8,8 @@ import '../../database/tables/medications.dart';
 import '../../services/gemini_medication_service.dart';
 import '../../utils/time_parse.dart';
 import '../../features/meds/providers/medications_provider.dart';
+import '../../data/services/notification_service.dart';
+import '../../features/core/providers/database_provider.dart';
 import '../../features/core/providers/intake_schedule_provider.dart';
 import '../../main.dart' show homePageKey;
 import '../components/hinted_scroll_view.dart';
@@ -413,6 +415,8 @@ class _SpecificDaysSelectTimesScreenState
 
       // Generate schedule
       await scheduleGenerator.generateScheduledIntakes();
+      await NotificationService()
+          .scheduleAllUpcomingNotifications(ref.read(databaseProvider));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

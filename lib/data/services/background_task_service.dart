@@ -1,3 +1,4 @@
+import 'package:alarm/alarm.dart';
 import 'package:workmanager/workmanager.dart';
 import 'dart:developer' as developer;
 import '../../database/drift_database.dart';
@@ -15,6 +16,13 @@ void callbackDispatcher() {
     AppDatabase? db;
     try {
       developer.log('Background task started: $task', name: 'BackgroundTask');
+
+      // This isolate has no alarm state: without Alarm.init() every
+      // AlarmStorage call (Alarm.getAlarms/set/stop) waits forever on an
+      // _initialized flag that is only set by init() — which used to make the
+      // notification refresh below cancel everything and then hang before
+      // rescheduling anything.
+      await Alarm.init();
 
       // Initialize database
       db = AppDatabase();

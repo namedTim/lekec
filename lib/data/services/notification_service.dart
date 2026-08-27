@@ -455,7 +455,19 @@ class NotificationService {
     //    stop an alarm that is ringing right now, cutting the reminder off
     //    about a second after it starts. `Alarm.isRinging` reads the
     //    process-wide native state, so it is correct from any isolate.
-    final activeAlarms = await Alarm.getAlarms();
+    // In an isolate where Alarm.init() was never called, AlarmStorage waits
+    // forever — a hang here would strand the wipe above with nothing
+    // rescheduled, so time out and skip alarm cleanup rather than block.
+    List<AlarmSettings> activeAlarms = const [];
+    try {
+      activeAlarms = await Alarm.getAlarms().timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      developer.log(
+        'Alarm.getAlarms() timed out — AlarmStorage not initialized in this '
+        'isolate? Skipping alarm cleanup so rescheduling can proceed.',
+        name: 'NotificationService',
+      );
+    }
     int stoppedCount = 0;
     int skippedRinging = 0;
     for (final alarm in activeAlarms) {
