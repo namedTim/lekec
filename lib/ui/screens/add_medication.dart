@@ -2,18 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../features/core/providers/database_provider.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
+import '../components/hinted_scroll_view.dart';
+import '../components/step_progress_indicator.dart';
+import '../components/confirmation_dialog.dart';
+import '../components/medication_camera_dialog.dart';
+import '../components/label_scanner_screen.dart';
+import '../../services/gemini_medication_service.dart';
+import '../../utils/gender_guesser.dart';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 class AddMedicationScreen extends ConsumerStatefulWidget {
-  const AddMedicationScreen({super.key});
+  final String? presetName;
+  final MedicationType? presetType;
+  final String? presetIntakeAdvice;
+
+  const AddMedicationScreen({
+    super.key,
+    this.presetName,
+    this.presetType,
+    this.presetIntakeAdvice,
+  });
 
   @override
-  ConsumerState<AddMedicationScreen> createState() => _AddMedicationScreenState();
+  ConsumerState<AddMedicationScreen> createState() =>
+      _AddMedicationScreenState();
 }
 
 class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
@@ -23,6 +40,45 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
   MedicationType _selectedType = MedicationType.pills;
   String _selectedIntakeAdvice = 'Ni posebnosti';
   bool _showCustomAdviceField = false;
+  List<User> _users = [];
+  int? _selectedUserId;
+  bool _isLoadingUsers = true;
+
+  // Store extracted data for passing to next screens
+  MedicationExtractionResult? _extractedData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+    _applyPresetData();
+  }
+
+  void _applyPresetData() {
+    if (widget.presetName != null) {
+      _medicationNameController.text = widget.presetName!;
+    }
+    if (widget.presetType != null) {
+      _selectedType = widget.presetType!;
+    }
+    if (widget.presetIntakeAdvice != null) {
+      final advice = widget.presetIntakeAdvice!;
+
+      // Map preset advice to dropdown values
+      if (advice == 'Ni posebnosti') {
+        _selectedIntakeAdvice = 'Ni posebnosti';
+      } else if (advice.contains('pred obrokom')) {
+        _selectedIntakeAdvice = 'Pred obrokom';
+      } else if (advice.contains('po obroku') || advice.contains('z obrokom')) {
+        _selectedIntakeAdvice = 'Po obroku';
+      } else {
+        // For any other advice, use custom field
+        _selectedIntakeAdvice = 'Po meri';
+        _showCustomAdviceField = true;
+        _customIntakeAdviceController.text = advice;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -31,30 +87,381 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
     super.dispose();
   }
 
+  Future<void> _loadUsers() async {
+    final db = ref.read(databaseProvider);
+
+    // Get all active users
+    final users = await (db.select(
+      db.users,
+    )..where((t) => t.isActive.equals(true))).get();
+
+    // If no users exist, create default "jaz" user
+    if (users.isEmpty) {
+      final id = await db
+          .into(db.users)
+          .insert(UsersCompanion.insert(name: 'jaz'));
+      final jazUser = await (db.select(
+        db.users,
+      )..where((u) => u.id.equals(id))).getSingle();
+      users.add(jazUser);
+    }
+
+    // Find "jaz" user or use first user as default
+    final jazUser = users.firstWhere(
+      (u) => u.name.toLowerCase() == 'jaz',
+      orElse: () => users.first,
+    );
+
+    setState(() {
+      _users = users;
+      _selectedUserId = jazUser.id;
+      _isLoadingUsers = false;
+    });
+  }
+
+  Future<void> _showAddUserDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _AddUserInMedicationDialog(),
+    );
+
+    if (result != null && result['name'] != null) {
+      final userName = result['name'] as String;
+      final age = result['age'] as int?;
+      final gender = result['gender'] as String?;
+      final database = ref.read(databaseProvider);
+      final id = await database
+          .into(database.users)
+          .insert(
+            UsersCompanion.insert(
+              name: userName,
+              age: drift.Value(age),
+              gender: drift.Value(gender),
+            ),
+          );
+      final newUser = await (database.select(
+        database.users,
+      )..where((u) => u.id.equals(id))).getSingle();
+
+      setState(() {
+        _users.add(newUser);
+        _selectedUserId = newUser.id;
+      });
+    }
+  }
+
+  Future<void> _showDeleteUserDialog(User user) async {
+    // Don't allow deleting the "jaz" user
+    if (user.name.toLowerCase() == 'jaz') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Privzeti uporabnik se ne more izbrisati'),
+        ),
+      );
+      return;
+    }
+
+    final result = await showConfirmationDialog(
+      context,
+      title: 'Izbriši uporabnika',
+      message:
+          'Ali ste prepričani, da želite izbrisati uporabnika "${user.name}"?',
+      confirmText: 'Izbriši',
+      cancelText: 'Prekliči',
+    );
+
+    if (result) {
+      final db = ref.read(databaseProvider);
+      await (db.delete(db.users)..where((u) => u.id.equals(user.id))).go();
+
+      setState(() {
+        _users.removeWhere((u) => u.id == user.id);
+
+        // If the deleted user was selected, select "jaz" or first available user
+        if (_selectedUserId == user.id) {
+          final jazUser = _users.firstWhere(
+            (u) => u.name.toLowerCase() == 'jaz',
+            orElse: () => _users.first,
+          );
+          _selectedUserId = jazUser.id;
+        }
+      });
+    }
+  }
+
   String _getMedicationTypeLabel(MedicationType type) {
     switch (type) {
-      case MedicationType.pills: return 'Tablete';
-      case MedicationType.ampules: return 'Ampule';
-      case MedicationType.applications: return 'Nanosi';
-      case MedicationType.capsules: return 'Kapsule';
-      case MedicationType.drops: return 'Kapljice';
-      case MedicationType.grams: return 'Grami';
-      case MedicationType.injections: return 'Injekcije';
-      case MedicationType.milligrams: return 'Miligrami';
-      case MedicationType.milliliters: return 'Mililiter';
-      case MedicationType.patches: return 'Obliži';
-      case MedicationType.pieces: return 'Kosi';
-      case MedicationType.portions: return 'Porcije';
-      case MedicationType.puffs: return 'Puhljaji';
-      case MedicationType.sprays: return 'Pršila';
-      case MedicationType.tablespoons: return 'Žlice';
-      case MedicationType.units: return 'Enote';
-      case MedicationType.micrograms: return 'Mikrogrami';
+      case MedicationType.pills:
+        return 'Tablete';
+      case MedicationType.ampules:
+        return 'Ampule';
+      case MedicationType.applications:
+        return 'Nanosi';
+      case MedicationType.capsules:
+        return 'Kapsule';
+      case MedicationType.drops:
+        return 'Kapljice';
+      case MedicationType.grams:
+        return 'Grami';
+      case MedicationType.injections:
+        return 'Injekcije';
+      case MedicationType.milligrams:
+        return 'Miligrami';
+      case MedicationType.milliliters:
+        return 'Mililiter';
+      case MedicationType.patches:
+        return 'Obliži';
+      case MedicationType.pieces:
+        return 'Kosi';
+      case MedicationType.portions:
+        return 'Porcije';
+      case MedicationType.puffs:
+        return 'Puhljaji';
+      case MedicationType.sprays:
+        return 'Pršila';
+      case MedicationType.tablespoons:
+        return 'Žlice';
+      case MedicationType.units:
+        return 'Enote';
+      case MedicationType.micrograms:
+        return 'Mikrogrami';
     }
+  }
+
+  Future<void> _openCameraDialog() async {
+    // Check for internet connectivity — AI feature requires it
+    try {
+      final lookup = await InternetAddress.lookup('google.com');
+      if (lookup.isEmpty || lookup.first.rawAddress.isEmpty) {
+        throw SocketException('No internet');
+      }
+    } on SocketException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Symbols.wifi_off, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'AI zajem potrebuje internetno povezavo',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    final result = await showDialog<MedicationExtractionResult>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => const MedicationCameraDialog(),
+    );
+
+    if (result != null && mounted) {
+      // Store extracted data for passing to subsequent screens
+      _extractedData = result;
+
+      // Auto-fill form with extracted data
+      if (result.medicationName != null && result.medicationName!.isNotEmpty) {
+        _medicationNameController.text = result.medicationName!;
+      }
+
+      if (result.medicationType != null) {
+        setState(() {
+          _selectedType = result.medicationType!;
+        });
+      }
+
+      // Auto-fill intake advice if available
+      final extractedAdvice = result.getIntakeAdvice();
+      if (extractedAdvice != null) {
+        final adviceOptions = [
+          'Ni posebnosti',
+          'Pred obrokom',
+          'Z obrokom',
+          'Po obroku',
+          'Po meri',
+        ];
+        if (adviceOptions.contains(extractedAdvice)) {
+          setState(() {
+            _selectedIntakeAdvice = extractedAdvice;
+            _showCustomAdviceField = false;
+          });
+        } else {
+          // Custom advice from label
+          setState(() {
+            _selectedIntakeAdvice = 'Po meri';
+            _showCustomAdviceField = true;
+            _customIntakeAdviceController.text = extractedAdvice;
+          });
+        }
+      }
+
+      // Show simple success/fail message
+      final hasData =
+          result.medicationName != null ||
+          result.medicationType != null ||
+          result.dosageFrequency != null;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                hasData ? Symbols.check_circle : Symbols.info,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(hasData ? 'Podatki izpolnjeni ✓' : 'Ni zaznanih podatkov'),
+            ],
+          ),
+          backgroundColor: hasData ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+
+      // Log extracted data for debugging
+      if (result.notes != null && result.notes!.isNotEmpty) {
+        developer.log('Medication extraction notes: ${result.notes}');
+      }
+      if (result.dosageFrequency?.rawText != null) {
+        developer.log(
+          'Dosage frequency text: ${result.dosageFrequency!.rawText}',
+        );
+      }
+    }
+  }
+
+  Future<void> _openLabelScanner() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const LabelScannerScreen()),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      _medicationNameController.text = result;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Symbols.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text('Ime izpolnjeno ✓'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showScanHelpDialog() async {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    Widget buildRow({
+      required IconData icon,
+      required String title,
+      required String description,
+    }) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: colors.onPrimaryContainer, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Samodejno izpolnjevanje'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            buildRow(
+              icon: Icons.document_scanner_outlined,
+              title: 'Skeniraj ime (OCR)',
+              description:
+                  'S kamero prebere samo ime zdravila z nalepke in ga vpiše v polje. Deluje brez interneta.',
+            ),
+            const SizedBox(height: 20),
+            buildRow(
+              icon: Icons.auto_awesome_outlined,
+              title: 'AI zajem',
+              description:
+                  'S sliko škatlice z umetno inteligenco prebere vse podrobnosti — ime, vrsto in odmerjanje. Potrebuje internetno povezavo.',
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Razumem'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleNext() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedUserId == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Izberite uporabnika')));
+        return;
+      }
+
       // Determine final intake advice
       final intakeAdvice = _selectedIntakeAdvice == 'Po meri'
           ? _customIntakeAdviceController.text.trim()
@@ -65,8 +472,11 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
           '/add-medication/frequency',
           extra: {
             'name': _medicationNameController.text,
-            'medType': _selectedType,
+            'medTypeIndex': _selectedType.index,
             'intakeAdvice': intakeAdvice,
+            'userId': _selectedUserId,
+            // Pass extracted data for auto-filling subsequent screens
+            'extractedData': _extractedData,
           },
         );
       }
@@ -88,7 +498,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         title: const Text(''),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -104,24 +514,70 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
-                
-                // Name Input - Full Width
-                TextFormField(
-                  controller: _medicationNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Ime zdravila',
-                    hintText: 'Vnesite ime zdravila',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+
+                // Name Input with Camera Button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _medicationNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Ime zdravila',
+                          hintText: 'Vnesite ime zdravila',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vnesite ime zdravila';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                    filled: true,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vnesite ime zdravila';
-                    }
-                    return null;
-                  },
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.document_scanner_outlined),
+                        tooltip: 'Skeniraj ime (OCR)',
+                        onPressed: _openLabelScanner,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.auto_awesome_outlined),
+                        tooltip: 'AI zajem (vse podrobnosti)',
+                        onPressed: _openCameraDialog,
+                      ),
+                    ),
+                    SizedBox(
+                      height: 56,
+                      child: IconButton(
+                        icon: const Icon(Symbols.help_outline),
+                        iconSize: 20,
+                        visualDensity: VisualDensity.compact,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        tooltip: 'Kaj počneta gumba?',
+                        onPressed: _showScanHelpDialog,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
@@ -131,21 +587,26 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   isExpanded: true,
                   menuMaxHeight: 400,
                   // 1. Center the text in the button itself
-                  alignment: Alignment.center, 
+                  alignment: Alignment.center,
                   decoration: InputDecoration(
                     labelText: 'Vrsta zdravila',
                     // Center the label if possible, or leave default
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  
+
                   // 2. Center the selected item text
                   selectedItemBuilder: (BuildContext context) {
-                    return MedicationType.values.map<Widget>((MedicationType type) {
+                    return MedicationType.values.map<Widget>((
+                      MedicationType type,
+                    ) {
                       return Center(
                         child: Text(
                           _getMedicationTypeLabel(type),
@@ -162,7 +623,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       alignment: Alignment.center, // Aligns item in the menu
                       child: SizedBox(
                         // This forces the text content to be max 60% of screen width
-                        width: screenWidth * 0.6, 
+                        width: screenWidth * 0.6,
                         child: Text(
                           _getMedicationTypeLabel(type),
                           textAlign: TextAlign.center,
@@ -170,7 +631,7 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       ),
                     );
                   }).toList(),
-                  
+
                   onChanged: (value) {
                     if (value != null) {
                       setState(() => _selectedType = value);
@@ -187,7 +648,10 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   alignment: Alignment.center,
                   decoration: InputDecoration(
                     labelText: 'Priporočilo pred zaužitjem',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -195,28 +659,35 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   selectedItemBuilder: (BuildContext context) {
-                    return ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map<Widget>((String value) {
+                    return [
+                      'Ni posebnosti',
+                      'Pred obrokom',
+                      'Z obrokom',
+                      'Po obroku',
+                      'Po meri',
+                    ].map<Widget>((String value) {
                       return Center(
-                        child: Text(
-                          value,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: Text(value, textAlign: TextAlign.center),
                       );
                     }).toList();
                   },
-                  items: ['Ni posebnosti', 'Pred obrokom', 'Z obrokom', 'Po obroku', 'Po meri'].map((String value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: screenWidth * 0.6,
-                        child: Text(
-                          value,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  items:
+                      [
+                        'Ni posebnosti',
+                        'Pred obrokom',
+                        'Z obrokom',
+                        'Po obroku',
+                        'Po meri',
+                      ].map((String value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: screenWidth * 0.6,
+                            child: Text(value, textAlign: TextAlign.center),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (value) {
                     if (value != null) {
                       setState(() {
@@ -241,7 +712,8 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                       filled: true,
                     ),
                     validator: (value) {
-                      if (_selectedIntakeAdvice == 'Po meri' && (value == null || value.trim().isEmpty)) {
+                      if (_selectedIntakeAdvice == 'Po meri' &&
+                          (value == null || value.trim().isEmpty)) {
                         return 'Vnesite priporočilo';
                       }
                       return null;
@@ -250,8 +722,48 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
                   ),
                 ],
 
+                const SizedBox(height: 40),
+
+                // User Selection
+                if (_isLoadingUsers)
+                  const Center(child: CircularProgressIndicator())
+                else ...[
+                  Text(
+                    'Kdo bo vzel zdravilo?',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ..._users.map(
+                        (user) => GestureDetector(
+                          onLongPress: () => _showDeleteUserDialog(user),
+                          child: ChoiceChip(
+                            label: Text(user.name),
+                            selected: _selectedUserId == user.id,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() => _selectedUserId = user.id);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Symbols.add, size: 18),
+                        label: const Text('Dodaj'),
+                        onPressed: _showAddUserDialog,
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(height: 48),
-                
+
                 FilledButton(
                   onPressed: _handleNext,
                   style: FilledButton.styleFrom(
@@ -274,6 +786,178 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
         currentStep: 1,
         totalSteps: 3,
       ),
+    );
+  }
+}
+
+class _AddUserInMedicationDialog extends StatefulWidget {
+  const _AddUserInMedicationDialog();
+
+  @override
+  State<_AddUserInMedicationDialog> createState() =>
+      _AddUserInMedicationDialogState();
+}
+
+class _AddUserInMedicationDialogState
+    extends State<_AddUserInMedicationDialog> {
+  final _nameController = TextEditingController();
+  int? _birthYear;
+  String? _selectedGender;
+  bool _manualGenderSelection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (_manualGenderSelection) return;
+    final guess = guessGenderFromName(_nameController.text);
+    if (guess != _selectedGender) {
+      setState(() => _selectedGender = guess);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectBirthYear() async {
+    final now = DateTime.now();
+    final initialDate = _birthYear != null
+        ? DateTime(_birthYear!)
+        : DateTime(now.year - 18);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1920),
+      lastDate: now,
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Izberite leto rojstva',
+      cancelText: 'Prekliči',
+      confirmText: 'Potrdi',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _birthYear = picked.year;
+      });
+    }
+    if (mounted) FocusScope.of(context).unfocus();
+  }
+
+  int? _calculateAge() {
+    if (_birthYear == null) return null;
+    final now = DateTime.now();
+    return now.year - _birthYear!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final age = _calculateAge();
+
+    return AlertDialog(
+      title: const Text('Dodaj novega uporabnika'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Ime uporabnika',
+              hintText: 'Vnesite ime',
+              prefixIcon: const Icon(Symbols.person),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: _selectBirthYear,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Leto rojstva (neobvezno)',
+                prefixIcon: const Icon(Symbols.cake),
+                suffixIcon: const Icon(Symbols.calendar_month),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                _birthYear != null
+                    ? '$_birthYear ($age let)'
+                    : 'Tapnite za izbiro',
+                style: TextStyle(
+                  color: _birthYear != null
+                      ? null
+                      : colors.onSurfaceVariant.withOpacity(0.6),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Spol (neobvezno)',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment<String>(
+                value: 'male',
+                label: Text('Moški'),
+                icon: Icon(Symbols.male),
+              ),
+              ButtonSegment<String>(
+                value: 'female',
+                label: Text('Ženski'),
+                icon: Icon(Symbols.female),
+              ),
+            ],
+            selected: _selectedGender != null ? {_selectedGender!} : {},
+            onSelectionChanged: (selected) {
+              setState(() {
+                _manualGenderSelection = true;
+                _selectedGender = selected.isEmpty ? null : selected.first;
+              });
+            },
+            emptySelectionAllowed: true,
+            style: ButtonStyle(
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              visualDensity: VisualDensity.comfortable,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Prekliči'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_nameController.text.trim().isNotEmpty) {
+              Navigator.pop(context, {
+                'name': _nameController.text.trim(),
+                'age': _calculateAge(),
+                'gender': _selectedGender,
+              });
+            }
+          },
+          child: const Text('Dodaj'),
+        ),
+      ],
     );
   }
 }

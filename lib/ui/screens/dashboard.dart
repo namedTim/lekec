@@ -1,0 +1,1316 @@
+import 'dart:async';
+
+import 'package:alarm/alarm.dart';
+import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationType;
+import '../../main.dart' show db;
+import '../../helpers/medication_unit_helper.dart';
+import '../../ui/widgets/medication_card.dart';
+import '../../ui/widgets/medication_detail_dialog.dart';
+import '../../ui/widgets/appointment_detail_dialog.dart';
+import '../../ui/components/confirmation_dialog.dart';
+import '../../ui/components/speed_dial_item.dart';
+import '../../data/services/appointment_service.dart';
+import '../../data/services/intake_log_service.dart';
+import '../../data/services/mood_service.dart';
+import '../../data/services/notification_service.dart';
+import '../../data/services/server_message_service.dart';
+import '../../data/services/user_labels.dart';
+import '../../data/services/water_service.dart';
+import '../../ui/widgets/time_island.dart';
+import '../../ui/widgets/server_message_banner.dart';
+import '../../ui/widgets/appointment_card.dart';
+import '../../ui/components/time_slot.dart';
+import '../../ui/components/week_strip.dart';
+import '../../ui/widgets/empty_state_card.dart';
+import '../../ui/components/mood_logging_sheet.dart';
+import '../../ui/components/water_logging_sheet.dart';
+import '../../ui/components/island_details_sheet.dart';
+
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key, required this.title});
+  final String title;
+
+  @override
+  State<DashboardScreen> createState() => DashboardScreenState();
+}
+
+class DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  final controller = TimeIslandController();
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  bool _isExpanded = false;
+  final ScrollController _scrollController = ScrollController();
+
+  DateTime _selectedDate = _today();
+
+  Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
+  /// Stock projection keyed by intake id. Walked from today through the end
+  /// of the selected day, so cards on future days continue the count from
+  /// whatever's left after the in-between doses (not from today's stock).
+  Map<int, int> _projectedRemaining = {};
+  Set<String> _activeDateKeys = <String>{};
+  late IntakeLogService _intakeService;
+  int _totalUserCount = 0;
+  Map<int, String> _userNames = {};
+  String? _ownerName;
+
+  // Time Island state
+  Map<String, dynamic>? _nextMedication;
+  Appointment? _nextAppointment;
+  // Prime-user water stats shown in the time-island when the user has logged
+  // water in the last 40h. Null = panel hidden (either no prime user yet or
+  // they're not actively using the hydration feature).
+  int? _primeWaterTodayMl;
+  int? _primeWaterGoalMl;
+  int? _primeUserId;
+  Timer? _islandUpdateTimer;
+  Timer? _waterRefreshTimer;
+  Timer? _dayChangeTimer;
+
+  // Server messages (obvestila): mirrors the local cache; drives the island
+  // bell/badge and the one-off banner (newest unread).
+  late final ServerMessageService _messageService;
+  StreamSubscription<List<ServerMessage>>? _messagesSub;
+  List<ServerMessage> _serverMessages = const [];
+
+  List<AlarmSettings> alarms = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _intakeService = IntakeLogService(db);
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    loadUserData();
+    _loadIntakesForSelectedDate();
+    _loadActivityWindow();
+    _updateTimeIsland();
+    _startIslandUpdateTimer();
+    _startDayChangeTimer();
+    loadAlarms();
+    _messageService = ServerMessageService(db);
+    _messagesSub = _messageService.watchAll().listen((rows) {
+      if (!mounted) return;
+      setState(() => _serverMessages = rows);
+    });
+    // Runs once per launch (this screen lives in an indexed-stack branch).
+    // Fire-and-forget: offline or a failing server changes nothing visible.
+    _messageService.syncFromServer(force: true);
+  }
+
+  Future<void> _loadActivityWindow() async {
+    final today = _today();
+    final start = today.subtract(const Duration(days: 35));
+    // Cap forward at +1 month + 1 day to match the WeekStrip's lock.
+    final end = DateTime(today.year, today.month + 1, today.day + 2);
+
+    final intakeKeys = await _intakeService.loadIntakesForRange(
+      start: start,
+      end: end,
+    );
+
+    final appts = await (db.select(db.appointments)
+          ..where((t) => t.appointmentTime.isBiggerOrEqualValue(start))
+          ..where((t) => t.appointmentTime.isSmallerThanValue(end)))
+        .get();
+
+    final keys = <String>{};
+    keys.addAll(intakeKeys.keys);
+    for (final a in appts) {
+      final d = a.appointmentTime;
+      keys.add(
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _activeDateKeys = keys;
+    });
+  }
+
+  static DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool get _isViewingToday {
+    final today = _today();
+    return _selectedDate.year == today.year &&
+        _selectedDate.month == today.month &&
+        _selectedDate.day == today.day;
+  }
+
+  Future<void> loadAlarms() async {
+    final updatedAlarms = await Alarm.getAlarms();
+    updatedAlarms.sort((a, b) => a.dateTime.isBefore(b.dateTime) ? 0 : 1);
+    setState(() {
+      alarms = updatedAlarms;
+    });
+  }
+
+  Future<void> loadUserData() async {
+    final users = await (db.select(db.users)
+          ..where((t) => t.isActive.equals(true))
+          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
+        .get();
+    if (mounted) {
+      setState(() {
+        _totalUserCount = users.length;
+        _userNames = {for (var user in users) user.id: user.name};
+        _ownerName = users.isNotEmpty ? users.first.name : null;
+        _primeUserId = users.isNotEmpty ? users.first.id : null;
+        _primeWaterGoalMl =
+            users.isNotEmpty ? users.first.dailyWaterGoalMl : null;
+      });
+    }
+    await _loadPrimeWaterIfActive();
+  }
+
+  /// Refresh the prime user's "today" hydration total — but only surface it
+  /// in the island if they logged something in the last 40h. The 40h window
+  /// (vs 24h) keeps the panel visible the morning after a late entry without
+  /// keeping it around forever for one-off loggers.
+  Future<void> _loadPrimeWaterIfActive() async {
+    final uid = _primeUserId;
+    if (uid == null) {
+      if (mounted) setState(() => _primeWaterTodayMl = null);
+      return;
+    }
+    final service = WaterService(db);
+    final lastAt = await service.getLastIntakeTime(uid);
+    final active = lastAt != null &&
+        DateTime.now().difference(lastAt) < const Duration(hours: 40);
+    if (!active) {
+      if (mounted) setState(() => _primeWaterTodayMl = null);
+      return;
+    }
+    final today = await service.getTodayTotal(uid);
+    if (mounted) {
+      setState(() => _primeWaterTodayMl = today);
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _scrollController.dispose();
+    _islandUpdateTimer?.cancel();
+    _waterRefreshTimer?.cancel();
+    _dayChangeTimer?.cancel();
+    _messagesSub?.cancel();
+    super.dispose();
+  }
+
+  void _startDayChangeTimer() {
+    // Calculate time until midnight
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final timeUntilMidnight = tomorrow.difference(now);
+
+    // Schedule refresh at midnight
+    _dayChangeTimer = Timer(timeUntilMidnight, () {
+      if (mounted) {
+        // If the user was looking at today, slide the selection forward.
+        if (_isViewingToday) {
+          setState(() => _selectedDate = _today());
+        }
+        _loadIntakesForSelectedDate();
+        // Restart timer for next day
+        _startDayChangeTimer();
+      }
+    });
+  }
+
+  void _startIslandUpdateTimer() {
+    // Update every second to keep island fresh
+    _islandUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateTimeIsland();
+    });
+    // The water panel only needs a periodic re-read (vs every second) — once
+    // a minute is enough to keep "today's total" and the 40h activity window
+    // honest without hammering the DB.
+    _waterRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      _loadPrimeWaterIfActive();
+    });
+  }
+
+  Future<void> _updateTimeIsland() async {
+    final nextMed = await _intakeService.getNextMedication();
+    final nextAppt = await (db.select(db.appointments)
+          ..where((t) =>
+              t.appointmentTime.isBiggerThanValue(DateTime.now()))
+          ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (mounted) {
+      setState(() {
+        _nextMedication = nextMed;
+        _nextAppointment = nextAppt;
+      });
+      controller.update();
+    }
+  }
+
+  Future<void> _loadIntakesForSelectedDate({bool autoScroll = true}) async {
+    final startOfDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final grouped = await _intakeService.loadIntakesForRange(
+      start: startOfDay,
+      end: endOfDay,
+    );
+
+    final dayAppts = await (db.select(db.appointments)
+          ..where((t) => t.appointmentTime.isBiggerOrEqualValue(startOfDay))
+          ..where((t) => t.appointmentTime.isSmallerThanValue(endOfDay))
+          ..orderBy([(t) => OrderingTerm.asc(t.appointmentTime)]))
+        .get();
+
+    final byTime = <String, List<Map<String, dynamic>>>{};
+    for (final entries in grouped.values) {
+      for (final entry in entries) {
+        final intake = entry['intake'] as MedicationIntakeLog;
+        final t = intake.scheduledTime;
+        final timeKey =
+            '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+        byTime.putIfAbsent(timeKey, () => []).add(entry);
+      }
+    }
+
+    for (final appt in dayAppts) {
+      final timeKey =
+          '${appt.appointmentTime.hour.toString().padLeft(2, '0')}:${appt.appointmentTime.minute.toString().padLeft(2, '0')}';
+      byTime.putIfAbsent(timeKey, () => []);
+      byTime[timeKey]!.add({
+        'isAppointment': true,
+        'appointment': appt,
+      });
+    }
+
+    final sortedGrouped = Map.fromEntries(
+      byTime.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+
+    final projection = await _computeProjectedRemaining(endOfDay: endOfDay);
+
+    if (!mounted) return;
+    setState(() {
+      _groupedIntakes = sortedGrouped;
+      _projectedRemaining = projection;
+    });
+
+    // Keep activity dots in sync after any change to intakes/appointments.
+    unawaited(_loadActivityWindow());
+
+    await _updateTimeIsland();
+
+    if (autoScroll && _isViewingToday) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToNextIntake();
+      });
+    }
+  }
+
+  /// Back-compat shim — keep the existing public API used by speed-dial flows.
+  Future<void> loadTodaysIntakes({bool autoScroll = true}) =>
+      _loadIntakesForSelectedDate(autoScroll: autoScroll);
+
+  /// Full refresh of everything the time-island (and its expanded overview)
+  /// shows: the prime user's water goal + today's total, plus the next
+  /// medication and appointment. Call this from any screen that adds a med,
+  /// logs water, or otherwise changes island data — from the dashboard FAB,
+  /// the profile/Voda page, or a notification action. Safe to call when the
+  /// dashboard is alive in another tab branch but off-screen.
+  Future<void> refreshIsland() async {
+    await loadUserData(); // users + prime water goal/total
+    await _updateTimeIsland(); // next medication + appointment
+  }
+
+  /// Back-compat alias — older callers refresh "the water island"; that now
+  /// means the same full island refresh.
+  Future<void> refreshWaterIsland() => refreshIsland();
+
+  /// Per-intake "stock right before this dose" across the window
+  /// `[min(today, selectedDay), endOfDay)`. Walks intakes in time order:
+  ///   * Taken intakes are skipped from the map → the card hides the chip
+  ///     (the dose already happened; stock-after-this is meaningless).
+  ///   * Not-yet-taken intakes record the running stock *before* this dose,
+  ///     then decrement for the next one. So the first upcoming card shows
+  ///     current stock unchanged, the next shows current-1, etc.
+  /// Walks from today's start (or the selected day, whichever is earlier)
+  /// so navigating to tomorrow continues from today's leftover stock.
+  Future<Map<int, int>> _computeProjectedRemaining({
+    required DateTime endOfDay,
+  }) async {
+    final today = _today();
+    final projectionStart =
+        _selectedDate.isBefore(today) ? _selectedDate : today;
+
+    final intakes = await (db.select(db.medicationIntakeLogs)
+          ..where(
+              (t) => t.scheduledTime.isBiggerOrEqualValue(projectionStart))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..orderBy([(t) => OrderingTerm.asc(t.scheduledTime)]))
+        .get();
+    if (intakes.isEmpty) return const {};
+
+    final medIds = intakes.map((i) => i.medicationId).toSet().toList();
+    final planIds = intakes.map((i) => i.planId).toSet().toList();
+    final meds = await (db.select(db.medications)
+          ..where((t) => t.id.isIn(medIds)))
+        .get();
+    final plans = planIds.isEmpty
+        ? <MedicationPlan>[]
+        : await (db.select(db.medicationPlans)
+              ..where((t) => t.id.isIn(planIds)))
+            .get();
+    final medMap = {for (final m in meds) m.id: m};
+    final planMap = {for (final p in plans) p.id: p};
+
+    final medRunning = <int, double>{};
+    final result = <int, int>{};
+    for (final intake in intakes) {
+      final med = medMap[intake.medicationId];
+      if (med == null) continue;
+      // First time we see this med in the walk, seed the running stock from
+      // the current `dosagesRemaining` (which already reflects every dose
+      // the user has marked taken so far).
+      medRunning[med.id] ??= (med.dosagesRemaining ?? 0).toDouble();
+      if (intake.wasTaken) continue;
+
+      final plan = planMap[intake.planId];
+      final dosage = intake.dosageAmount ?? plan?.dosageAmount ?? 1.0;
+      // Display stock BEFORE this dose, then decrement for the next one.
+      result[intake.id] = medRunning[med.id]!.toInt();
+      medRunning[med.id] = medRunning[med.id]! - dosage;
+    }
+    return result;
+  }
+
+  void _scrollToNextIntake() {
+    if (_groupedIntakes.isEmpty) return;
+
+    final now = DateTime.now();
+    final times = _groupedIntakes.keys.toList();
+
+    // Find the next upcoming time
+    int nextIndex = times.indexWhere((timeStr) {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final timeToday = DateTime(now.year, now.month, now.day, hour, minute);
+      return timeToday.isAfter(now);
+    });
+
+    if (nextIndex > 0 && _scrollController.hasClients) {
+      // Scroll to show the next time slot near the top
+      // Each time slot + cards is roughly 100-150px, adjust as needed
+      final offset = (nextIndex * 120.0).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void scrollToIntake(int intakeId) {
+    if (_groupedIntakes.isEmpty || !_scrollController.hasClients) return;
+
+    // Find the time slot containing this intake
+    int targetIndex = -1;
+    for (int i = 0; i < _groupedIntakes.keys.length; i++) {
+      final timeKey = _groupedIntakes.keys.elementAt(i);
+      final intakes = _groupedIntakes[timeKey] ?? [];
+      if (intakes.any((intake) => intake['isAppointment'] != true && intake['intake']?.id == intakeId)) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    if (targetIndex >= 0) {
+      // Scroll to the time slot containing the intake
+      final offset = (targetIndex * 120.0).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _deleteOneTimeEntry(int intakeId) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Izbriši vnos',
+      message: 'Ali ste prepričani, da želite izbrisati ta enkraten vnos?',
+      confirmText: 'Izbriši',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await _intakeService.deleteOneTimeEntry(intakeId);
+      await loadTodaysIntakes(autoScroll: false);
+
+      if (mounted) {
+        final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Vnos izbrisan',
+              style: TextStyle(color: colors.onSurface),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: colors.surfaceContainerHighest,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Napaka: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showMedicationDetail({
+    required int intakeId,
+    required bool isOneTimeEntry,
+    required MedicationStatus currentStatus,
+    required String medName,
+    required String dosage,
+    required DateTime scheduledTime,
+    required double dosageAmount,
+    required int? pillsRemaining,
+    required String userName,
+    String? intakeAdvice,
+    MedicationType? medType,
+  }) async {
+    final labels = await UserLabels.forPrimaryUser(db);
+    if (!mounted) return;
+    // Scheduled (non-one-time) intakes: allow marking only if the time is now
+    // or in the past. Future intakes are read-only regardless of their
+    // current status — no editing doses for days ahead.
+    final isFuture = scheduledTime.isAfter(DateTime.now());
+    final canAct = !isOneTimeEntry && !isFuture;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => MedicationDetailDialog(
+        medName: medName,
+        dosage: dosage,
+        scheduledTime: scheduledTime,
+        dosageAmount: dosageAmount,
+        pillsRemaining: pillsRemaining,
+        userName: userName,
+        intakeAdvice: intakeAdvice,
+        medType: medType,
+        labels: labels,
+        onTake: canAct
+            ? () {
+                Navigator.of(ctx).pop();
+                _updateIntakeStatus(intakeId, MedicationStatus.taken);
+              }
+            : null,
+        onNotTake: canAct
+            ? () {
+                Navigator.of(ctx).pop();
+                _updateIntakeStatus(intakeId, MedicationStatus.notTaken);
+              }
+            : null,
+        onDelete: isOneTimeEntry
+            ? () {
+                Navigator.of(ctx).pop();
+                _deleteOneTimeEntry(intakeId);
+              }
+            : null,
+      ),
+    );
+  }
+
+  void _showAppointmentDetail(Appointment appt) {
+    final userName = _userNames[appt.userId] ?? '';
+    showDialog(
+      context: context,
+      builder: (ctx) => AppointmentDetailDialog(
+        title: appt.title,
+        appointmentTime: appt.appointmentTime,
+        note: appt.note,
+        userName: userName,
+        onDelete: () async {
+          Navigator.of(ctx).pop();
+          final confirmed = await showConfirmationDialog(
+            context,
+            title: 'Izbriši termin',
+            message: 'Ali želite izbrisati termin "${appt.title}"?',
+          );
+          if (!confirmed || !mounted) return;
+          await AppointmentService(db).deleteAppointment(appt.id);
+          await loadTodaysIntakes(autoScroll: false);
+        },
+      ),
+    );
+  }
+
+  /// Keep the OS-scheduled reminder for a single intake in sync with the
+  /// user's choice on the dashboard:
+  ///   - marked taken → cancel pending notification/alarm for that intake.
+  ///   - marked not-taken AND scheduled time is in the future → (re)schedule
+  ///     it, so toggling back restores the reminder.
+  /// Past not-taken intakes get no reminder (the time has already passed).
+  Future<void> _syncIntakeReminder(int intakeId, bool wasTaken) async {
+    final notificationService = NotificationService();
+    if (wasTaken) {
+      await notificationService.cancelNotification(intakeId);
+      return;
+    }
+
+    final intake = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.id.equals(intakeId)))
+        .getSingleOrNull();
+    if (intake == null) return;
+    if (!intake.scheduledTime.isAfter(DateTime.now())) return;
+
+    final medication = await (db.select(db.medications)
+          ..where((m) => m.id.equals(intake.medicationId)))
+        .getSingleOrNull();
+    final plan = await (db.select(db.medicationPlans)
+          ..where((p) => p.id.equals(intake.planId)))
+        .getSingleOrNull();
+    if (medication == null || plan == null) return;
+
+    final dosageCount = plan.dosageAmount.toInt();
+    final dosage =
+        '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
+
+    await notificationService.scheduleIntakeNotification(
+      id: intakeId,
+      medicationName: medication.name,
+      scheduledTime: intake.scheduledTime,
+      dosage: dosage,
+      criticalReminder: medication.criticalReminder,
+      database: db,
+    );
+  }
+
+  Future<void> _updateIntakeStatus(
+    int intakeId,
+    MedicationStatus newStatus,
+  ) async {
+    try {
+      final wasTaken = newStatus == MedicationStatus.taken;
+      await _intakeService.updateIntakeStatus(intakeId, wasTaken);
+      await _syncIntakeReminder(intakeId, wasTaken);
+      await loadTodaysIntakes(autoScroll: false);
+
+      // Update time island immediately after taking medication
+      await _updateTimeIsland();
+
+      if (mounted) {
+        final colors = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              wasTaken
+                  ? 'Vnos zdravila zabeležen'
+                  : 'Zdravilo označeno kot ne-vzeto',
+              style: TextStyle(color: colors.onSurface),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: colors.surfaceContainerHighest,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Napaka: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _toggleSpeedDial() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    });
+  }
+
+  void _ensureSpeedDialClosed() {
+    if (_isExpanded) {
+      setState(() {
+        _isExpanded = false;
+        _animationController.reverse();
+      });
+    }
+  }
+
+  void _onAddSingleEntry() async {
+    _toggleSpeedDial();
+    await context.push('/add-single-entry');
+    _ensureSpeedDialClosed();
+    // Refresh after returning from adding entry
+    await loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddNewMedication() async {
+    _toggleSpeedDial();
+    await context.push('/add-medication');
+    _ensureSpeedDialClosed();
+    // Refresh after returning — medication or new user may have been added
+    await loadUserData();
+    await loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddAppointment() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    await context.push('/add-appointment', extra: {'userId': userId});
+    _ensureSpeedDialClosed();
+    // Refresh to show new appointment in daily view
+    await loadTodaysIntakes(autoScroll: false);
+  }
+
+  /// Pick a user if multiple users exist, or auto-select the only user
+  Future<int?> _pickUser() async {
+    if (_userNames.length == 1) {
+      return _userNames.keys.first;
+    }
+
+    return showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final colors = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Izberite uporabnika',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._userNames.entries.map((entry) {
+                return ListTile(
+                  leading: Icon(Symbols.person, color: colors.primary),
+                  title: Text(entry.value),
+                  onTap: () => Navigator.of(ctx).pop(entry.key),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _onLogWater() async {
+    _toggleSpeedDial();
+
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+
+    final result = await showWaterLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+
+    try {
+      await WaterService(db).logIntake(
+        userId: userId,
+        amountMl: result['amountMl'] as int,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💧 ${result['amountMl']} ml zabeleženo'),
+            backgroundColor: const Color(0xFF38BDF8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      await refreshIsland();
+      // Stop nagging once today's goal is met (and resume normally otherwise).
+      await _refreshWaterRemindersForUser(userId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Open the expanded island overview (water for the prime user, meds and
+  /// appointments for everyone). Refreshes the island figures afterwards in
+  /// case the user logged something from inside the sheet.
+  Future<void> _showIslandDetails() async {
+    await showIslandDetailsSheet(context: context, db: db);
+    if (!mounted) return;
+    await refreshIsland();
+  }
+
+  int get _unreadMessageCount =>
+      _serverMessages.where((m) => m.seenAt == null).length;
+
+  /// Newest unread server message, shown once as a dashboard banner.
+  ServerMessage? get _bannerMessage {
+    for (final m in _serverMessages) {
+      if (m.seenAt == null) return m;
+    }
+    return null;
+  }
+
+  Future<void> _onBannerAction(ServerMessage m) async {
+    await openServerMessageAction(context, m);
+    await _messageService.markSeen(m.id);
+  }
+
+  /// Re-evaluate a user's water reminders against today's goal after a log.
+  Future<void> _refreshWaterRemindersForUser(int userId) async {
+    final user = await (db.select(db.users)
+          ..where((t) => t.id.equals(userId)))
+        .getSingleOrNull();
+    if (user == null) return;
+    await NotificationService().refreshWaterRemindersForGoal(user);
+  }
+
+  void _onLogMood() async {
+    _toggleSpeedDial();
+
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+
+    final result = await showMoodLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+
+    try {
+      final moodService = MoodService(db);
+      await moodService.logMood(
+        userId: userId,
+        moodLevel: result['moodLevel'] as int,
+        note: result['note'] as String?,
+      );
+
+      if (mounted) {
+        final emoji = MoodService.moodEmojis[result['moodLevel'] as int]!;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$emoji Razpoloženje zabeleženo'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Stock projection per intake is computed in _loadIntakesForSelectedDate
+    // (walks the window from today through end-of-selected-day so future days
+    // continue the count instead of restarting at current stock).
+    final projectedRemaining = _projectedRemaining;
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _nextMedication != null
+                      ? TimeIsland(
+                          medicationName:
+                              (_nextMedication!['medication'] as Medication)
+                                  .name,
+                          medType:
+                              (_nextMedication!['medication'] as Medication)
+                                  .medType,
+                          totalDuration: const Duration(minutes: 30),
+                          remainingDuration:
+                              _nextMedication!['timeUntil'] as Duration,
+                          isOverdue: _nextMedication!['isOverdue'] as bool,
+                          ownerName: _ownerName,
+                          appointmentTitle: _nextAppointment?.title,
+                          appointmentTime:
+                              _nextAppointment?.appointmentTime,
+                          waterTodayMl: _primeWaterTodayMl,
+                          waterGoalMl: _primeWaterGoalMl,
+                          controller: controller,
+                          onTap: _showIslandDetails,
+                          hasMessages: _serverMessages.isNotEmpty,
+                          unreadMessageCount: _unreadMessageCount,
+                          onMessagesTap: _showIslandDetails,
+                        )
+                      : TimeIsland(
+                          totalDuration: const Duration(minutes: 30),
+                          remainingDuration: const Duration(minutes: 30),
+                          isOverdue: false,
+                          ownerName: _ownerName,
+                          appointmentTitle: _nextAppointment?.title,
+                          appointmentTime:
+                              _nextAppointment?.appointmentTime,
+                          waterTodayMl: _primeWaterTodayMl,
+                          waterGoalMl: _primeWaterGoalMl,
+                          controller: controller,
+                          onTap: _showIslandDetails,
+                          hasMessages: _serverMessages.isNotEmpty,
+                          unreadMessageCount: _unreadMessageCount,
+                          onMessagesTap: _showIslandDetails,
+                        ),
+                ),
+              ),
+              // One-off banner for the newest unread server message. Gone for
+              // good once dismissed/acted on; still listed in the island sheet.
+              if (_bannerMessage != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: ServerMessageBanner(
+                    message: _bannerMessage!,
+                    onDismiss: () => _messageService.markSeen(_bannerMessage!.id),
+                    onAction: () => _onBannerAction(_bannerMessage!),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: WeekStrip(
+                  selectedDate: _selectedDate,
+                  activeDateKeys: _activeDateKeys,
+                  onDateSelected: (date) {
+                    if (date.year == _selectedDate.year &&
+                        date.month == _selectedDate.month &&
+                        date.day == _selectedDate.day) {
+                      return;
+                    }
+                    setState(() => _selectedDate = date);
+                    _loadIntakesForSelectedDate();
+                  },
+                ),
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _groupedIntakes.isEmpty
+                          ? Center(
+                              child: EmptyStateCard(
+                                icon: Symbols.event_available,
+                                title: _isViewingToday
+                                    ? 'Ni načrtovanih vnosov za danes'
+                                    : 'Ni načrtovanih vnosov za izbrani dan',
+                                subtitle: 'Dodajte zdravila ali termine',
+                                onTap: () => context.push('/add-medication'),
+                              ),
+                            )
+                          : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          bottom: 88.0,
+                        ),
+                        itemCount: _groupedIntakes.length,
+                        itemBuilder: (context, index) {
+                          final timeKey = _groupedIntakes.keys.elementAt(index);
+                          final intakesAtTime = _groupedIntakes[timeKey]!;
+
+                          // Determine if this time slot is in the past
+                          final now = DateTime.now();
+                          final parts = timeKey.split(':');
+                          final hour = int.parse(parts[0]);
+                          final minute = int.parse(parts[1]);
+                          final slotTime = DateTime(
+                            _selectedDate.year,
+                            _selectedDate.month,
+                            _selectedDate.day,
+                            hour,
+                            minute,
+                          );
+                          // Add 10 minute grace period before marking as "not taken"
+                          final gracePeriodEnd = slotTime.add(
+                            const Duration(minutes: 10),
+                          );
+                          // 10 minute window for green border
+                          final borderWindowEnd = slotTime.add(
+                            const Duration(minutes: 10),
+                          );
+                          final isPast = slotTime.isBefore(now);
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TimeSlot(time: timeKey, isPast: isPast),
+                              ...intakesAtTime.map((intakeData) {
+                                // Check if this is an appointment item
+                                if (intakeData['isAppointment'] == true) {
+                                  final appt = intakeData['appointment'] as Appointment;
+                                  final userName = _userNames[appt.userId] ?? '';
+                                  // Show green border in the 10-min window before the appointment
+                                  final isApptActive = now.isAfter(slotTime) && now.isBefore(borderWindowEnd);
+                                  return AppointmentCard(
+                                    title: appt.title,
+                                    note: appt.note,
+                                    appointmentTime: appt.appointmentTime,
+                                    userName: userName,
+                                    showName: _totalUserCount > 1,
+                                    isPast: isPast,
+                                    isActive: isApptActive,
+                                    onTap: () => _showAppointmentDetail(appt),
+                                  );
+                                }
+
+                                final medication =
+                                    intakeData['medication'] as Medication;
+                                final plan =
+                                    intakeData['plan'] as MedicationPlan?;
+                                final intake =
+                                    intakeData['intake'] as MedicationIntakeLog;
+                                final isOneTime =
+                                    intakeData['isOneTimeEntry'] as bool;
+
+                                // Determine status based on wasTaken and time
+                                MedicationStatus status;
+                                if (intake.wasTaken) {
+                                  status = MedicationStatus.taken;
+                                } else if (intake.takenTime != null) {
+                                  // User explicitly marked as not taken (takenTime is set but wasTaken is false)
+                                  status = MedicationStatus.notTaken;
+                                } else if (now.isAfter(gracePeriodEnd)) {
+                                  // Automatically mark as not taken after 10 minute grace period
+                                  status = MedicationStatus.notTaken;
+                                } else if (isPast) {
+                                  // During grace period - show as upcoming (clock) if user hasn't acted yet
+                                  status = MedicationStatus.upcoming;
+                                } else {
+                                  // Future medication (time hasn't arrived yet)
+                                  status = MedicationStatus.upcoming;
+                                }
+
+                                // Check if this is the next medication to take
+                                // Show border only when: time has arrived, within 10 min window, not yet taken
+                                final isInBorderWindow =
+                                    now.isAfter(slotTime) &&
+                                    now.isBefore(borderWindowEnd);
+                                final isNextMed =
+                                    _nextMedication != null &&
+                                    (_nextMedication!['intake']
+                                                as MedicationIntakeLog?)
+                                            ?.id ==
+                                        intake.id &&
+                                    status == MedicationStatus.upcoming &&
+                                    isInBorderWindow;
+
+                                // For as-needed entries, dosage is stored in the intake log
+                                // Otherwise, use plan dosage
+                                final dosageAmount =
+                                    intake.dosageAmount ??
+                                    plan?.dosageAmount ??
+                                    1.0;
+                                final dosageCount = dosageAmount.toInt();
+
+                                // Get user name
+                                final userName =
+                                    _userNames[intake.userId] ?? 'Unknown';
+
+                                // Projected stock after this dose (or current
+                                // stock if this dose was already taken) — see
+                                // the projection comment near the top of build.
+                                final remaining =
+                                    projectedRemaining[intake.id] ?? 0;
+
+                                // Enable swipes only if time has passed (isPast)
+                                // For future medications, disable swiping
+                                // For one-time entries, only enable left swipe (delete)
+                                final canSwipeScheduled = isPast && !isOneTime;
+                                final canDeleteOneTime = isPast && isOneTime;
+
+                                return MedicationCard(
+                                  medName: medication.name,
+
+                                  medType: medication.medType,
+                                  dosage:
+                                      '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                  medicineRemaining: remaining > 1
+                                      ? 'še $remaining ${getMedicationUnit(medication.medType, remaining)}'
+                                      : remaining == 1
+                                          ? 'Zadnja ${getMedicationUnit(medication.medType, 1)}'
+                                          : '',
+                                  pillCount: remaining,
+                                  showName: _totalUserCount > 1,
+                                  username: userName,
+                                  userId: intake.userId.toString(),
+                                  status: status,
+                                  isOneTimeEntry: isOneTime,
+                                  enableLeftSwipe:
+                                      canSwipeScheduled || canDeleteOneTime,
+                                  enableRightSwipe: canSwipeScheduled,
+                                  isNextMedication: isNextMed,
+                                  onTap: () {
+                                    _showMedicationDetail(
+                                      intakeId: intake.id,
+                                      isOneTimeEntry: isOneTime,
+                                      currentStatus: status,
+                                      medName: medication.name,
+                                      dosage:
+                                          '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
+                                      scheduledTime: intake.scheduledTime,
+                                      dosageAmount: dosageAmount,
+                                      pillsRemaining: remaining > 0
+                                          ? remaining
+                                          : null,
+                                      userName: userName,
+                                      intakeAdvice: medication.intakeAdvice,
+                                      medType: medication.medType,
+                                    );
+                                  },
+                                  onStatusChanged: isOneTime
+                                      ? null
+                                      : (newStatus) async {
+                                          await _updateIntakeStatus(
+                                            intake.id,
+                                            newStatus,
+                                          );
+                                        },
+                                  onDelete: isOneTime
+                                      ? () async {
+                                          await _deleteOneTimeEntry(intake.id);
+                                        }
+                                      : null,
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 24,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Theme.of(context).scaffoldBackgroundColor,
+                                Theme.of(context)
+                                    .scaffoldBackgroundColor
+                                    .withOpacity(0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Full-screen barrier when FAB is expanded
+          if (_isExpanded)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  if (_isExpanded) {
+                    _toggleSpeedDial();
+                  }
+                },
+                child: Container(color: Colors.black.withOpacity(0.01)),
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Speed dial options
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              if (!_isExpanded && _animation.value == 0) {
+                return const SizedBox.shrink();
+              }
+              // Cap the speed-dial column height so it can't grow past the
+              // screen — on shorter devices the topmost entry was being
+              // clipped (notably "Dodaj novo zdravilo"). `reverse: true`
+              // pins the items closest to the main FAB and lets the user
+              // scroll up to reach overflow.
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.55,
+                ),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  SpeedDialPanel(
+                    animation: _animation,
+                    items: [
+                      SpeedDialItem(
+                        label: 'Dodaj novo zdravilo',
+                        icon: Symbols.pill,
+                        accent: SpeedDialAccent.meds,
+                        onPressed: _onAddNewMedication,
+                      ),
+                      SpeedDialItem(
+                        label: 'Dodaj enkraten vnos zdravila',
+                        icon: Symbols.add,
+                        accent: SpeedDialAccent.entry,
+                        onPressed: _onAddSingleEntry,
+                      ),
+                      SpeedDialItem(
+                        label: 'Zabeleži razpoloženje',
+                        icon: Symbols.mood,
+                        accent: SpeedDialAccent.mood,
+                        onPressed: _onLogMood,
+                      ),
+                      SpeedDialItem(
+                        label: 'Zabeleži hidracijo',
+                        icon: Symbols.water_drop,
+                        accent: SpeedDialAccent.water,
+                        onPressed: _onLogWater,
+                      ),
+                      SpeedDialItem(
+                        label: 'Dodaj termin',
+                        icon: Symbols.calendar_add_on,
+                        accent: SpeedDialAccent.appointment,
+                        onPressed: _onAddAppointment,
+                      ),
+                    ],
+                  ),
+                ],
+                  ),
+                ),
+              );
+            },
+          ),
+          // Main FAB
+          FloatingActionButton(
+            heroTag: 'main_fab',
+            onPressed: _toggleSpeedDial,
+            tooltip: 'Dodaj',
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(32),
+                bottomLeft: Radius.circular(32),
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: AnimatedRotation(
+              turns: _isExpanded ? 0.125 : 0,
+              duration: const Duration(milliseconds: 250),
+              child: const Icon(Symbols.add),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+}
+

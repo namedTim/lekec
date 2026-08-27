@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
+import '../components/label_scanner_screen.dart';
 
 class AddSingleEntryScreen extends ConsumerStatefulWidget {
-  const AddSingleEntryScreen({super.key});
+  final int userId;
+
+  const AddSingleEntryScreen({super.key, this.userId = 1});
 
   @override
   ConsumerState<AddSingleEntryScreen> createState() =>
@@ -62,13 +65,42 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
     }
   }
 
+  Future<void> _openCameraScanner() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const LabelScannerScreen()),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      _medicationNameController.text = result;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text('Ime izpolnjeno ✓'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
   void _handleNext() {
     if (_formKey.currentState!.validate()) {
       context.push(
         '/add-single-entry/quantity',
         extra: {
           'name': _medicationNameController.text.trim(),
-          'medType': _selectedType,
+          'medTypeIndex': _selectedType.index,
+          'userId': widget.userId,
         },
       );
     }
@@ -105,23 +137,44 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Name Input
-                TextFormField(
-                  controller: _medicationNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Ime zdravila',
-                    hintText: 'Vnesite ime zdravila',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // Name Input with Camera Button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _medicationNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Ime zdravila',
+                          hintText: 'Vnesite ime zdravila',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Vnesite ime zdravila';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                    filled: true,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vnesite ime zdravila';
-                    }
-                    return null;
-                  },
+                    const SizedBox(width: 12),
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Symbols.photo_camera),
+                        tooltip: 'Zajemi s kamero',
+                        onPressed: _openCameraScanner,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
@@ -144,16 +197,16 @@ class _AddSingleEntryScreenState extends ConsumerState<AddSingleEntryScreen> {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   selectedItemBuilder: (BuildContext context) {
-                    return MedicationType.values.map<Widget>(
-                      (MedicationType type) {
-                        return Center(
-                          child: Text(
-                            _getMedicationTypeLabel(type),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      },
-                    ).toList();
+                    return MedicationType.values.map<Widget>((
+                      MedicationType type,
+                    ) {
+                      return Center(
+                        child: Text(
+                          _getMedicationTypeLabel(type),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }).toList();
                   },
                   items: MedicationType.values.map((type) {
                     return DropdownMenuItem(

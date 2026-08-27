@@ -1,32 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lekec/database/drift_database.dart';
+import '../../database/drift_database.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/ui/components/quantity_selector.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/data/services/notification_service.dart';
-import 'package:lekec/data/services/medication_service.dart';
-import 'package:lekec/data/services/plan_service.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../components/hinted_scroll_view.dart';
+import '../components/quantity_selector.dart';
+import '../components/step_progress_indicator.dart';
+import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
+import '../../features/core/providers/database_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../data/services/notification_service.dart';
+import '../../data/services/medication_service.dart';
+import '../../data/services/plan_service.dart';
 import 'dart:developer' as developer;
-import 'dart:convert';
 import 'medication_frequency_selection.dart' show FrequencyOption;
-import 'package:lekec/main.dart' show homePageKey;
+import '../../main.dart' show homePageKey;
 
 class SimpleMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final FrequencyOption frequency;
+  final int userId;
+  final String intakeAdvice;
+  final MedicationExtractionResult? extractedData;
 
   const SimpleMedicationPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.frequency,
+    required this.userId,
+    required this.intakeAdvice,
+    this.extractedData,
   });
 
   @override
@@ -38,9 +47,62 @@ class _SimpleMedicationPlanningScreenState
     extends ConsumerState<SimpleMedicationPlanningScreen> {
   DateTime? _startDate;
   TimeOfDay? _firstIntakeTime;
-  int _quantity = 1;
+  double _quantity = 1;
   int _initialQuantity = 0;
   bool _isSaving = false;
+  bool _isTimeAiSuggested = false;
+  bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
+
+  @override
+  void initState() {
+    super.initState();
+    // Default start date to today
+    _startDate = DateTime.now();
+
+    // Auto-fill from extracted data if available
+    if (widget.extractedData != null) {
+      // Set quantity per dose
+      if (widget.extractedData!.dosageFrequency?.amountPerDose != null) {
+        _quantity = widget.extractedData!.dosageFrequency!.amountPerDose!;
+      }
+      // Set initial quantity from box
+      if (widget.extractedData!.quantityInBox != null) {
+        _initialQuantity = widget.extractedData!.quantityInBox!;
+      }
+      // Set first intake time from AI suggestions
+      final suggestedTimes =
+          widget.extractedData!.dosageFrequency?.suggestedTimes;
+      if (suggestedTimes != null && suggestedTimes.isNotEmpty) {
+        final time = _parseTimeString(suggestedTimes[0]);
+        if (time != null) {
+          _firstIntakeTime = time;
+          _isTimeAiSuggested = true;
+        }
+      }
+      // Pre-fill the stop condition from the AI-extracted treatment duration.
+      final durationDays = widget.extractedData!.dosageFrequency?.durationDays;
+      if (durationDays != null && durationDays > 0) {
+        _stopCondition = StopCondition.afterDays(durationDays);
+      }
+    }
+  }
+
+  TimeOfDay? _parseTimeString(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = int.parse(parts[1]);
+        if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    return null;
+  }
 
   String _getFrequencyLabel() {
     switch (widget.frequency) {
@@ -73,7 +135,10 @@ class _SimpleMedicationPlanningScreenState
       initialTime: _firstIntakeTime ?? TimeOfDay.now(),
     );
     if (time != null) {
-      setState(() => _firstIntakeTime = time);
+      setState(() {
+        _firstIntakeTime = time;
+        _isTimeAiSuggested = false; // User changed it manually
+      });
     }
   }
 
@@ -91,19 +156,20 @@ class _SimpleMedicationPlanningScreenState
   Future<void> _selectInitialQuantity() async {
     final quantity = await showQuantitySelector(
       context,
-      initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+      initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
       minValue: 0,
-      maxValue: 999,
+      maxValue: 99999,
+      step: 1,
       label: 'Začetna zaloga',
     );
     if (quantity != null) {
-      setState(() => _initialQuantity = quantity);
+      setState(() => _initialQuantity = quantity.toInt());
     }
   }
 
   Future<void> _handleSave() async {
     if (_isSaving) return; // Prevent double-tap
-    
+
     // Validate required fields
     if (widget.frequency != FrequencyOption.asNeeded) {
       if (_startDate == null) {
@@ -134,6 +200,8 @@ class _SimpleMedicationPlanningScreenState
         MedicationsCompanion(
           name: drift.Value(widget.medicationName),
           medType: drift.Value(widget.medType),
+          intakeAdvice: drift.Value(widget.intakeAdvice),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 
@@ -171,11 +239,12 @@ class _SimpleMedicationPlanningScreenState
 
       // 3. Create medication plan with schedule rules
       final planId = await planService.createMedicationPlan(
-        userId: 1, // TODO: Get from current user
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: _startDate ?? DateTime.now(),
-        dosageAmount: _quantity.toDouble(),
-        initialQuantity: _initialQuantity?.toDouble(),
+        endDate: resolveEndDate(_stopCondition, _startDate ?? DateTime.now()),
+        dosageAmount: _quantity,
+        initialQuantity: _initialQuantity.toDouble(),
         ruleType: ruleType,
         times: times,
       );
@@ -243,7 +312,7 @@ class _SimpleMedicationPlanningScreenState
         title: const Text(''),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -287,14 +356,50 @@ class _SimpleMedicationPlanningScreenState
                       ? _firstIntakeTime!.format(context)
                       : 'Izberite čas',
                   onTap: _selectFirstIntakeTime,
+                  isAiSuggested: _isTimeAiSuggested,
                 ),
+
+                // Show second intake time info for twice daily
+                if (widget.frequency == FrequencyOption.twiceDaily &&
+                    _firstIntakeTime != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.secondaryContainer.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colors.outlineVariant.withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Symbols.info,
+                          size: 18,
+                          color: colors.secondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Drugi vnos bo čez 12 ur ob ${_formatTime(TimeOfDay(hour: (_firstIntakeTime!.hour + 12) % 24, minute: _firstIntakeTime!.minute))}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Quantity
                 _PlanningCard(
                   icon: Symbols.pill,
                   label: 'Količina na vnos',
-                  value: '$_quantity',
+                  value: '${_quantity == _quantity.roundToDouble() ? _quantity.toInt().toString() : _quantity.toString()}',
                   onTap: _selectQuantity,
                 ),
                 const SizedBox(height: 16),
@@ -308,7 +413,15 @@ class _SimpleMedicationPlanningScreenState
                       : 'Izberite količino',
                   onTap: _selectInitialQuantity,
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 16),
+
+                // Stop date (optional end of plan)
+                StopDateCard(
+                  condition: _stopCondition,
+                  startDate: _startDate ?? DateTime.now(),
+                  onChanged: (c) => setState(() => _stopCondition = c),
+                ),
+                const SizedBox(height: 16),
               ] else ...[
                 Text(
                   'Zdravilo bo na voljo za ročni vnos brez opomnikov.',
@@ -316,6 +429,16 @@ class _SimpleMedicationPlanningScreenState
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
+              ],
+
+              // Critical Reminder Recap
+              if (widget.frequency != FrequencyOption.asNeeded) ...[
+                CriticalReminderRecap(
+                  enabled: _criticalReminder,
+                  onChanged: (value) =>
+                      setState(() => _criticalReminder = value),
+                ),
+                const SizedBox(height: 24),
               ],
 
               FilledButton(
@@ -337,7 +460,10 @@ class _SimpleMedicationPlanningScreenState
                       )
                     : const Text(
                         'Shrani',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
               ),
             ],
@@ -357,12 +483,14 @@ class _PlanningCard extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback onTap;
+  final bool isAiSuggested;
 
   const _PlanningCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.onTap,
+    this.isAiSuggested = false,
   });
 
   @override
@@ -378,20 +506,54 @@ class _PlanningCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
+          border: isAiSuggested
+              ? Border.all(color: colors.onSurface, width: 2)
+              : Border.all(
+                  color: colors.outlineVariant.withOpacity(0.5),
+                  width: 1,
+                ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: colors.primary),
+            Icon(
+              isAiSuggested ? Symbols.auto_awesome : icon,
+              color: isAiSuggested ? colors.onSurface : colors.primary,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (isAiSuggested) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.onSurface,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.surface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(

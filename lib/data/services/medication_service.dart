@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart' as drift;
 import 'dart:convert';
+import 'package:alarm/alarm.dart';
 import '../../database/drift_database.dart';
 import '../../database/tables/medications.dart';
+import 'notification_service.dart';
 
 class MedicationService {
   final AppDatabase db;
@@ -21,7 +23,8 @@ class MedicationService {
     final existingMeds =
         await (db.select(db.medications)
               ..where((m) => m.name.equals(name))
-              ..where((m) => m.medType.equalsValue(medType)))
+              ..where((m) => m.medType.equalsValue(medType))
+              ..where((m) => m.status.equalsValue(MedicationStatus.active)))
             .get();
 
     if (existingMeds.isNotEmpty) {
@@ -39,9 +42,36 @@ class MedicationService {
   }
 
   /// Soft delete a medication by ID (mark as deleted)
-  /// Also deletes future intake logs
+  /// Also deletes future intake logs and cancels all alarms/notifications
   Future<void> deleteMedication(int medicationId) async {
     final now = DateTime.now();
+
+    // Get ALL intake logs for this medication (not just future ones)
+    // to ensure we cancel any currently-ringing or recently-scheduled alarms
+    final allIntakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((log) => log.medicationId.equals(medicationId)))
+            .get();
+
+    // Cancel all alarms and notifications for ALL intakes of this medication
+    final notificationService = NotificationService();
+    for (final intake in allIntakes) {
+      // Cancel alarm (for critical reminders) - safe to call even if not set
+      await Alarm.stop(intake.id);
+
+      // Cancel notification (for regular reminders)
+      await notificationService.cancelNotification(intake.id);
+    }
+
+    // Also stop any alarms that the Alarm package still has registered
+    // in case IDs got out of sync
+    final activeAlarms = await Alarm.getAlarms();
+    for (final alarm in activeAlarms) {
+      // Check if this alarm belongs to an intake of this medication
+      if (allIntakes.any((intake) => intake.id == alarm.id)) {
+        await Alarm.stop(alarm.id);
+      }
+    }
 
     // Mark medication as deleted
     await (db.update(
@@ -50,11 +80,71 @@ class MedicationService {
       MedicationsCompanion(status: drift.Value(MedicationStatus.deleted)),
     );
 
+    // Deactivate all plans for this medication so they are not regenerated
+    await (db.update(db.medicationPlans)
+          ..where((p) => p.medicationId.equals(medicationId)))
+        .write(const MedicationPlansCompanion(isActive: drift.Value(false)));
+
+    // Deactivate all schedule rules for this medication's plans
+    final plans = await (db.select(
+      db.medicationPlans,
+    )..where((p) => p.medicationId.equals(medicationId))).get();
+    for (final plan in plans) {
+      await (db.update(
+        db.medicationScheduleRules,
+      )..where((r) => r.planId.equals(plan.id))).write(
+        const MedicationScheduleRulesCompanion(isActive: drift.Value(false)),
+      );
+    }
+
     // Delete all future intake logs (keep historical data)
     await (db.delete(db.medicationIntakeLogs)
           ..where((log) => log.medicationId.equals(medicationId))
           ..where((log) => log.scheduledTime.isBiggerOrEqualValue(now)))
         .go();
+  }
+
+  /// Cancel every critical reminder still scheduled to ring later today.
+  ///
+  /// For each not-yet-handled critical intake remaining today: stops any alarm
+  /// already registered and marks the intake as handled (sets takenTime, leaves
+  /// wasTaken false) so [NotificationService.scheduleAllUpcomingNotifications]
+  /// won't recreate its alarm. The cancellation is permanent — it does not
+  /// re-ring — and resets naturally tomorrow (only today's window is affected).
+  /// Returns the number of reminders stopped.
+  Future<int> stopTodaysCriticalReminders() async {
+    final now = DateTime.now();
+    final endOfDay =
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+
+    // Which medications use critical (alarm) reminders.
+    final criticalMedIds = (await (db.select(db.medications)
+              ..where((m) => m.criticalReminder.equals(true))
+              ..where((m) => m.status.equalsValue(MedicationStatus.active)))
+            .get())
+        .map((m) => m.id)
+        .toList();
+    if (criticalMedIds.isEmpty) return 0;
+
+    // Today's remaining, not-yet-acted-on critical intakes.
+    final intakes = await (db.select(db.medicationIntakeLogs)
+          ..where((t) => t.scheduledTime.isBiggerThanValue(now))
+          ..where((t) => t.scheduledTime.isSmallerThanValue(endOfDay))
+          ..where((t) => t.wasTaken.equals(false))
+          ..where((t) => t.takenTime.isNull())
+          ..where((t) => t.medicationId.isIn(criticalMedIds)))
+        .get();
+
+    for (final intake in intakes) {
+      // Cancel any alarm already registered for this intake.
+      await Alarm.stop(intake.id);
+      // Mark as handled so the scheduler never re-creates it.
+      await (db.update(db.medicationIntakeLogs)
+            ..where((t) => t.id.equals(intake.id)))
+          .write(MedicationIntakeLogsCompanion(takenTime: drift.Value(now)));
+    }
+
+    return intakes.length;
   }
 
   /// Load all medications with their plan details and schedule info
@@ -184,7 +274,9 @@ class MedicationService {
           case 'weekly':
             if (rule.daysOfWeek != null) {
               final daysOfWeek = (jsonDecode(rule.daysOfWeek!) as List<dynamic>)
-                  .cast<int>();
+                  .cast<int>()
+                  .toList()
+                ..sort();
               final dayNames = [
                 'Pon',
                 'Tor',
@@ -213,6 +305,11 @@ class MedicationService {
         }
       }
 
+      // "HH:MM" sorts lexicographically — same order as chronologically.
+      // Guarantees the detail screen + the medication card display times
+      // in order regardless of the order the user originally entered them.
+      times.sort();
+
       result.add({
         'id': medication.id,
         'name': medication.name,
@@ -229,4 +326,93 @@ class MedicationService {
 
     return result;
   }
+
+  /// Returns the active medications whose remaining stock has dropped to the
+  /// low-stock threshold (~3 doses) or fewer, out-of-stock first. Powers the
+  /// "Zaloga zdravil" card in the island detail sheet.
+  Future<List<LowStockMed>> getLowStockMedications() async {
+    final rows =
+        await (db.select(db.medications)
+              ..where((m) => m.status.equalsValue(MedicationStatus.active))
+              ..where((m) => m.dosagesRemaining.isNotNull()))
+            .join([
+              drift.innerJoin(
+                db.medicationPlans,
+                db.medicationPlans.medicationId.equalsExp(db.medications.id) &
+                    db.medicationPlans.isActive.equals(true),
+              ),
+              drift.leftOuterJoin(
+                db.users,
+                db.users.id.equalsExp(db.medicationPlans.userId),
+              ),
+            ])
+            .get();
+
+    // A medication can have several active plans (e.g. one per user). Collapse
+    // to one entry per medication, keeping the largest dose so the threshold
+    // reflects the heaviest regimen, plus one owner name for display.
+    final byMed = <int, LowStockMed>{};
+    for (final row in rows) {
+      final med = row.readTable(db.medications);
+      final remaining = med.dosagesRemaining;
+      if (remaining == null) continue;
+      final plan = row.readTableOrNull(db.medicationPlans);
+      final user = row.readTableOrNull(db.users);
+      final dose = plan?.dosageAmount ?? 1.0;
+      final existing = byMed[med.id];
+      byMed[med.id] = LowStockMed(
+        medicationId: med.id,
+        name: med.name,
+        medType: med.medType,
+        remaining: remaining,
+        doseAmount: existing == null
+            ? dose
+            : (dose > existing.doseAmount ? dose : existing.doseAmount),
+        ownerName: existing?.ownerName ?? user?.name,
+      );
+    }
+
+    final result = byMed.values.where((m) => m.remaining <= m.threshold).toList()
+      ..sort((a, b) {
+        if (a.isOut != b.isOut) return a.isOut ? -1 : 1; // out first
+        return a.remaining.compareTo(b.remaining); // then least left
+      });
+    return result;
+  }
+
+  /// Overwrites a medication's remaining stock (used by the refill action).
+  Future<void> setRemainingStock(int medicationId, double remaining) async {
+    await (db.update(
+      db.medications,
+    )..where((t) => t.id.equals(medicationId))).write(
+      MedicationsCompanion(
+        dosagesRemaining: drift.Value(remaining.clamp(0.0, double.infinity)),
+      ),
+    );
+  }
+}
+
+/// A medication that is running low (or out), as surfaced in the island sheet.
+class LowStockMed {
+  final int medicationId;
+  final String name;
+  final MedicationType medType;
+  final double remaining;
+  final double doseAmount;
+
+  /// Owning user's name — shown only in multi-user setups.
+  final String? ownerName;
+
+  const LowStockMed({
+    required this.medicationId,
+    required this.name,
+    required this.medType,
+    required this.remaining,
+    required this.doseAmount,
+    this.ownerName,
+  });
+
+  /// Warn once stock is at ~3 doses or fewer (mirrors IntakeLogService).
+  double get threshold => (doseAmount > 0 ? doseAmount : 1.0) * 3;
+  bool get isOut => remaining <= 0;
 }

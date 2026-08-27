@@ -3,18 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/meds/providers/medications_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/main.dart' show homePageKey;
-import 'package:lekec/ui/components/quantity_selector.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../features/meds/providers/medications_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../main.dart' show homePageKey;
+import '../../services/gemini_medication_service.dart';
+import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final int timesPerDay;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const MultipleTimesSelectTimesScreen({
     super.key,
@@ -22,6 +27,8 @@ class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.timesPerDay,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -32,14 +39,84 @@ class MultipleTimesSelectTimesScreen extends ConsumerStatefulWidget {
 class _MultipleTimesSelectTimesScreenState
     extends ConsumerState<MultipleTimesSelectTimesScreen> {
   List<TimeOfDay?> _times = [];
+  List<bool> _aiSuggestedTimes = [];
   int _initialQuantity = 0;
-  int _dosageAmount = 1;
+  double _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
 
   @override
   void initState() {
     super.initState();
     _times = List.generate(widget.timesPerDay, (_) => null);
+    _aiSuggestedTimes = List.generate(widget.timesPerDay, (_) => false);
+    _initFromExtractedData();
+  }
+
+  void _initFromExtractedData() {
+    final suggestedTimes =
+        widget.extractedData?.dosageFrequency?.suggestedTimes;
+    if (suggestedTimes != null && suggestedTimes.isNotEmpty) {
+      for (
+        int i = 0;
+        i < widget.timesPerDay && i < suggestedTimes.length;
+        i++
+      ) {
+        final time = _parseTimeString(suggestedTimes[i]);
+        if (time != null) {
+          _times[i] = time;
+          _aiSuggestedTimes[i] = true;
+        }
+      }
+    }
+
+    // Twice-daily fallback: if the AI only returned a single time, derive the
+    // second dose 12h later so both slots come pre-filled. (The server prompt
+    // may not yet return two suggested times for 2×/day meds — this keeps the
+    // flow usable until it does; the user can still adjust either slot.)
+    if (widget.timesPerDay == 2 && _times[0] != null && _times[1] == null) {
+      final first = _times[0]!;
+      _times[1] = TimeOfDay(
+        hour: (first.hour + 12) % 24,
+        minute: first.minute,
+      );
+      _aiSuggestedTimes[1] = _aiSuggestedTimes[0];
+    }
+
+    // Also auto-fill dosage amount if available
+    final amountPerDose = widget.extractedData?.dosageFrequency?.amountPerDose;
+    if (amountPerDose != null && amountPerDose > 0) {
+      _dosageAmount = amountPerDose;
+    }
+
+    // Auto-fill initial quantity if available
+    final quantityInBox = widget.extractedData?.quantityInBox;
+    if (quantityInBox != null && quantityInBox > 0) {
+      _initialQuantity = quantityInBox;
+    }
+
+    // Pre-fill the stop condition from the AI-extracted treatment duration.
+    final durationDays = widget.extractedData?.dosageFrequency?.durationDays;
+    if (durationDays != null && durationDays > 0) {
+      _stopCondition = StopCondition.afterDays(durationDays);
+    }
+  }
+
+  TimeOfDay? _parseTimeString(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = int.parse(parts[1]);
+        if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    return null;
   }
 
   @override
@@ -47,6 +124,7 @@ class _MultipleTimesSelectTimesScreenState
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final allTimesSelected = _times.every((t) => t != null);
+    final hasAnySuggestedTime = _aiSuggestedTimes.any((v) => v);
 
     return Scaffold(
       appBar: AppBar(
@@ -57,7 +135,7 @@ class _MultipleTimesSelectTimesScreenState
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,18 +147,97 @@ class _MultipleTimesSelectTimesScreenState
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Izberite čase za ${widget.timesPerDay} dnevne vnose',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+              // Header with AI badge if any times are AI-suggested
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Izberite čase za ${widget.timesPerDay} dnevne vnose',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (hasAnySuggestedTime)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.onSurface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Symbols.auto_awesome,
+                            size: 14,
+                            color: colors.surface,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'AI',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.surface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 32),
 
-              Expanded(
+              // Progress indicator: X / Y times selected
+              Builder(
+                builder: (context) {
+                  final filledCount = _times.where((t) => t != null).length;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: filledCount == widget.timesPerDay
+                          ? colors.primaryContainer.withOpacity(0.5)
+                          : colors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          filledCount == widget.timesPerDay
+                              ? Symbols.check_circle
+                              : Symbols.schedule,
+                          color: filledCount == widget.timesPerDay
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '$filledCount / ${widget.timesPerDay} časov nastavljenih',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: filledCount == widget.timesPerDay
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
                 child: ListView.builder(
+                  shrinkWrap: true,
                   itemCount: widget.timesPerDay,
                   itemBuilder: (context, index) {
+                    final isAiTime = _aiSuggestedTimes[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: InkWell(
@@ -90,7 +247,11 @@ class _MultipleTimesSelectTimesScreenState
                             initialTime: _times[index] ?? TimeOfDay.now(),
                           );
                           if (time != null) {
-                            setState(() => _times[index] = time);
+                            setState(() {
+                              _times[index] = time;
+                              _aiSuggestedTimes[index] =
+                                  false; // User changed it
+                            });
                           }
                         },
                         borderRadius: BorderRadius.circular(12),
@@ -103,9 +264,11 @@ class _MultipleTimesSelectTimesScreenState
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: _times[index] != null
-                                  ? colors.primary
-                                  : Colors.transparent,
-                              width: 2,
+                                  ? (isAiTime
+                                        ? colors.onSurface
+                                        : colors.primary)
+                                    : colors.outlineVariant.withOpacity(0.5),
+                                width: _times[index] != null ? 2 : 1,
                             ),
                           ),
                           child: Row(
@@ -114,14 +277,20 @@ class _MultipleTimesSelectTimesScreenState
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: _times[index] != null
-                                      ? colors.primary
+                                      ? (isAiTime
+                                            ? colors.onSurface
+                                            : colors.primary)
                                       : colors.surfaceContainerHigh,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
-                                  Symbols.schedule,
+                                  isAiTime
+                                      ? Symbols.auto_awesome
+                                      : Symbols.schedule,
                                   color: _times[index] != null
-                                      ? colors.onPrimary
+                                      ? (isAiTime
+                                            ? colors.surface
+                                            : colors.onPrimary)
                                       : colors.onSurfaceVariant,
                                   size: 24,
                                 ),
@@ -131,12 +300,39 @@ class _MultipleTimesSelectTimesScreenState
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '${index + 1}. vnos',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colors.onSurfaceVariant,
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${index + 1}. vnos',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: colors.onSurfaceVariant,
+                                              ),
+                                        ),
+                                        if (isAiTime) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: colors.onSurface,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              'AI',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                    color: colors.surface,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 10,
+                                                  ),
+                                            ),
                                           ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
@@ -168,6 +364,7 @@ class _MultipleTimesSelectTimesScreenState
                   },
                 ),
               ),
+              const SizedBox(height: 16),
 
               // Količina na vnos card
               InkWell(
@@ -176,7 +373,7 @@ class _MultipleTimesSelectTimesScreenState
                     context,
                     initialValue: _dosageAmount,
                     minValue: 1,
-                    maxValue: 99,
+                    maxValue: 9999,
                     label: 'Količina na vnos',
                   );
                   if (quantity != null) {
@@ -206,7 +403,7 @@ class _MultipleTimesSelectTimesScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$_dosageAmount',
+                              '${_dosageAmount == _dosageAmount.roundToDouble() ? _dosageAmount.toInt().toString() : _dosageAmount.toString()}',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -230,13 +427,14 @@ class _MultipleTimesSelectTimesScreenState
                 onTap: () async {
                   final quantity = await showQuantitySelector(
                     context,
-                    initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+                    initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
                     minValue: 0,
-                    maxValue: 999,
+                    maxValue: 99999,
+                    step: 1,
                     label: 'Začetna zaloga',
                   );
                   if (quantity != null) {
-                    setState(() => _initialQuantity = quantity);
+                    setState(() => _initialQuantity = quantity.toInt());
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -290,6 +488,21 @@ class _MultipleTimesSelectTimesScreenState
               ),
               const SizedBox(height: 16),
 
+              // Stop date (optional end of plan)
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+              const SizedBox(height: 16),
+
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+              const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: allTimesSelected && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
@@ -338,6 +551,7 @@ class _MultipleTimesSelectTimesScreenState
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 
@@ -351,10 +565,11 @@ class _MultipleTimesSelectTimesScreenState
 
       // Create daily plan with multiple times
       await planService.createMedicationPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: _dosageAmount.toDouble(),
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
+        dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         ruleType: 'daily',
         times: times,

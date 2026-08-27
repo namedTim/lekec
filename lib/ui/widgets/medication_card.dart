@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../database/tables/medications.dart' as db;
+import '../../helpers/medication_icon_helper.dart';
+
 enum MedicationStatus {
   notTaken,
   taken,
@@ -17,6 +20,7 @@ class MedicationCard extends StatefulWidget {
     required this.showName,
     required this.username,
     required this.userId,
+    required this.medType,
     this.status = MedicationStatus.upcoming,
     this.onStatusChanged,
     this.isOneTimeEntry = false,
@@ -24,6 +28,7 @@ class MedicationCard extends StatefulWidget {
     this.enableLeftSwipe = true,
     this.enableRightSwipe = true,
     this.isNextMedication = false,
+    this.onTap,
   });
 
   final String medName;
@@ -33,6 +38,7 @@ class MedicationCard extends StatefulWidget {
   final bool showName;
   final String username;
   final String userId;
+  final db.MedicationType medType;
   final MedicationStatus status;
   final Function(MedicationStatus)? onStatusChanged;
   final bool isOneTimeEntry;
@@ -40,10 +46,12 @@ class MedicationCard extends StatefulWidget {
   final bool enableLeftSwipe;
   final bool enableRightSwipe;
   final bool isNextMedication;
+  final VoidCallback? onTap;
 
   @override
   State<MedicationCard> createState() => _MedicationCardState();
 }
+
 
 class _MedicationCardState extends State<MedicationCard> {
   DismissDirection _getDismissDirection() {
@@ -87,13 +95,19 @@ class _MedicationCardState extends State<MedicationCard> {
         DismissDirection.endToStart: 0.3,
       },
       resizeDuration: null,
-      background: widget.enableLeftSwipe ? _buildSwipeBackground(colors, isLeft: true) : null,
-      secondaryBackground: widget.enableRightSwipe ? _buildSwipeBackground(colors, isLeft: false) : null,
+      background: widget.enableLeftSwipe
+          ? _buildSwipeBackground(colors, isLeft: true)
+          : null,
+      secondaryBackground: widget.enableRightSwipe
+          ? _buildSwipeBackground(colors, isLeft: false)
+          : null,
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.endToStart && widget.enableRightSwipe) {
+        if (direction == DismissDirection.endToStart &&
+            widget.enableRightSwipe) {
           // Swipe from right - mark as taken
           widget.onStatusChanged?.call(MedicationStatus.taken);
-        } else if (direction == DismissDirection.startToEnd && widget.enableLeftSwipe) {
+        } else if (direction == DismissDirection.startToEnd &&
+            widget.enableLeftSwipe) {
           // Swipe from left - delete one-time entry or mark as not taken
           if (widget.isOneTimeEntry) {
             widget.onDelete?.call();
@@ -103,99 +117,132 @@ class _MedicationCardState extends State<MedicationCard> {
         }
         return false; // Don't actually dismiss the card
       },
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: widget.isNextMedication
-              ? Border.all(
-                  color: const Color(0xFF22C55E), // Green color
-                  width: 3,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 🧾 Main content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Medicine name
-                  Text(
-                    widget.medName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.isNextMedication
+                ? Border.all(
+                    color: const Color(0xFF22C55E), // Green color
+                    width: 3,
+                  )
+                : Border.all(
+                    color: colors.outlineVariant.withOpacity(0.5),
+                    width: 1,
                   ),
-
-                  const SizedBox(height: 6),
-
-                  // Dosage
-                  Text(
-                    widget.dosage,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildTypeIcon(),
+              const SizedBox(width: 14),
+              // Left content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Medicine name and dosage in same row
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.medName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.dosage,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
 
-                  const SizedBox(height: 8),
-
-                  // Remaining pills / info chip
-                  if (widget.medicineRemaining.isNotEmpty)
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getPillCountColor(widget.pillCount),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        widget.medicineRemaining,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                    // Remaining pills / info chip
+                    if (widget.medicineRemaining.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getPillCountColor(widget.pillCount),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          widget.medicineRemaining,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
+                    ],
 
-            // Status indicator icon
-            _buildStatusIcon(colors),
-
-            // 👤 User badge
-            if (widget.showName)
-              Container(
-                margin: const EdgeInsets.only(left: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  widget.username,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                    // Username row
+                    if (widget.showName) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Symbols.person,
+                            size: 14,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.username,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
-          ],
+
+              // Status indicator icon
+              _buildStatusIcon(colors),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTypeIcon() {
+    final style = getMedicationStyle(widget.medType);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: style.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: Icon(style.icon, size: 26, color: style.color),
     );
   }
 
@@ -218,35 +265,41 @@ class _MedicationCardState extends State<MedicationCard> {
         break;
     }
 
+    // Mirror the swipe gating: marking / un-marking is only allowed once the
+    // intake's time has arrived (signalled by `enableRightSwipe`). Future
+    // intakes — including ones that were already marked — stay read-only,
+    // so a dose can't be edited days ahead.
+    final canToggle = widget.enableRightSwipe;
+
     return GestureDetector(
-      onTap: () {
-        // Toggle between taken and not taken
-        if (widget.status == MedicationStatus.taken) {
-          widget.onStatusChanged?.call(MedicationStatus.notTaken);
-        } else if (widget.status == MedicationStatus.notTaken || 
-                   widget.status == MedicationStatus.upcoming) {
-          widget.onStatusChanged?.call(MedicationStatus.taken);
-        }
-      },
+      onTap: canToggle
+          ? () {
+              // Toggle between taken and not taken
+              if (widget.status == MedicationStatus.taken) {
+                widget.onStatusChanged?.call(MedicationStatus.notTaken);
+              } else if (widget.status == MedicationStatus.notTaken ||
+                  widget.status == MedicationStatus.upcoming) {
+                widget.onStatusChanged?.call(MedicationStatus.taken);
+              }
+            }
+          : null,
       child: Container(
         margin: const EdgeInsets.only(left: 12),
         padding: const EdgeInsets.all(8),
         alignment: Alignment.center,
-        child: Icon(
-          icon,
-          color: iconColor,
-          size: 36,
-        ),
+        child: Icon(icon, color: iconColor, size: 36),
       ),
     );
   }
 
   Widget _buildSwipeBackground(ColorScheme colors, {required bool isLeft}) {
-    final backgroundColor = isLeft ? Colors.red.shade100 : Colors.green.shade100;
+    final backgroundColor = isLeft
+        ? Colors.red.shade100
+        : Colors.green.shade100;
     final iconColor = isLeft ? Colors.red : Colors.green;
     final icon = isLeft ? Symbols.cancel : Symbols.check_circle;
     final alignment = isLeft ? Alignment.centerLeft : Alignment.centerRight;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -255,11 +308,7 @@ class _MedicationCardState extends State<MedicationCard> {
       ),
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Icon(
-        icon,
-        color: iconColor,
-        size: 36,
-      ),
+      child: Icon(icon, color: iconColor, size: 36),
     );
   }
 }

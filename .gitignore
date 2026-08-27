@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+packages/alarm/android/build/
 
 # Symbolication related
 app.*.symbols
@@ -67,3 +68,11 @@ app.*.map.json
 
 # Local Database
 *.sqlite
+
+# API Keys - NEVER commit this file
+lib/config/api_keys.dart
+
+# Android signing - NEVER commit these
+**/android/key.properties
+*.jks
+*.keystore

@@ -1,0 +1,397 @@
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import 'dart:developer' as developer;
+import 'dart:io';
+import 'package:image/image.dart' as img;
+
+class LabelScannerScreen extends StatefulWidget {
+  const LabelScannerScreen({super.key});
+
+  @override
+  State<LabelScannerScreen> createState() => _LabelScannerScreenState();
+}
+
+class _LabelScannerScreenState extends State<LabelScannerScreen> {
+  CameraController? _cameraController;
+  bool _isInitialized = false;
+  bool _isProcessing = false;
+  String? _error;
+  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+
+  @override
+  void initState() {
+    super.initState();
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        setState(() => _error = 'Ni razpoložljive kamere');
+        return;
+      }
+
+      final camera = cameras.first;
+      _cameraController = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+
+      await _cameraController!.initialize();
+
+      if (mounted) {
+        setState(() => _isInitialized = true);
+      }
+    } catch (e) {
+      developer.log('Camera init error: $e', name: 'LabelScanner');
+      if (mounted) {
+        setState(() => _error = 'Napaka pri inicializaciji kamere');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    _textRecognizer.close();
+    super.dispose();
+  }
+
+  Future<void> _captureAndRecognize() async {
+    if (_cameraController == null ||
+        !_cameraController!.value.isInitialized ||
+        _isProcessing) {
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final image = await _cameraController!.takePicture();
+      
+      // Crop the image to the highlighted rectangle area
+      final croppedImageFile = await _cropImageToRectangle(image.path);
+      
+      final inputImage = InputImage.fromFilePath(croppedImageFile.path);
+      final recognizedText = await _textRecognizer.processImage(inputImage);
+
+      final fullText = recognizedText.text.trim();
+      developer.log('Recognized text: $fullText', name: 'LabelScanner');
+
+      if (fullText.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Besedilo ni bilo zaznano. Poskusite znova.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          setState(() => _isProcessing = false);
+        }
+        return;
+      }
+
+      // Extract the medication name - typically the first meaningful line
+      final medName = _extractMedicationName(recognizedText);
+
+      if (mounted) {
+        Navigator.of(context).pop(medName);
+      }
+    } catch (e) {
+      developer.log('Recognition error: $e', name: 'LabelScanner');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Napaka: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  /// Crop the captured image to match the rectangle shown on screen
+  Future<File> _cropImageToRectangle(String imagePath) async {
+    final originalImage = img.decodeImage(File(imagePath).readAsBytesSync());
+    if (originalImage == null) {
+      throw Exception('Failed to decode image');
+    }
+
+    // Calculate the crop rectangle
+    // The rectangle is 85% of screen width and 80px height, centered
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height - kToolbarHeight - MediaQuery.of(context).padding.top;
+    
+    final rectWidth = screenWidth * 0.85;
+    const rectHeight = 80.0;
+    final rectLeft = (screenWidth - rectWidth) / 2;
+    final rectTop = (screenHeight - rectHeight) / 2;
+    
+    // Convert screen coordinates to image coordinates
+    final imageWidth = originalImage.width;
+    final imageHeight = originalImage.height;
+    
+    // Calculate scale factors
+    final scaleX = imageWidth / screenWidth;
+    final scaleY = imageHeight / screenHeight;
+    
+    // Apply scaling to crop coordinates
+    final cropX = (rectLeft * scaleX).round();
+    final cropY = (rectTop * scaleY).round();
+    final cropWidth = (rectWidth * scaleX).round();
+    final cropHeight = (rectHeight * scaleY).round();
+    
+    // Crop the image
+    final croppedImage = img.copyCrop(
+      originalImage,
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+    
+    // Save the cropped image
+    final croppedFile = File('${imagePath}_cropped.jpg');
+    await croppedFile.writeAsBytes(img.encodeJpg(croppedImage));
+    
+    return croppedFile;
+  }
+
+  /// Extract the most likely medication name from recognized text.
+  /// Looks for the largest/most prominent text block which is typically the med name on labels.
+  String _extractMedicationName(RecognizedText recognizedText) {
+    if (recognizedText.blocks.isEmpty) return '';
+
+    // Strategy: medication name on labels is usually the largest text.
+    // Find the block with the tallest bounding box (biggest font).
+    TextBlock? largestBlock;
+    double maxHeight = 0;
+
+    for (final block in recognizedText.blocks) {
+      final height = block.boundingBox.height;
+      if (height > maxHeight) {
+        maxHeight = height;
+        largestBlock = block;
+      }
+    }
+
+    if (largestBlock != null) {
+      // Clean up the text - take first line if multi-line
+      final text = largestBlock.text.trim();
+      final lines = text.split('\n');
+      // Return the first non-empty line, cleaned up
+      for (final line in lines) {
+        final cleaned = line.trim();
+        if (cleaned.isNotEmpty && cleaned.length > 1) {
+          // Remove trailing dosage info like "500 mg", "20 mg" etc.
+          // But keep the medication name intact
+          return _cleanMedName(cleaned);
+        }
+      }
+      return text;
+    }
+
+    // Fallback: return first block's text
+    return recognizedText.blocks.first.text.trim().split('\n').first.trim();
+  }
+
+  String _cleanMedName(String raw) {
+    // Remove common suffixes that are not part of the name
+    // but keep things like "Aspirin 500mg" as is since user might want dosage info
+    return raw.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final size = MediaQuery.of(context).size;
+
+    return Scaffold(
+      backgroundColor: colors.surface,
+      appBar: AppBar(
+        backgroundColor: colors.surface,
+        foregroundColor: colors.onSurface,
+        leading: IconButton(
+          icon: const Icon(Symbols.close),
+          onPressed: () => Navigator.of(context).pop(null),
+        ),
+        title: const Text('Skeniraj nalepko'),
+      ),
+      body: _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Symbols.error, size: 48, color: colors.error),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      style: TextStyle(color: colors.error, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : !_isInitialized
+          ? Center(child: CircularProgressIndicator(color: colors.primary))
+          : Stack(
+              children: [
+                // Camera preview - full screen
+                Positioned.fill(child: CameraPreview(_cameraController!)),
+
+                // Dark overlay with cut-out + border, using LayoutBuilder for correct sizing
+                Positioned.fill(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bodyWidth = constraints.maxWidth;
+                      final bodyHeight = constraints.maxHeight;
+                      final labelWidth = bodyWidth * 0.85;
+                      const labelHeight = 80.0;
+                      final labelLeft = (bodyWidth - labelWidth) / 2;
+                      final labelTop = (bodyHeight - labelHeight) / 2;
+                      final labelRect = Rect.fromLTWH(
+                        labelLeft,
+                        labelTop,
+                        labelWidth,
+                        labelHeight,
+                      );
+
+                      return CustomPaint(
+                        size: Size(bodyWidth, bodyHeight),
+                        painter: _LabelOverlayPainter(labelRect: labelRect),
+                      );
+                    },
+                  ),
+                ),
+
+                // Label frame border (uses Center which also centers within body)
+                Positioned.fill(
+                  child: Center(
+                    child: Container(
+                      width: size.width * 0.85,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: colors.primary,
+                          width: 2.5,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Instruction text
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: MediaQuery.of(context).size.height * 0.25,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Poravnajte ime zdravila v okvir',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colors.onSurface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Capture button - centered in bottom half of screen
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: MediaQuery.of(context).size.height * 0.5, // bottom half
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: _isProcessing ? null : _captureAndRecognize,
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isProcessing
+                              ? colors.surfaceContainerHighest
+                              : colors.primary,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            width: 4,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: _isProcessing
+                            ? Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: colors.primary,
+                                ),
+                              )
+                            : Icon(
+                                Symbols.photo_camera,
+                                size: 32,
+                                color: colors.onPrimary,
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Paints a semi-transparent dark overlay with a cut-out for the label area
+class _LabelOverlayPainter extends CustomPainter {
+  final Rect labelRect;
+
+  _LabelOverlayPainter({required this.labelRect});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.5);
+
+    // Draw full overlay
+    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(labelRect, const Radius.circular(12));
+
+    // Create path with hole
+    final path = Path()
+      ..addRect(fullRect)
+      ..addRRect(rrect);
+    path.fillType = PathFillType.evenOdd;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LabelOverlayPainter oldDelegate) {
+    return oldDelegate.labelRect != labelRect;
+  }
+}

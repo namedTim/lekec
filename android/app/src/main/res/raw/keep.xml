@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Resources referenced only via runtime strings (notifications, alarm
+    plugin) need to be pinned here, otherwise `shrinkResources true` strips
+    them from the release APK. Symptom: PlatformException("invalid icon …")
+    or alarms that ring but post no notification in the shade.
+
+    - @drawable/notification_icon : alarm plugin's small icon
+    - @mipmap/launcher_icon       : passed as the notification icon for
+                                    flutter_local_notifications
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/notification_icon,@mipmap/launcher_icon" />

@@ -3,18 +3,24 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../components/hinted_scroll_view.dart';
 
 class CyclicPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const CyclicPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -25,6 +31,17 @@ class CyclicPlanningScreen extends ConsumerStatefulWidget {
 class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
   final _takingDaysController = TextEditingController(text: '10');
   final _pauseDaysController = TextEditingController(text: '20');
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the cycle from the AI-extracted "N dni jemanja, M dni pavze".
+    final freq = widget.extractedData?.dosageFrequency;
+    final on = freq?.cyclicDaysOn;
+    final off = freq?.cyclicDaysOff;
+    if (on != null && on > 0) _takingDaysController.text = '$on';
+    if (off != null && off > 0) _pauseDaysController.text = '$off';
+  }
 
   @override
   void dispose() {
@@ -47,7 +64,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
         title: const Text('Ciklično jemanje'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -134,11 +151,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Symbols.info,
-                      color: colors.primary,
-                      size: 20,
-                    ),
+                    Icon(Symbols.info, color: colors.primary, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -152,7 +165,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 32),
 
               FilledButton(
                 onPressed: _handleContinue,
@@ -164,10 +177,7 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -193,12 +203,17 @@ class _CyclicPlanningScreenState extends ConsumerState<CyclicPlanningScreen> {
     }
 
     // Navigate to time configuration
-    context.push('/add-medication/advanced-planning/cyclic/configure', extra: {
-      'name': widget.medicationName,
-      'medType': widget.medType,
-      'takingDays': takingDays,
-      'pauseDays': pauseDays,
-      'intakeAdvice': widget.intakeAdvice,
-    });
+    context.push(
+      '/add-medication/advanced-planning/cyclic/configure',
+      extra: {
+        'name': widget.medicationName,
+        'medTypeIndex': widget.medType.index,
+        'takingDays': takingDays,
+        'pauseDays': pauseDays,
+        'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
+        'extractedData': widget.extractedData,
+      },
+    );
   }
 }

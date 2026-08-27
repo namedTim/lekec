@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:drift/drift.dart';
 
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/features/core/providers/database_provider.dart';
+import '../../../database/drift_database.dart';
+import 'database_provider.dart';
 
 part 'theme_provider.g.dart';
 
@@ -16,10 +16,10 @@ class ThemeModeNotifier extends _$ThemeModeNotifier {
     final settings = await db.select(db.appSettings).getSingleOrNull();
 
     if (settings == null) {
-      await db.into(db.appSettings).insert(
-            AppSettingsCompanion.insert(
-              themeMode: const Value('system'),
-            ),
+      await db
+          .into(db.appSettings)
+          .insert(
+            AppSettingsCompanion.insert(themeMode: const Value('system')),
           );
       return ThemeMode.system;
     }
@@ -37,17 +37,12 @@ class ThemeModeNotifier extends _$ThemeModeNotifier {
     final settings = await db.select(db.appSettings).getSingleOrNull();
 
     if (settings != null) {
-      await (db.update(db.appSettings)
-            ..where((t) => t.id.equals(settings.id)))
-          .write(
-        AppSettingsCompanion(themeMode: Value(modeString)),
-      );
+      await (db.update(db.appSettings)..where((t) => t.id.equals(settings.id)))
+          .write(AppSettingsCompanion(themeMode: Value(modeString)));
     } else {
-      await db.into(db.appSettings).insert(
-            AppSettingsCompanion.insert(
-              themeMode: Value(modeString),
-            ),
-          );
+      await db
+          .into(db.appSettings)
+          .insert(AppSettingsCompanion.insert(themeMode: Value(modeString)));
     }
   }
 

@@ -37,35 +37,30 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.backgroundLight,
         height: 64,
-
-        // 🔥 STRONG active indicator
-        indicatorColor: const Color.fromARGB(87, 8, 211, 35),
+        indicatorColor: AppColors.primary.withOpacity(0.18),
 
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 11,
-              color: Color.fromARGB(255, 12, 160, 56),
+              fontSize: 10,
+              letterSpacing: -0.1,
+              color: AppColors.primaryDark,
             );
           }
           return const TextStyle(
             fontWeight: FontWeight.w500,
-            fontSize: 11,
+            fontSize: 10,
+            letterSpacing: -0.1,
             color: Color(0xFF6B7280),
           );
         }),
 
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(
-              color: AppColors.primary,
-              size: 26,
-            );
+            return const IconThemeData(color: AppColors.primary, size: 26);
           }
-          return const IconThemeData(
-            color: Color(0xFF6B7280),
-          );
+          return const IconThemeData(color: Color(0xFF6B7280));
         }),
       ),
 
@@ -74,14 +69,39 @@ class AppTheme {
         foregroundColor: Colors.white,
       ),
 
-      cardTheme: const CardThemeData(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          side: BorderSide(
+            color: AppColors.outlineLight.withOpacity(0.45),
+            width: 1,
+          ),
         ),
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimaryLight,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+
+      // Quiet, theme-tinted scrollbar — visible on long forms (e.g. add
+      // medication) without competing for attention with the content.
+      scrollbarTheme: const ScrollbarThemeData(
+        thumbColor: WidgetStatePropertyAll(Color(0xFFC2C7C3)),
+        thickness: WidgetStatePropertyAll(2),
+        radius: Radius.circular(8),
+        crossAxisMargin: 2,
       ),
     );
   }
+
   static ThemeData get dark {
     return ThemeData(
       useMaterial3: true,
@@ -89,7 +109,7 @@ class AppTheme {
 
       colorScheme: ColorScheme(
         brightness: Brightness.dark,
-        primary: AppColors.primaryLight, // brighter green pops on dark
+        primary: AppColors.primary,
         onPrimary: Colors.black,
 
         primaryContainer: AppColors.primaryDark,
@@ -124,25 +144,58 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 11,
-              color: AppColors.primaryLight,
+              fontSize: 10,
+              letterSpacing: -0.1,
+              color: AppColors.primary,
             );
           }
           return const TextStyle(
             fontWeight: FontWeight.w500,
-            fontSize: 11,
+            fontSize: 10,
+            letterSpacing: -0.1,
             color: Color(0xFF9CA3AF),
           );
         }),
 
         iconTheme: WidgetStateProperty.all(
-          const IconThemeData(color: AppColors.primaryLight),
+          const IconThemeData(color: AppColors.primary),
         ),
       ),
 
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.black,
+      ),
+
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          side: BorderSide(
+            color: AppColors.outlineDark.withOpacity(0.7),
+            width: 1,
+          ),
+        ),
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimaryDark,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+
+      // Slightly lighter than the dark surface — visible against #1E1E1E /
+      // #141414 backgrounds without lighting up the screen.
+      scrollbarTheme: const ScrollbarThemeData(
+        thumbColor: WidgetStatePropertyAll(Color(0xFF4F4F4F)),
+        thickness: WidgetStatePropertyAll(2),
+        radius: Radius.circular(8),
+        crossAxisMargin: 2,
       ),
     );
   }

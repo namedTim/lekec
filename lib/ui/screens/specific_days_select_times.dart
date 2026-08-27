@@ -3,18 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/meds/providers/medications_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/main.dart' show homePageKey;
-import 'package:lekec/ui/components/quantity_selector.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../../utils/time_parse.dart';
+import '../../features/meds/providers/medications_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../main.dart' show homePageKey;
+import '../components/hinted_scroll_view.dart';
+import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class SpecificDaysSelectTimesScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final List<int> selectedDays;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const SpecificDaysSelectTimesScreen({
     super.key,
@@ -22,6 +29,8 @@ class SpecificDaysSelectTimesScreen extends ConsumerStatefulWidget {
     required this.medType,
     required this.selectedDays,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -33,8 +42,31 @@ class _SpecificDaysSelectTimesScreenState
     extends ConsumerState<SpecificDaysSelectTimesScreen> {
   final List<TimeOfDay> _times = [];
   int _initialQuantity = 0;
-  int _dosageAmount = 1;
+  double _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
+
+  @override
+  void initState() {
+    super.initState();
+    final freq = widget.extractedData?.dosageFrequency;
+    if (freq != null) {
+      // Recommended intake times (start hours) from the label / AI.
+      for (final s in freq.suggestedTimes ?? const <String>[]) {
+        final t = parseTimeOfDay(s);
+        if (t != null) _times.add(t);
+      }
+      // Dose per intake.
+      final amount = freq.amountPerDose;
+      if (amount != null && amount > 0) _dosageAmount = amount;
+      // Treatment duration → stop condition.
+      final duration = freq.durationDays;
+      if (duration != null && duration > 0) {
+        _stopCondition = StopCondition.afterDays(duration);
+      }
+    }
+  }
 
   final List<String> _dayNames = [
     'Ponedeljek',
@@ -60,7 +92,7 @@ class _SpecificDaysSelectTimesScreenState
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,7 +130,8 @@ class _SpecificDaysSelectTimesScreenState
               const SizedBox(height: 32),
 
               // Times list
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
                 child: _times.isEmpty
                     ? Center(
                         child: Text(
@@ -109,6 +142,7 @@ class _SpecificDaysSelectTimesScreenState
                         ),
                       )
                     : ListView.builder(
+                        shrinkWrap: true,
                         itemCount: _times.length,
                         itemBuilder: (context, index) {
                           return Padding(
@@ -173,7 +207,7 @@ class _SpecificDaysSelectTimesScreenState
                     context,
                     initialValue: _dosageAmount,
                     minValue: 1,
-                    maxValue: 99,
+                    maxValue: 9999,
                     label: 'Količina na vnos',
                   );
                   if (quantity != null) {
@@ -203,7 +237,7 @@ class _SpecificDaysSelectTimesScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$_dosageAmount',
+                              '${_dosageAmount == _dosageAmount.roundToDouble() ? _dosageAmount.toInt().toString() : _dosageAmount.toString()}',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -227,13 +261,14 @@ class _SpecificDaysSelectTimesScreenState
                 onTap: () async {
                   final quantity = await showQuantitySelector(
                     context,
-                    initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+                    initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
                     minValue: 0,
-                    maxValue: 999,
+                    maxValue: 99999,
+                    step: 1,
                     label: 'Začetna zaloga',
                   );
                   if (quantity != null) {
-                    setState(() => _initialQuantity = quantity);
+                    setState(() => _initialQuantity = quantity.toInt());
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -287,6 +322,21 @@ class _SpecificDaysSelectTimesScreenState
               ),
               const SizedBox(height: 16),
 
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+              const SizedBox(height: 16),
+
+              // Konec jemanja card
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+              const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: _times.isNotEmpty && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
@@ -335,6 +385,7 @@ class _SpecificDaysSelectTimesScreenState
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 
@@ -348,15 +399,16 @@ class _SpecificDaysSelectTimesScreenState
 
       // Create specific days plan
       await planService.createSpecificDaysPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: _dosageAmount.toDouble(),
+        dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         daysOfWeek: widget.selectedDays
             .map((d) => d + 1)
             .toList(), // Convert 0-based to 1-based (1=Monday)
         times: times,
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
       );
 
       // Generate schedule

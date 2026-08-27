@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 
 enum IntervalType { hours, days }
 
@@ -10,12 +11,16 @@ class IntervalPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const IntervalPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -27,6 +32,17 @@ class _IntervalPlanningScreenState
     extends ConsumerState<IntervalPlanningScreen> {
   IntervalType _selectedType = IntervalType.hours;
   int _intervalValue = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the interval from the AI-extracted "na X ur" value when present.
+    final hours = widget.extractedData?.dosageFrequency?.intervalHours;
+    if (hours != null && hours >= 1 && hours <= 24) {
+      _selectedType = IntervalType.hours;
+      _intervalValue = hours;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,10 +154,7 @@ class _IntervalPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -172,8 +185,10 @@ class _IntervalPlanningScreenState
           color: colors.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? colors.primary : Colors.transparent,
-            width: 2,
+            color: isSelected
+                ? colors.primary
+                : colors.outlineVariant.withOpacity(0.5),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
@@ -199,12 +214,17 @@ class _IntervalPlanningScreenState
 
   void _handleContinue() {
     // Navigate to time selection or final configuration
-    context.push('/add-medication/advanced-planning/interval/configure', extra: {
-      'name': widget.medicationName,
-      'medType': widget.medType,
-      'intervalType': _selectedType,
-      'intervalValue': _intervalValue,
-      'intakeAdvice': widget.intakeAdvice,
-    });
+    context.push(
+      '/add-medication/advanced-planning/interval/configure',
+      extra: {
+        'name': widget.medicationName,
+        'medTypeIndex': widget.medType.index,
+        'intervalTypeIndex': _selectedType.index,
+        'intervalValue': _intervalValue,
+        'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
+        'extractedData': widget.extractedData,
+      },
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../features/dev/providers/dev_actions_provider.dart';
 import '../../features/core/providers/database_provider.dart';
+import '../../features/core/providers/onboarding_provider.dart';
 import '../../database/drift_database.dart';
 import '../../data/services/notification_service.dart';
 
@@ -59,14 +60,13 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Insert test user and log output",
             onTap: () async {
               try {
-                final insertedId = await db.into(db.users).insert(
-                  UsersCompanion.insert(
-                    name: 'Test User',
-                  ),
-                );
+                final insertedId = await db
+                    .into(db.users)
+                    .insert(UsersCompanion.insert(name: 'Test User'));
 
                 final allUsers = await db.select(db.users).get();
-                final output = 'Inserted user id: $insertedId\nAll users: $allUsers';
+                final output =
+                    'Inserted user id: $insertedId\nAll users: $allUsers';
                 print(output);
 
                 if (context.mounted) {
@@ -86,6 +86,36 @@ class DeveloperSettingsScreen extends ConsumerWidget {
                       content: Text('Error: $e'),
                       backgroundColor: Colors.red,
                       duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _DevCard(
+            icon: Symbols.restart_alt,
+            color: Colors.cyan,
+            title: "Reset Onboarding",
+            subtitle: "Clear onboarding completion to show welcome screens",
+            onTap: () async {
+              try {
+                await db.delete(db.onboardingSettings).go();
+                ref.invalidate(onboardingStatusProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Onboarding reset! Restart app to see welcome screens"),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
                     ),
                   );
                 }
@@ -120,7 +150,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Notification scheduled for 10 seconds from now"),
+                    content: Text(
+                      "Notification scheduled for 10 seconds from now",
+                    ),
                     duration: Duration(seconds: 3),
                   ),
                 );
@@ -135,7 +167,8 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "View count of scheduled notifications",
             onTap: () async {
               final notificationService = NotificationService();
-              final count = await notificationService.getPendingNotificationsCount();
+              final count = await notificationService
+                  .getPendingNotificationsCount();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -155,7 +188,8 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             onTap: () async {
               final notificationService = NotificationService();
               await notificationService.logPendingNotifications();
-              final count = await notificationService.getPendingNotificationsCount();
+              final count = await notificationService
+                  .getPendingNotificationsCount();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -174,14 +208,15 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Verify if app can schedule exact alarms",
             onTap: () async {
               final notificationService = NotificationService();
-              final canSchedule = await notificationService.checkExactAlarmPermission();
+              final canSchedule = await notificationService
+                  .checkExactAlarmPermission();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      canSchedule 
-                        ? "✓ Exact alarm permission granted" 
-                        : "✗ Exact alarm permission NOT granted - go to Settings"
+                      canSchedule
+                          ? "✓ Exact alarm permission granted"
+                          : "✗ Exact alarm permission NOT granted - go to Settings",
                     ),
                     backgroundColor: canSchedule ? Colors.green : Colors.red,
                     duration: const Duration(seconds: 5),
@@ -217,14 +252,16 @@ class DeveloperSettingsScreen extends ConsumerWidget {
             subtitle: "Check all permissions and notification status",
             onTap: () async {
               final notificationService = NotificationService();
-              final status = await notificationService.checkNotificationStatus();
+              final status = await notificationService
+                  .checkNotificationStatus();
               if (context.mounted) {
-                final message = 'Initialized: ${status['initialized']}\n'
+                final message =
+                    'Initialized: ${status['initialized']}\n'
                     'Notifications enabled: ${status['notificationPermission']}\n'
                     'Exact alarm: ${status['canScheduleExact']}\n'
                     'Pending: ${status['pendingCount']}\n'
                     'Active: ${status['activeCount']}';
-                
+
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -253,7 +290,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Scheduled 8 test notifications - check logs"),
+                    content: Text(
+                      "Scheduled 8 test notifications - check logs",
+                    ),
                     duration: Duration(seconds: 4),
                   ),
                 );
@@ -272,7 +311,9 @@ class DeveloperSettingsScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Medication notification scheduled for 30s - tap it to test scroll"),
+                    content: Text(
+                      "Medication notification scheduled for 30s - tap it to test scroll",
+                    ),
                     duration: Duration(seconds: 4),
                   ),
                 );
@@ -281,17 +322,17 @@ class DeveloperSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _DevCard(
-            icon: Symbols.medication,
-            color: Colors.pink,
-            title: "Test Alarm",
-            subtitle: "Schedule notification for next intake in 30 seconds",
+            icon: Symbols.alarm,
+            color: Colors.deepOrange,
+            title: "Test Alarm (1 Minute)",
+            subtitle: "Trigger an alarm that will ring in 1 minute",
             onTap: () async {
               final notificationService = NotificationService();
               await notificationService.triggerAlarm();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Alarm triggered"),
+                    content: Text("Alarm set - will ring in 1 minute"),
                     duration: Duration(seconds: 4),
                   ),
                 );
@@ -321,14 +362,30 @@ class _DevCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colors.outlineVariant.withOpacity(0.5),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
           child: Row(
             children: [
               CircleAvatar(
@@ -341,15 +398,13 @@ class _DevCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: Theme.of(context).textTheme.titleLarge),
+                    Text(title, style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: Colors.grey[600]),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                     ),
                   ],
                 ),

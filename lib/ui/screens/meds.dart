@@ -4,81 +4,291 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../database/drift_database.dart';
-import '../views/settings_view.dart';
 import '../widgets/medication_details_card.dart';
-import '../components/speed_dial_fab.dart';
+import '../widgets/appointment_card.dart';
 import '../components/confirmation_dialog.dart';
+import '../components/speed_dial_item.dart';
+import '../../data/services/mood_service.dart';
+import '../../data/services/water_service.dart';
+import '../components/mood_logging_sheet.dart';
+import '../components/water_logging_sheet.dart';
+import '../components/medication_presets_panel.dart';
 import '../../database/tables/medications.dart';
 import '../../features/core/providers/database_provider.dart';
 import '../../helpers/medication_unit_helper.dart';
 import '../../data/services/medication_service.dart';
-import 'medication_detail_screen.dart';
-import 'package:lekec/main.dart' show homePageKey;
+import '../../data/services/intake_log_service.dart';
+import '../../data/services/appointment_service.dart';
+import 'add_appointment_screen.dart';
+import '../widgets/empty_state_card.dart';
+import '../components/log_intake_sheet.dart';
+import '../../main.dart' show homePageKey;
 
-enum MedsTab { medications, users, settings }
+enum MedsTab { medications, appointments }
 
 class MedsScreen extends ConsumerStatefulWidget {
   const MedsScreen({super.key});
 
   @override
-  ConsumerState<MedsScreen> createState() => _MedsScreenState();
+  ConsumerState<MedsScreen> createState() => MedsScreenState();
 }
 
-class _MedsScreenState extends ConsumerState<MedsScreen> {
+class MedsScreenState extends ConsumerState<MedsScreen> with SingleTickerProviderStateMixin {
   MedsTab _selectedTab = MedsTab.medications;
   int _refreshKey = 0;
-  final ValueNotifier<bool> _fabExpandedNotifier = ValueNotifier(false);
+  // ValueNotifier instead of plain bool so toggling the FAB never calls
+  // setState on the parent — this prevents FutureBuilder from re-running.
+  final ValueNotifier<bool> _fabExpanded = ValueNotifier(false);
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+  }
 
   @override
   void dispose() {
-    _fabExpandedNotifier.dispose();
+    _fabExpanded.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   void _refreshMedications() {
+    if (!mounted) return;
     setState(() {
       _refreshKey++;
     });
   }
 
+  /// Public hook so other screens (e.g. PeopleScreen) can ask this tab to
+  /// re-fetch users + medications after the active user set changes.
+  void refresh() => _refreshMedications();
+
+  void _toggleSpeedDial() {
+    _fabExpanded.value = !_fabExpanded.value;
+    if (_fabExpanded.value) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
+  void _ensureSpeedDialClosed() {
+    if (_fabExpanded.value) {
+      _fabExpanded.value = false;
+      _animationController.reverse();
+    }
+  }
+
+  void _onAddSingleEntry() async {
+    _toggleSpeedDial();
+    await context.push('/add-single-entry');
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddNewMedication() async {
+    _toggleSpeedDial();
+    await context.push('/add-medication');
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onAddAppointment() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    await context.push('/add-appointment', extra: {'userId': userId});
+    _ensureSpeedDialClosed();
+    _refreshMedications();
+    homePageKey.currentState?.loadTodaysIntakes(autoScroll: false);
+  }
+
+  void _onLogWater() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    final result = await showWaterLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+    try {
+      final database = ref.read(databaseProvider);
+      await WaterService(database).logIntake(
+        userId: userId,
+        amountMl: result['amountMl'] as int,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💧 ${result['amountMl']} ml zabeleženo'),
+            backgroundColor: const Color(0xFF38BDF8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onLogMood() async {
+    _toggleSpeedDial();
+    final userId = await _pickUser();
+    if (userId == null || !mounted) return;
+    final result = await showMoodLoggingSheet(context: context);
+    _ensureSpeedDialClosed();
+    if (result == null || !mounted) return;
+    try {
+      final database = ref.read(databaseProvider);
+      final moodService = MoodService(database);
+      await moodService.logMood(
+        userId: userId,
+        moodLevel: result['moodLevel'] as int,
+        note: result['note'] as String?,
+      );
+      if (mounted) {
+        final emoji = MoodService.moodEmojis[result['moodLevel'] as int]!;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$emoji Razpoloženje zabeleženo'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<int?> _pickUser() async {
+    final database = ref.read(databaseProvider);
+    final users = await (database.select(database.users)
+          ..where((t) => t.isActive.equals(true)))
+        .get();
+    if (users.length == 1) return users.first.id;
+    if (!mounted) return null;
+    return showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final colors = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Izberite uporabnika',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...users.map(
+                (user) => ListTile(
+                  leading: Icon(Symbols.person, color: colors.primary),
+                  title: Text(user.name),
+                  onTap: () => Navigator.of(ctx).pop(user.id),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _deleteMedication(
     int medicationId,
-    String medicationName,
-  ) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Izbris zdravila',
-      message: 'Ali želite izbrisati zdravilo $medicationName?',
-    );
+    String medicationName, {
+    bool skipConfirm = false,
+  }) async {
+    if (!skipConfirm) {
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: 'Izbris zdravila',
+        message: 'Ali želite izbrisati zdravilo $medicationName?',
+      );
+      if (!confirmed) return;
+    }
 
-    if (confirmed) {
-      try {
-        final db = ref.read(databaseProvider);
-        final medicationService = MedicationService(db);
-        await medicationService.deleteMedication(medicationId);
+    try {
+      final db = ref.read(databaseProvider);
+      final medicationService = MedicationService(db);
+      await medicationService.deleteMedication(medicationId);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Zdravilo $medicationName je bilo izbrisano'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _refreshMedications();
-          // Refresh home screen to reflect deleted medication
-          homePageKey.currentState?.loadTodaysIntakes();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Napaka pri brisanju: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Zdravilo $medicationName je bilo izbrisano'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshMedications();
+        // Refresh home screen to reflect deleted medication
+        homePageKey.currentState?.loadTodaysIntakes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Napaka pri brisanju: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -103,14 +313,9 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                           icon: Icon(Symbols.pill),
                         ),
                         ButtonSegment<MedsTab>(
-                          value: MedsTab.users,
-                          label: Text('Uporabniki'),
-                          icon: Icon(Symbols.group),
-                        ),
-                        ButtonSegment<MedsTab>(
-                          value: MedsTab.settings,
-                          label: Text('Nastavitve'),
-                          icon: Icon(Symbols.settings),
+                          value: MedsTab.appointments,
+                          label: Text('Termini'),
+                          icon: Icon(Symbols.calendar_month),
                         ),
                       ],
                       selected: {_selectedTab},
@@ -120,7 +325,13 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
                         });
                       },
                       style: ButtonStyle(
-                        visualDensity: VisualDensity(horizontal: -2),
+                        visualDensity: const VisualDensity(horizontal: -2),
+                        textStyle: WidgetStateProperty.all(
+                          const TextStyle(fontSize: 13),
+                        ),
+                        padding: WidgetStateProperty.all(
+                          const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                       ),
                     ),
                   ),
@@ -129,16 +340,15 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
               ],
             ),
           ),
-          // Full-screen barrier when FAB is expanded
+          // Full-screen barrier when FAB is expanded — ValueListenableBuilder
+          // rebuilds only this subtree, never the parent.
           ValueListenableBuilder<bool>(
-            valueListenable: _fabExpandedNotifier,
-            builder: (context, isExpanded, child) {
+            valueListenable: _fabExpanded,
+            builder: (context, isExpanded, _) {
               if (!isExpanded) return const SizedBox.shrink();
               return Positioned.fill(
                 child: GestureDetector(
-                  onTap: () {
-                    _fabExpandedNotifier.value = false;
-                  },
+                  onTap: _toggleSpeedDial,
                   child: Container(color: Colors.black.withOpacity(0.01)),
                 ),
               );
@@ -146,28 +356,75 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
           ),
         ],
       ),
-      floatingActionButton: SpeedDialFab(
-        onExpandedChanged: (expanded) {
-          _fabExpandedNotifier.value = expanded;
-        },
-        options: [
-          SpeedDialOption(
-            label: 'Dodaj enkraten vnos',
-            icon: Symbols.add,
-            heroTag: 'add_entry_meds',
-            onPressed: () async {
-              await context.push('/add-single-entry');
-              _refreshMedications();
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              if (_animation.value == 0) {
+                return const SizedBox.shrink();
+              }
+              return SpeedDialPanel(
+                animation: _animation,
+                items: [
+                  SpeedDialItem(
+                    label: 'Dodaj novo zdravilo',
+                    icon: Symbols.pill,
+                    accent: SpeedDialAccent.meds,
+                    onPressed: _onAddNewMedication,
+                  ),
+                  SpeedDialItem(
+                    label: 'Dodaj enkraten vnos zdravila',
+                    icon: Symbols.add,
+                    accent: SpeedDialAccent.entry,
+                    onPressed: _onAddSingleEntry,
+                  ),
+                  SpeedDialItem(
+                    label: 'Zabeleži razpoloženje',
+                    icon: Symbols.mood,
+                    accent: SpeedDialAccent.mood,
+                    onPressed: _onLogMood,
+                  ),
+                  SpeedDialItem(
+                    label: 'Zabeleži hidracijo',
+                    icon: Symbols.water_drop,
+                    accent: SpeedDialAccent.water,
+                    onPressed: _onLogWater,
+                  ),
+                  SpeedDialItem(
+                    label: 'Dodaj termin',
+                    icon: Symbols.calendar_add_on,
+                    accent: SpeedDialAccent.appointment,
+                    onPressed: _onAddAppointment,
+                  ),
+                ],
+              );
             },
           ),
-          SpeedDialOption(
-            label: 'Dodaj novo zdravilo',
-            icon: Symbols.pill,
-            heroTag: 'add_medication_meds',
-            onPressed: () async {
-              await context.push('/add-medication');
-              _refreshMedications();
-            },
+          // Main FAB — ValueListenableBuilder keeps the rotation in sync
+          // without triggering a parent setState.
+          ValueListenableBuilder<bool>(
+            valueListenable: _fabExpanded,
+            builder: (context, isExpanded, _) => FloatingActionButton(
+              heroTag: 'meds_main_fab',
+              onPressed: _toggleSpeedDial,
+              tooltip: 'Dodaj',
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  bottomLeft: Radius.circular(32),
+                  topRight: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: AnimatedRotation(
+                turns: isExpanded ? 0.125 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: const Icon(Symbols.add),
+              ),
+            ),
           ),
         ],
       ),
@@ -176,16 +433,16 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
   }
 
   Widget _buildContent() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
     switch (_selectedTab) {
       case MedsTab.medications:
         final db = ref.watch(databaseProvider);
         final medicationService = MedicationService(db);
         return FutureBuilder(
           key: ValueKey(_refreshKey),
-          future: medicationService.loadMedicationsWithDetails(),
+          future: Future.wait([
+            medicationService.loadMedicationsWithDetails(),
+            (db.select(db.users)..where((t) => t.isActive.equals(true))).get(),
+          ]),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -193,121 +450,406 @@ class _MedsScreenState extends ConsumerState<MedsScreen> {
             if (snapshot.hasError) {
               return Center(child: Text('Napaka: ${snapshot.error}'));
             }
-            final medications = snapshot.data ?? [];
+            final results = snapshot.data as List<dynamic>;
+            final medications = results[0] as List<Map<String, dynamic>>;
+            final users = results[1] as List<User>;
+            final userNames = {for (var u in users) u.id: u.name};
+            final showUserNames = users.length > 1;
+            final isEmpty = medications.isEmpty;
 
-            if (medications.isEmpty) {
-              return Center(
-                child: Text(
-                  'Ni dodanih zdravil.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.only(
-                left: 8,
-                right: 8,
-                top: 8,
-                bottom: 88,
-              ),
-              itemCount: medications.length,
-              itemBuilder: (context, index) {
-                final med = medications[index];
-                final dosageAmount = med['dosage'] as double;
-                final dosageCount = dosageAmount.toInt();
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => MedicationDetailScreen(
-                          medicationId: med['id'] as int,
-                          medicationName: med['name'] as String,
-                          medType: med['medType'] as MedicationType,
+            return Stack(
+              children: [
+                // Main content
+                if (isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: EmptyStateCard(
+                        icon: Symbols.medication,
+                        title: 'Ni dodanih zdravil',
+                        subtitle: 'Izberite zdravilo spodaj ali dodajte novo',
+                        onTap: () => context.push('/add-medication'),
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    padding: const EdgeInsets.only(
+                      left: 8,
+                      right: 8,
+                      top: 8,
+                      bottom: 180, // Extra padding for the presets panel
+                    ),
+                    itemCount: medications.length,
+                    itemBuilder: (context, index) {
+                      final med = medications[index];
+                      final dosageAmount = med['dosage'] as double;
+                      final dosageCount = dosageAmount.toInt();
+                      return GestureDetector(
+                        onTap: () async {
+                          await context.push('/medication-detail', extra: {
+                            'medicationId': med['id'] as int,
+                            'medicationName': med['name'] as String,
+                            'medType': med['medType'] as MedicationType,
+                            'pillsRemaining': med['remaining'] as int,
+                            'dosageAmount': dosageAmount,
+                            'frequency': med['frequency'] as String,
+                            'times': med['times'] as List<String>,
+                            'intakeAdvice': med['intakeAdvice'] as String?,
+                            'criticalReminder': med['criticalReminder'] as bool,
+                            'isAsNeeded':
+                                (med['frequency'] as String) == 'Po potrebi',
+                            'planId': (med['plan'] as MedicationPlan?)?.id,
+                            'userId':
+                                (med['plan'] as MedicationPlan?)?.userId,
+                            'onDelete': () => _deleteMedication(
+                              med['id'] as int,
+                              med['name'] as String,
+                              skipConfirm: true,
+                            ),
+                            'onRefresh': _refreshMedications,
+                          });
+                          if (mounted) {
+                            homePageKey.currentState?.loadTodaysIntakes(
+                              autoScroll: false,
+                            );
+                          }
+                        },
+                        child: MedicationDetailsCard(
+                          medName: med['name'] as String,
+                          userName: showUserNames
+                              ? userNames[(med['plan'] as MedicationPlan?)?.userId]
+                              : null,
+                          dosage:
+                              '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
                           pillsRemaining: med['remaining'] as int,
-                          dosageAmount: dosageAmount,
                           frequency: med['frequency'] as String,
                           times: med['times'] as List<String>,
-                          intakeAdvice: med['intakeAdvice'] as String?,
-                          criticalReminder: med['criticalReminder'] as bool? ?? false,
+                          medType: med['medType'] as MedicationType,
+                          onAddMedication: (quantity) async {
+                            try {
+                              final db = ref.read(databaseProvider);
+                              final currentRemaining = med['remaining'] as int;
+                              final newRemaining = (currentRemaining + quantity.toInt())
+                                  .clamp(0, 9999);
+
+                              await (db.update(db.medications)..where(
+                                    (t) => t.id.equals(med['id'] as int),
+                                  ))
+                                  .write(
+                                    MedicationsCompanion(
+                                      dosagesRemaining: drift.Value(
+                                        newRemaining.toDouble(),
+                                      ),
+                                    ),
+                                  );
+
+                              if (mounted) {
+                                final absQuantity = quantity.abs().toInt();
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      quantity >= 0
+                                          ? 'Dodal ${quantity.toInt()} ${getMedicationUnitShort(med['medType'] as MedicationType, quantity.toInt())}'
+                                          : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
+                                    ),
+                                    backgroundColor: quantity >= 0
+                                        ? Colors.green
+                                        : Colors.orange,
+                                  ),
+                                );
+                                _refreshMedications();                                  homePageKey.currentState?.loadTodaysIntakes(
+                                    autoScroll: false,
+                                  );                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Napaka: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
                           onDelete: () => _deleteMedication(
                             med['id'] as int,
                             med['name'] as String,
                           ),
+                          isAsNeeded:
+                              (med['frequency'] as String) == 'Po potrebi',
+                          onLogIntake:
+                              (med['frequency'] as String) == 'Po potrebi' &&
+                                  (med['plan'] as MedicationPlan?) != null
+                              ? () async {
+                                  final plan = med['plan'] as MedicationPlan;
+                                  final result = await showLogIntakeSheet(
+                                    context: context,
+                                    medicationName: med['name'] as String,
+                                    medType: med['medType'] as MedicationType,
+                                    defaultQuantity: dosageCount,
+                                  );
+                                  if (result != null && mounted) {
+                                    final time = result['time'] as TimeOfDay;
+                                    final qty = result['quantity'] as int;
+                                    final now = DateTime.now();
+                                    final takenTime = DateTime(
+                                      now.year,
+                                      now.month,
+                                      now.day,
+                                      time.hour,
+                                      time.minute,
+                                    );
+                                    try {
+                                      final database = ref.read(
+                                        databaseProvider,
+                                      );
+                                      final intakeService = IntakeLogService(
+                                        database,
+                                      );
+                                      await intakeService.logAsNeededIntake(
+                                        planId: plan.id,
+                                        medicationId: med['id'] as int,
+                                        userId: plan.userId,
+                                        dosageAmount: qty.toDouble(),
+                                        takenTime: takenTime,
+                                      );
+                                      if (mounted) {
+                                        final colors = Theme.of(
+                                          context,
+                                        ).colorScheme;
+                                        final timeStr =
+                                            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).clearSnackBars();
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '✓ $qty ${getMedicationUnitShort(med['medType'] as MedicationType, qty)} ob $timeStr',
+                                              style: TextStyle(
+                                                color: colors.onSurface,
+                                              ),
+                                            ),
+                                            duration: const Duration(
+                                              seconds: 2,
+                                            ),
+                                            backgroundColor:
+                                                colors.surfaceContainerHighest,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        _refreshMedications();
+                                        homePageKey.currentState
+                                            ?.loadTodaysIntakes(
+                                              autoScroll: false,
+                                            );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).clearSnackBars();
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Napaka: $e'),
+                                            backgroundColor: Colors.red,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                }
+                              : null,
                         ),
-                      ),
-                    );
-                  },
-                  child: MedicationDetailsCard(
-                    medName: med['name'] as String,
-                    dosage:
-                        '$dosageCount ${getMedicationUnit(med['medType'] as MedicationType, dosageCount)}',
-                    pillsRemaining: med['remaining'] as int,
-                    frequency: med['frequency'] as String,
-                    times: med['times'] as List<String>,
-                    medType: med['medType'] as MedicationType,
-                    criticalReminder: med['criticalReminder'] as bool? ?? false,
-                    onAddMedication: (quantity) async {
-                      try {
-                        final db = ref.read(databaseProvider);
-                        final currentRemaining = med['remaining'] as int;
-                        final newRemaining = (currentRemaining + quantity)
-                            .clamp(0, 9999);
-
-                        await (db.update(
-                          db.medications,
-                        )..where((t) => t.id.equals(med['id'] as int))).write(
-                          MedicationsCompanion(
-                            dosagesRemaining: drift.Value(
-                              newRemaining.toDouble(),
-                            ),
-                          ),
-                        );
-
-                        if (mounted) {
-                          final absQuantity = quantity.abs();
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                quantity >= 0
-                                    ? 'Dodal $quantity ${getMedicationUnitShort(med['medType'] as MedicationType, quantity)}'
-                                    : 'Odstranil $absQuantity ${getMedicationUnitShort(med['medType'] as MedicationType, absQuantity)}',
-                              ),
-                              backgroundColor: quantity >= 0
-                                  ? Colors.green
-                                  : Colors.orange,
-                            ),
-                          );
-                          _refreshMedications();
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Napaka: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
+                      );
                     },
-                    onDelete: () => _deleteMedication(
-                      med['id'] as int,
-                      med['name'] as String,
-                    ),
                   ),
-                );
-              },
+
+                // Presets panel at the bottom
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: MedicationPresetsPanel(
+                    initiallyExpanded: isEmpty,
+                    onPresetSelected: _refreshMedications,
+                  ),
+                ),
+              ],
             );
           },
         );
-      case MedsTab.users:
-        return const Center(child: Text('Seznam uporabnikov'));
-      case MedsTab.settings:
-        return const SettingsView();
+      case MedsTab.appointments:
+        final database = ref.watch(databaseProvider);
+        final appointmentService = AppointmentService(database);
+        return FutureBuilder(
+          key: ValueKey(_refreshKey),
+          future: Future.wait([
+            appointmentService.getUpcomingAppointments(),
+            (database.select(database.users)..where((t) => t.isActive.equals(true))).get(),
+            // Last 2 past appointments, newest first
+            (database.select(database.appointments)
+                  ..where((t) => t.appointmentTime.isSmallerOrEqualValue(DateTime.now()))
+                  ..orderBy([(t) => drift.OrderingTerm.desc(t.appointmentTime)])
+                  ..limit(2))
+                .get(),
+          ]),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Napaka: ${snapshot.error}'));
+            }
+
+            final results = snapshot.data as List<dynamic>;
+            final appointments = results[0] as List<Appointment>;
+            final users = results[1] as List<User>;
+            final pastAppointments = results[2] as List<Appointment>;
+            final userNames = {for (var u in users) u.id: u.name};
+            final showUserNames = users.length > 1;
+
+            // Build items list: upcoming + section header + past 2
+            return ListView(
+              padding: const EdgeInsets.only(
+                top: 8,
+                left: 16,
+                right: 16,
+                bottom: 88,
+              ),
+              children: [
+                // Upcoming appointments
+                if (appointments.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: EmptyStateCard(
+                        icon: Symbols.calendar_month,
+                        title: 'Ni prihajajočih terminov',
+                        subtitle: 'Dodajte termin za opomnike',
+                        onTap: () async {
+                          await context.push('/add-appointment');
+                          _refreshMedications();
+                        },
+                      ),
+                    ),
+                  )
+                else
+                  ...appointments.map((appt) => AppointmentDetailsCard(
+                    title: appt.title,
+                    note: appt.note,
+                    appointmentTime: appt.appointmentTime,
+                    userName: userNames[appt.userId],
+                    showName: showUserNames,
+                    onTap: () async {
+                      final result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => AddAppointmentScreen(
+                            userId: appt.userId,
+                            existingAppointment: appt,
+                          ),
+                        ),
+                      );
+                      if (result == true) _refreshMedications();
+                    },
+                    onDelete: () async {
+                      final confirmed = await showConfirmationDialog(
+                        context,
+                        title: 'Izbriši termin',
+                        message: 'Ali želite izbrisati termin "${appt.title}"?',
+                      );
+                      if (confirmed) {
+                        await appointmentService.deleteAppointment(appt.id);
+                        _refreshMedications();
+                      }
+                    },
+                  )),
+
+                // ── Zadnja dva termina section ──
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Text(
+                    'Zadnja dva termina',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (pastAppointments.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Symbols.calendar_month,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ni preteklih terminov',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...pastAppointments.map((appt) => AppointmentDetailsCard(
+                    title: appt.title,
+                    note: appt.note,
+                    appointmentTime: appt.appointmentTime,
+                    userName: userNames[appt.userId],
+                    showName: showUserNames,
+                    onTap: () async {
+                      final result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => AddAppointmentScreen(
+                            userId: appt.userId,
+                            existingAppointment: appt,
+                          ),
+                        ),
+                      );
+                      if (result == true) _refreshMedications();
+                    },
+                    onDelete: () async {
+                      final confirmed = await showConfirmationDialog(
+                        context,
+                        title: 'Izbriši termin',
+                        message: 'Ali želite izbrisati termin "${appt.title}"?',
+                      );
+                      if (confirmed) {
+                        await appointmentService.deleteAppointment(appt.id);
+                        _refreshMedications();
+                      }
+                    },
+                  )),
+              ],
+            );
+          },
+        );
     }
   }
 }

@@ -1,0 +1,28 @@
+import 'package:drift/drift.dart';
+import 'users.dart';
+
+class Appointments extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get userId => integer().references(Users, #id)();
+
+  /// Appointment title (e.g., "Pregled pri zdravniku")
+  TextColumn get title => text()();
+
+  /// Optional note with additional details
+  TextColumn get note => text().nullable()();
+
+  /// Date and time of the appointment
+  DateTimeColumn get appointmentTime => dateTime()();
+
+  /// Whether a critical (full-screen) alarm is enabled for this appointment
+  BoolColumn get criticalReminder =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Minutes before the appointment when the full-screen alarm should ring.
+  /// Defaults to 120 (2 hours).
+  IntColumn get reminderMinutesBefore =>
+      integer().withDefault(const Constant(120))();
+
+  /// When this record was created
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}

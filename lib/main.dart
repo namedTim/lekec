@@ -1,15 +1,28 @@
-// drift InsertMode not used here; rely on default insert behavior
 import 'dart:async';
 
 import 'package:alarm/alarm.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:lekec/ui/screens/ring.dart';
+import 'package:lekec/ui/screens/appointment_ring_screen.dart';
+import 'package:lekec/services/alarm_service.dart';
+import 'package:lekec/utils/logging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/drift_database.dart';
+import 'database/drift_database.dart';
 import 'ui/screens/developer_settings.dart';
 import 'ui/screens/meds.dart';
 import 'ui/screens/meds_history.dart';
+import 'ui/screens/dashboard.dart';
+import 'ui/screens/people_screen.dart';
+
+export 'ui/screens/dashboard.dart' show DashboardScreenState;
+export 'ui/screens/user_medications_screen.dart'
+    show UserMedicationsScreenState;
+import 'ui/screens/user_medications_screen.dart';
 import 'ui/screens/add_medication.dart';
 import 'ui/screens/add_single_entry.dart';
 import 'ui/screens/add_single_entry_quantity.dart';
@@ -24,115 +37,31 @@ import 'ui/screens/specific_days_planning.dart';
 import 'ui/screens/specific_days_select_times.dart';
 import 'ui/screens/cyclic_planning.dart';
 import 'ui/screens/cyclic_configure.dart';
-import 'ui/screens/alarm_notification_screen.dart';
+import 'ui/screens/add_appointment_screen.dart';
+import 'ui/screens/medication_detail_screen.dart';
 import 'features/core/providers/database_provider.dart';
 import 'features/core/providers/theme_provider.dart';
-import 'package:lekec/database/tables/medications.dart' hide MedicationStatus;
+import 'features/core/providers/onboarding_provider.dart';
+import 'database/tables/medications.dart';
+import 'data/services/server_message_service.dart';
+import 'services/gemini_medication_service.dart';
+import 'services/permission.dart';
 import 'ui/theme/app_theme.dart';
-import 'ui/widgets/medication_card.dart';
-import 'ui/components/confirmation_dialog.dart';
-import 'data/services/intake_log_service.dart';
-import 'ui/widgets/time_island.dart';
-import 'ui/components/time_slot.dart';
 import 'data/services/intake_schedule_generator.dart';
 import 'data/services/notification_service.dart';
+import 'data/services/notification_action_service.dart';
 import 'data/services/background_task_service.dart';
-import 'helpers/medication_unit_helper.dart';
+import 'ui/screens/onboarding/onboarding_flow.dart';
 
 export 'ui/widgets/medication_card.dart' show MedicationStatus;
 
 late final AppDatabase db;
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    print('=== INITIALIZING APP ===');
-    
-    print('1. Creating database...');
-    db = AppDatabase();
-    print('✓ Database created');
-
-    // Initialize alarm service FIRST before anything else
-    print('2. Initializing alarm service...');
-    await Alarm.init();
-    print('✓ Alarm service initialized');
-
-    // Initialize notification service
-    print('3. Initializing notification service...');
-    final notificationService = NotificationService();
-    await notificationService.initialize();
-    print('✓ Notification service initialized');
-
-    // Generate upcoming intake schedules
-    print('4. Generating intake schedules...');
-    final scheduleGenerator = IntakeScheduleGenerator(db);
-    await scheduleGenerator.generateScheduledIntakes();
-    print('✓ Intake schedules generated');
-
-    // Schedule notifications for upcoming intakes
-    print('5. Scheduling notifications...');
-    await notificationService.scheduleAllUpcomingNotifications(db);
-    print('✓ Notifications scheduled');
-
-    // Initialize and schedule background tasks
-    print('6. Initializing background service...');
-    final backgroundService = BackgroundTaskService();
-    await backgroundService.initialize();
-    await backgroundService.scheduleScheduleGeneration();
-    await backgroundService.scheduleNotificationRefresh();
-    print('✓ Background service initialized');
-
-    print('7. Starting app...');
-    runApp(
-      ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: const MyApp(),
-      ),
-    );
-    print('✓ App started');
-  } catch (e, stackTrace) {
-    print('❌ ERROR IN MAIN: $e');
-    print('STACK TRACE: $stackTrace');
-    // Still run the app with minimal initialization to show the error
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          backgroundColor: Colors.red,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Initialization Error',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '$e',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '$stackTrace',
-                    style: const TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+final GlobalKey<DashboardScreenState> homePageKey =
+    GlobalKey<DashboardScreenState>();
+final GlobalKey<MedsScreenState> medsPageKey = GlobalKey<MedsScreenState>();
+final GlobalKey<UserMedicationsScreenState> userDetailsPageKey =
+    GlobalKey<UserMedicationsScreenState>();
 
 final _router = GoRouter(
   navigatorKey: rootNavigatorKey,
@@ -146,8 +75,16 @@ final _router = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
+              path: '/history',
+              builder: (context, state) => const MedsHistoryScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
               path: '/meds',
-              builder: (context, state) => const MedsScreen(),
+              builder: (context, state) => MedsScreen(key: medsPageKey),
             ),
           ],
         ),
@@ -156,19 +93,48 @@ final _router = GoRouter(
             GoRoute(
               path: '/',
               builder: (context, state) =>
-                  MyHomePage(key: homePageKey, title: 'Lekec'),
+                  DashboardScreen(key: homePageKey, title: 'Lekec'),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/history',
-              builder: (context, state) => const MedsHistoryScreen(),
+              path: '/people',
+              builder: (context, state) => const PeopleScreen(),
             ),
           ],
         ),
       ],
+    ),
+    GoRoute(
+      path: '/ring',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) {
+        final alarmSettings = state.extra as AlarmSettings;
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: ExampleAlarmRingScreen(alarmSettings: alarmSettings),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // No animation - instant appearance
+            return child;
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/appointment-ring',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) {
+        final alarmSettings = state.extra as AlarmSettings;
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: AppointmentRingScreen(alarmSettings: alarmSettings),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return child;
+          },
+        );
+      },
     ),
     GoRoute(
       path: '/dev',
@@ -176,16 +142,29 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/add-medication',
-      builder: (context, state) => const AddMedicationScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final presetTypeIndex = extra?['presetTypeIndex'] as int?;
+        return AddMedicationScreen(
+          presetName: extra?['presetName'] as String?,
+          presetType: presetTypeIndex != null
+              ? MedicationType.values[presetTypeIndex]
+              : null,
+          presetIntakeAdvice: extra?['presetIntakeAdvice'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/add-medication/frequency',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MedicationFrequencySelectionScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -193,10 +172,15 @@ final _router = GoRouter(
       path: '/add-medication/simple-planning',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
+        final frequencyIndex = extra['frequencyIndex'] as int;
         return SimpleMedicationPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
-          frequency: extra['frequency'] as FrequencyOption,
+          medType: MedicationType.values[medTypeIndex],
+          frequency: FrequencyOption.values[frequencyIndex],
+          userId: extra['userId'] as int,
+          intakeAdvice: extra['intakeAdvice'] as String,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -204,10 +188,13 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return AdvancedMedicationPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -215,10 +202,13 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/interval',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return IntervalPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -226,12 +216,16 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/interval/configure',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
+        final intervalTypeIndex = extra['intervalTypeIndex'] as int;
         return IntervalConfigureScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
-          intervalType: extra['intervalType'] as IntervalType,
+          medType: MedicationType.values[medTypeIndex],
+          intervalType: IntervalType.values[intervalTypeIndex],
           intervalValue: extra['intervalValue'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -239,10 +233,13 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/multiple-times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MultipleTimesPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -250,11 +247,14 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/multiple-times/times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return MultipleTimesSelectTimesScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           timesPerDay: extra['timesPerDay'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -262,10 +262,13 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/specific-days',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return SpecificDaysPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -273,11 +276,14 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/specific-days/times',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return SpecificDaysSelectTimesScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           selectedDays: List<int>.from(extra['selectedDays'] as List),
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -285,10 +291,13 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/cyclic',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return CyclicPlanningScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
@@ -296,40 +305,66 @@ final _router = GoRouter(
       path: '/add-medication/advanced-planning/cyclic/configure',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return CyclicConfigureScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
           takingDays: extra['takingDays'] as int,
           pauseDays: extra['pauseDays'] as int,
           intakeAdvice: extra['intakeAdvice'] as String,
+          userId: extra['userId'] as int,
+          extractedData: extra['extractedData'] as MedicationExtractionResult?,
         );
       },
     ),
     GoRoute(
       path: '/add-single-entry',
-      builder: (context, state) => const AddSingleEntryScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AddSingleEntryScreen(userId: extra?['userId'] as int? ?? 1);
+      },
     ),
     GoRoute(
       path: '/add-single-entry/quantity',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
+        final medTypeIndex = extra['medTypeIndex'] as int;
         return AddSingleEntryQuantityScreen(
           medicationName: extra['name'] as String,
-          medType: extra['medType'] as MedicationType,
+          medType: MedicationType.values[medTypeIndex],
+          userId: extra['userId'] as int,
         );
       },
     ),
     GoRoute(
-      path: '/alarm',
+      path: '/add-appointment',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AddAppointmentScreen(
+          userId: extra?['userId'] as int? ?? 1,
+          existingAppointment: extra?['existingAppointment'] as Appointment?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/medication-detail',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>;
-        return AlarmNotificationScreen(
-          intakeId: extra['intakeId'] as int,
+        return MedicationDetailScreen(
           medicationId: extra['medicationId'] as int,
           medicationName: extra['medicationName'] as String,
-          dosage: extra['dosage'] as String,
           medType: extra['medType'] as MedicationType,
-          scheduledTime: extra['scheduledTime'] as DateTime,
+          pillsRemaining: extra['pillsRemaining'] as int,
+          dosageAmount: extra['dosageAmount'] as double,
+          frequency: extra['frequency'] as String,
+          times: (extra['times'] as List).cast<String>(),
+          intakeAdvice: extra['intakeAdvice'] as String?,
+          criticalReminder: extra['criticalReminder'] as bool,
+          onDelete: extra['onDelete'] as Future<void> Function(),
+          onRefresh: extra['onRefresh'] as VoidCallback,
+          isAsNeeded: (extra['isAsNeeded'] as bool?) ?? false,
+          planId: extra['planId'] as int?,
+          userId: extra['userId'] as int?,
         );
       },
     ),
@@ -350,29 +385,164 @@ class ScaffoldWithNavBar extends StatelessWidget {
         onDestinationSelected: (int index) => _onTap(context, index),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
-        destinations: <NavigationDestination>[
+        destinations: const <NavigationDestination>[
           NavigationDestination(
-            icon: const Icon(Symbols.pill),
-            label: 'Zdravila',
-          ),
-          NavigationDestination(
-            icon: const Icon(Symbols.home),
-            label: 'Tekoči pregled',
-          ),
-          NavigationDestination(
-            icon: const Icon(Symbols.manage_search),
+            icon: Icon(Symbols.manage_search),
             label: 'Zgodovina',
           ),
+          NavigationDestination(icon: Icon(Symbols.pill), label: 'Zdravila'),
+          NavigationDestination(
+            icon: Icon(Symbols.home),
+            label: 'Tekoči pregled',
+          ),
+          NavigationDestination(icon: Icon(Symbols.group), label: 'Osebe'),
         ],
       ),
     );
   }
 
   void _onTap(BuildContext context, int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
-    );
+    navigationShell.goBranch(index, initialLocation: true);
+  }
+}
+
+Future<void> main() async {
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  setupLogging(showDebugLogs: true);
+
+  // Initialize database early — constructor is cheap (lazy open)
+  db = AppDatabase();
+  AlarmService alarmService = AlarmService(rootNavigatorKey, db);
+
+  try {
+    // PRIORITY: Initialize alarm service FIRST for fastest response.
+    // Retry once if platform channel isn't ready (hot restart / cold start race).
+    try {
+      await Alarm.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger('main').warning('Alarm.init() timed out — continuing without it');
+        },
+      );
+    } catch (e) {
+      Logger('main').warning('Alarm.init() failed, retrying: $e');
+      await Future.delayed(const Duration(milliseconds: 500));
+      await Alarm.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger('main').warning('Alarm.init() retry timed out');
+        },
+      );
+    }
+
+    // Initialize listeners
+    alarmService.initialize();
+
+    // Apply notification action button taps recorded while the app was closed
+    // ("Sem vzel" / "Bom preskočil" / "Razumem") BEFORE checkInitialRingingAlarms
+    // runs below — otherwise a just-handled alarm could re-pop its ring screen.
+    await NotificationActionService(db)
+        .drainPendingActions()
+        .timeout(const Duration(seconds: 10), onTimeout: () {});
+
+    // Keep applying taps as they happen: the ringing set changes whenever an
+    // alarm starts or stops, including a stop triggered by a notification
+    // action button.
+    Alarm.ringing.listen((_) {
+      NotificationActionService(db).drainPendingActions();
+    });
+
+    // Kill-warning notification is disabled app-wide (all alarms are set with
+    // warningNotificationOnKill: false). Alarms persisted by older builds may
+    // still carry the flag and keep the on-kill service running, so tear it
+    // down explicitly on every launch. Re-enable the feature by restoring
+    // setWarningNotificationOnKill here and the flags in NotificationService.
+    await Alarm.disableWarningNotificationOnKill()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
+  } catch (e, st) {
+    Logger('main').severe('Critical startup error', e, st);
+  }
+
+  // Start the app immediately so alarm can show
+  runApp(
+    ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        alarmServiceProvider.overrideWithValue(alarmService),
+      ],
+      child: const MyApp(),
+    ),
+  );
+
+  // Check for ringing alarms ASAP after first frame, then remove splash
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    FlutterNativeSplash.remove();
+    alarmService.checkInitialRingingAlarms();
+  });
+
+  // Defer heavy initialization — give providers time to resolve first
+  // so the app renders before background DB-heavy tasks start
+  Future.delayed(const Duration(seconds: 2), () {
+    _initializeServicesInBackground();
+  });
+}
+
+
+// Run heavy initialization in background after app starts
+Future<void> _initializeServicesInBackground() async {
+  try {
+    // Set screen orientation
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+    // Initialize notification service
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+
+    // Apply any notification action button taps made while the app was closed.
+    await NotificationActionService(db).drainPendingActions();
+
+    // Generate upcoming intake schedules
+    final scheduleGenerator = IntakeScheduleGenerator(db);
+
+    // Clean up duplicates with a safety timeout so it can't block forever
+    try {
+      await scheduleGenerator.removeDuplicateEntries().timeout(
+        const Duration(seconds: 15),
+      );
+    } catch (e) {
+      Logger('main').warning('removeDuplicateEntries timed out or failed: $e');
+    }
+
+    try {
+      await scheduleGenerator.generateScheduledIntakes().timeout(
+        const Duration(seconds: 30),
+      );
+    } catch (e) {
+      Logger(
+        'main',
+      ).warning('generateScheduledIntakes timed out or failed: $e');
+    }
+
+    // Schedule notifications for upcoming intakes
+    try {
+      await notificationService
+          .scheduleAllUpcomingNotifications(db)
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      Logger('main').warning('scheduleAllUpcomingNotifications failed: $e');
+    }
+
+    // Initialize and schedule background tasks
+    final backgroundService = BackgroundTaskService();
+    await backgroundService.initialize();
+    await backgroundService.scheduleScheduleGeneration();
+    await backgroundService.scheduleNotificationRefresh();
+
+    Logger('main').info('Background services initialized successfully');
+  } catch (e, st) {
+    Logger('main').severe('Error initializing background services', e, st);
   }
 }
 
@@ -383,666 +553,175 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  /// Skip the very first `resumed` event — it fires right after the app is
+  /// pushed to the foreground at cold start, and `_initializeServicesInBackground`
+  /// already covers that path. Without this guard we'd run the same heavy work
+  /// twice on every cold start.
+  bool _skipFirstResume = true;
+
+  /// Action buttons on non-critical reminders are delivered to a background
+  /// isolate (see notificationTapBackground), so a tap made while the app is
+  /// open isn't seen here directly. Poll the queue so those taps still get
+  /// applied promptly without needing an app resume.
+  Timer? _actionDrainTimer;
+
+  /// Guards the one-per-launch full-screen-intent permission re-check.
+  bool _fsiChecked = false;
+
   @override
   void initState() {
     super.initState();
-    _setupAlarmListener();
+    WidgetsBinding.instance.addObserver(this);
+    _actionDrainTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      NotificationActionService(db).drainPendingActions();
+    });
   }
 
-  void _setupAlarmListener() {
-    Alarm.ringStream.stream.listen((alarmSettings) async {
-      try {
-        // When an alarm rings, fetch the medication details and navigate to alarm screen
-        final intakeId = alarmSettings.id;
-        
-        // Get intake details from database
-        final intake = await (db.select(db.medicationIntakeLogs)
-              ..where((log) => log.id.equals(intakeId)))
-            .getSingleOrNull();
-        
-        if (intake == null) return;
-        
-        // Get medication details
-        final medication = await (db.select(db.medications)
-              ..where((m) => m.id.equals(intake.medicationId)))
-            .getSingleOrNull();
-        
-        if (medication == null) return;
-        
-        // Get plan details for dosage
-        final plan = await (db.select(db.medicationPlans)
-              ..where((p) => p.id.equals(intake.planId)))
-            .getSingleOrNull();
-        
-        String dosage = '';
-        if (plan != null) {
-          final dosageCount = plan.dosageAmount.toInt();
-          dosage = '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}';
-        }
-        
-        // Navigate to alarm screen
-        if (mounted) {
-          final context = rootNavigatorKey.currentContext;
-          if (context != null) {
-            context.push('/alarm', extra: {
-              'intakeId': intakeId,
-              'medicationId': medication.id,
-              'medicationName': medication.name,
-              'dosage': dosage,
-              'medType': medication.medType,
-              'scheduledTime': intake.scheduledTime,
-            });
-          }
-        }
-      } catch (e, stackTrace) {
-        print('ERROR IN ALARM LISTENER: $e');
-        print('STACK TRACE: $stackTrace');
-      }
+  @override
+  void dispose() {
+    _actionDrainTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_skipFirstResume) {
+      _skipFirstResume = false;
+      return;
+    }
+    _refreshSchedulesOnResume();
+  }
+
+  /// Triggered when the app comes back to the foreground. Extends the intake
+  /// schedule horizon and re-arms OS notifications/alarms so a long backgrounded
+  /// session can't leave the user without upcoming reminders.
+  Future<void> _refreshSchedulesOnResume() async {
+    // Pick up any notification action taps made while backgrounded.
+    await NotificationActionService(db).drainPendingActions();
+    // Re-check server messages (throttled inside; silent when offline).
+    ServerMessageService(db).syncFromServer();
+    try {
+      final generator = IntakeScheduleGenerator(db);
+      await generator.generateScheduledIntakes().timeout(
+        const Duration(seconds: 30),
+      );
+    } catch (e) {
+      Logger('main').warning('Resume: generateScheduledIntakes failed: $e');
+    }
+    try {
+      await NotificationService()
+          .scheduleAllUpcomingNotifications(db)
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      Logger('main').warning('Resume: scheduleAllUpcomingNotifications failed: $e');
+    }
+  }
+
+  /// Re-checks the Android 14+ full-screen-intent permission once per launch.
+  /// Without it, alarm reminders can't appear over the lock screen — and the
+  /// grant is silently lost on an uninstall/reinstall or an OS upgrade, so the
+  /// onboarding-time check alone isn't enough.
+  void _scheduleFullScreenIntentCheck() {
+    if (_fsiChecked) return;
+    _fsiChecked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _promptFullScreenIntentIfNeeded();
     });
+  }
+
+  Future<void> _promptFullScreenIntentIfNeeded() async {
+    // Let the app settle — and let any cold-start alarm screen open first.
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    // Never interrupt a ringing alarm with this dialog.
+    if (Alarm.ringing.value.alarms.isNotEmpty) return;
+    if (await AlarmPermissions.isFullScreenIntentAllowed()) return;
+
+    final context = rootNavigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Symbols.lock_open),
+        title: const Text('Opomniki se ne prikažejo čez zaklenjen zaslon'),
+        content: const Text(
+          'Da se opomnik za zdravilo pokaže čez zaklenjen zaslon — brez '
+          'predhodnega odklepanja — mora imeti Lekec dovoljenje za '
+          'celozaslonska obvestila.\n\nTo dovoljenje se ponastavi ob ponovni '
+          'namestitvi aplikacije. Odprite nastavitve in ga znova omogočite.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Pozneje'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              AlarmPermissions.openFullScreenIntentSettings();
+            },
+            child: const Text('Odpri nastavitve'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final onboardingStatus = ref.watch(onboardingStatusProvider);
 
-    return MaterialApp.router(
-      title: 'Lekec',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode.value ?? ThemeMode.system,
-      routerConfig: _router,
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-final GlobalKey<_MyHomePageState> homePageKey = GlobalKey<_MyHomePageState>();
-
-class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
-  final controller = TimeIslandController();
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-  bool _isExpanded = false;
-  final ScrollController _scrollController = ScrollController();
-
-  Map<String, List<Map<String, dynamic>>> _groupedIntakes = {};
-  late IntakeLogService _intakeService;
-
-  // Time Island state
-  Map<String, dynamic>? _nextMedication;
-  Timer? _islandUpdateTimer;
-  Timer? _dayChangeTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _intakeService = IntakeLogService(db);
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 250),
-      vsync: this,
-    );
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-    loadTodaysIntakes();
-    _updateTimeIsland();
-    _startIslandUpdateTimer();
-    _startDayChangeTimer();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _scrollController.dispose();
-    _islandUpdateTimer?.cancel();
-    _dayChangeTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startDayChangeTimer() {
-    // Calculate time until midnight
-    final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-    final timeUntilMidnight = tomorrow.difference(now);
-
-    // Schedule refresh at midnight
-    _dayChangeTimer = Timer(timeUntilMidnight, () {
-      if (mounted) {
-        loadTodaysIntakes();
-        // Restart timer for next day
-        _startDayChangeTimer();
-      }
-    });
-  }
-
-  void _startIslandUpdateTimer() {
-    // Update every second to keep island fresh
-    _islandUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateTimeIsland();
-    });
-  }
-
-  Future<void> _updateTimeIsland() async {
-    final nextMed = await _intakeService.getNextMedication();
-    if (mounted) {
-      setState(() {
-        _nextMedication = nextMed;
-      });
-      controller.update();
-    }
-  }
-
-  Future<void> loadTodaysIntakes({bool autoScroll = true}) async {
-    final grouped = await _intakeService.loadTodaysIntakes();
-
-    setState(() {
-      _groupedIntakes = grouped;
-    });
-
-    // Update time island after loading intakes
-    await _updateTimeIsland();
-
-    // Scroll to next intake only if autoScroll is true
-    if (autoScroll) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToNextIntake();
-      });
-    }
-  }
-
-  void _scrollToNextIntake() {
-    if (_groupedIntakes.isEmpty) return;
-
-    final now = DateTime.now();
-    final times = _groupedIntakes.keys.toList();
-
-    // Find the next upcoming time
-    int nextIndex = times.indexWhere((timeStr) {
-      final parts = timeStr.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-      final timeToday = DateTime(now.year, now.month, now.day, hour, minute);
-      return timeToday.isAfter(now);
-    });
-
-    if (nextIndex > 0 && _scrollController.hasClients) {
-      // Scroll to show the next time slot near the top
-      // Each time slot + cards is roughly 100-150px, adjust as needed
-      final offset = (nextIndex * 120.0).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      _scrollController.animateTo(
-        offset,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  void scrollToIntake(int intakeId) {
-    if (_groupedIntakes.isEmpty || !_scrollController.hasClients) return;
-
-    // Find the time slot containing this intake
-    int targetIndex = -1;
-    for (int i = 0; i < _groupedIntakes.keys.length; i++) {
-      final timeKey = _groupedIntakes.keys.elementAt(i);
-      final intakes = _groupedIntakes[timeKey] ?? [];
-      if (intakes.any((intake) => intake['intake'].id == intakeId)) {
-        targetIndex = i;
-        break;
-      }
-    }
-
-    if (targetIndex >= 0) {
-      // Scroll to the time slot containing the intake
-      final offset = (targetIndex * 120.0).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      _scrollController.animateTo(
-        offset,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  Future<void> _deleteOneTimeEntry(int intakeId) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Izbriši vnos',
-      message: 'Ali ste prepričani, da želite izbrisati ta enkraten vnos?',
-      confirmText: 'Izbriši',
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await _intakeService.deleteOneTimeEntry(intakeId);
-      await loadTodaysIntakes(autoScroll: false);
-
-      if (mounted) {
-        final colors = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Vnos izbrisan',
-              style: TextStyle(color: colors.onSurface),
-            ),
-            duration: const Duration(seconds: 2),
-            backgroundColor: colors.surfaceContainerHighest,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Napaka: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _updateIntakeStatus(
-    int intakeId,
-    MedicationStatus newStatus,
-  ) async {
-    try {
-      final wasTaken = newStatus == MedicationStatus.taken;
-      await _intakeService.updateIntakeStatus(intakeId, wasTaken);
-      await loadTodaysIntakes(autoScroll: false);
-
-      // Update time island immediately after taking medication
-      await _updateTimeIsland();
-
-      if (mounted) {
-        final colors = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              wasTaken
-                  ? 'Vnos zdravila zabeležen'
-                  : 'Zdravilo označeno kot ne-vzeto',
-              style: TextStyle(color: colors.onSurface),
-            ),
-            duration: const Duration(seconds: 2),
-            backgroundColor: colors.surfaceContainerHighest,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Napaka: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  void _toggleSpeedDial() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
-    });
-  }
-
-  void _onAddSingleEntry() async {
-    _toggleSpeedDial();
-    await context.push('/add-single-entry');
-    // Refresh after returning from adding entry
-    await loadTodaysIntakes(autoScroll: false);
-  }
-
-  void _onAddNewMedication() async {
-    _toggleSpeedDial();
-    await context.push('/add-medication');
-    // Refresh after returning from adding medication
-    await loadTodaysIntakes(autoScroll: false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: _nextMedication != null
-                      ? TimeIsland(
-                          medicationName:
-                              (_nextMedication!['medication'] as Medication)
-                                  .name,
-                          totalDuration: const Duration(minutes: 30),
-                          remainingDuration:
-                              _nextMedication!['timeUntil'] as Duration,
-                          isOverdue: _nextMedication!['isOverdue'] as bool,
-                          controller: controller,
-                        )
-                      : TimeIsland(
-                          totalDuration: const Duration(minutes: 30),
-                          remainingDuration: const Duration(minutes: 30),
-                          isOverdue: false,
-                          controller: controller,
-                        ),
-                ),
-              ),
-              Expanded(
-                child: _groupedIntakes.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Ni načrtovanih zdravil za danes',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.only(
-                          left: 16.0,
-                          right: 16.0,
-                          bottom: 88.0,
-                        ),
-                        itemCount: _groupedIntakes.length,
-                        itemBuilder: (context, index) {
-                          final timeKey = _groupedIntakes.keys.elementAt(index);
-                          final intakesAtTime = _groupedIntakes[timeKey]!;
-
-                          // Determine if this time slot is in the past
-                          final now = DateTime.now();
-                          final parts = timeKey.split(':');
-                          final hour = int.parse(parts[0]);
-                          final minute = int.parse(parts[1]);
-                          final slotTime = DateTime(
-                            now.year,
-                            now.month,
-                            now.day,
-                            hour,
-                            minute,
-                          );
-                          // Add 10 minute grace period before marking as "not taken"
-                          final gracePeriodEnd = slotTime.add(
-                            const Duration(minutes: 10),
-                          );
-                          // 10 minute window for green border
-                          final borderWindowEnd = slotTime.add(
-                            const Duration(minutes: 10),
-                          );
-                          final isPast = slotTime.isBefore(now);
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TimeSlot(time: timeKey, isPast: isPast),
-                              ...intakesAtTime.map((intakeData) {
-                                final medication =
-                                    intakeData['medication'] as Medication;
-                                final plan =
-                                    intakeData['plan'] as MedicationPlan?;
-                                final intake =
-                                    intakeData['intake'] as MedicationIntakeLog;
-                                final isOneTime =
-                                    intakeData['isOneTimeEntry'] as bool;
-
-                                // Determine status based on wasTaken and time
-                                MedicationStatus status;
-                                if (intake.wasTaken) {
-                                  status = MedicationStatus.taken;
-                                } else if (intake.takenTime != null) {
-                                  // User explicitly marked as not taken (takenTime is set but wasTaken is false)
-                                  status = MedicationStatus.notTaken;
-                                } else if (now.isAfter(gracePeriodEnd)) {
-                                  // Automatically mark as not taken after 10 minute grace period
-                                  status = MedicationStatus.notTaken;
-                                } else if (isPast) {
-                                  // During grace period - show as upcoming (clock) if user hasn't acted yet
-                                  status = MedicationStatus.upcoming;
-                                } else {
-                                  // Future medication (time hasn't arrived yet)
-                                  status = MedicationStatus.upcoming;
-                                }
-
-                                // Check if this is the next medication to take
-                                // Show border only when: time has arrived, within 10 min window, not yet taken
-                                final isInBorderWindow =
-                                    now.isAfter(slotTime) &&
-                                    now.isBefore(borderWindowEnd);
-                                final isNextMed =
-                                    _nextMedication != null &&
-                                    (_nextMedication!['intake']
-                                                as MedicationIntakeLog?)
-                                            ?.id ==
-                                        intake.id &&
-                                    status == MedicationStatus.upcoming &&
-                                    isInBorderWindow;
-
-                                // For one-time entries, dosage is stored in the intake log
-                                final dosageAmount = plan?.dosageAmount ?? 1.0;
-                                final dosageCount = dosageAmount.toInt();
-
-                                // Enable swipes only if time has passed (isPast)
-                                // For future medications, disable swiping
-                                // For one-time entries, only enable left swipe (delete)
-                                final canSwipeScheduled = isPast && !isOneTime;
-                                final canDeleteOneTime = isPast && isOneTime;
-
-                                return MedicationCard(
-                                  medName: medication.name,
-                                  dosage:
-                                      '$dosageCount ${getMedicationUnit(medication.medType, dosageCount)}',
-                                  medicineRemaining:
-                                      '', // TODO: Calculate remaining
-                                  pillCount:
-                                      0, // TODO: Calculate from inventory
-                                  showName: false,
-                                  username: 'jaz', // TODO: Get from user
-                                  userId: '1',
-                                  status: status,
-                                  isOneTimeEntry: isOneTime,
-                                  enableLeftSwipe: canSwipeScheduled || canDeleteOneTime,
-                                  enableRightSwipe: canSwipeScheduled,
-                                  isNextMedication: isNextMed,
-                                  onStatusChanged: isOneTime
-                                      ? null
-                                      : (newStatus) async {
-                                          await _updateIntakeStatus(
-                                            intake.id,
-                                            newStatus,
-                                          );
-                                        },
-                                  onDelete: isOneTime
-                                      ? () async {
-                                          await _deleteOneTimeEntry(intake.id);
-                                        }
-                                      : null,
-                                );
-                              }),
-                            ],
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-          // Full-screen barrier when FAB is expanded
-          if (_isExpanded)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  if (_isExpanded) {
-                    _toggleSpeedDial();
+    return onboardingStatus.when(
+      data: (isCompleted) {
+        if (!isCompleted) {
+          // Show onboarding flow
+          return MaterialApp(
+            title: 'Lekec',
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeMode.value ?? ThemeMode.system,
+            home: OnboardingFlow(
+              onComplete: () {
+                // Refresh the onboarding status to show the main app
+                ref.invalidate(onboardingStatusProvider);
+                // Use a slight delay to ensure the provider updates before navigation
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (rootNavigatorKey.currentContext != null) {
+                    rootNavigatorKey.currentContext!.go('/meds');
                   }
-                },
-                child: Container(color: Colors.black.withOpacity(0.01)),
-              ),
+                });
+              },
             ),
-        ],
+          );
+        }
+
+        // Show main app
+        _scheduleFullScreenIntentCheck();
+        return MaterialApp.router(
+          title: 'Lekec',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeMode.value ?? ThemeMode.system,
+          routerConfig: _router,
+        );
+      },
+      loading: () => MaterialApp(
+        title: 'Lekec',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode.value ?? ThemeMode.system,
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Speed dial options
-          AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) {
-              if (!_isExpanded && _animation.value == 0) {
-                return const SizedBox.shrink();
-              }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Option 2: Add new medication
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Dodaj novo zdravilo',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'add_medication',
-                              mini: true,
-                              onPressed: _onAddNewMedication,
-                              child: const Icon(Symbols.pill),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Option 1: Add single entry
-                  Transform.scale(
-                    scale: _animation.value,
-                    alignment: Alignment.centerRight,
-                    child: Opacity(
-                      opacity: _animation.value,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Dodaj enkraten vnos zdravila',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FloatingActionButton(
-                              heroTag: 'add_entry',
-                              mini: true,
-                              onPressed: _onAddSingleEntry,
-                              child: const Icon(Symbols.add),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          // Main FAB
-          FloatingActionButton(
-            heroTag: 'main_fab',
-            onPressed: _toggleSpeedDial,
-            tooltip: 'Dodaj',
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                bottomLeft: Radius.circular(32),
-                topRight: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-            ),
-            child: AnimatedRotation(
-              turns: _isExpanded ? 0.125 : 0,
-              duration: const Duration(milliseconds: 250),
-              child: const Icon(Symbols.pill),
-            ),
-          ),
-        ],
+      error: (error, stack) => MaterialApp(
+        title: 'Lekec',
+        theme: AppTheme.light,
+        home: Scaffold(body: Center(child: Text('Napaka: $error'))),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

@@ -2,25 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 
-enum AdvancedScheduleType {
-  interval,
-  multipleTimes,
-  specificDays,
-  cyclic,
-}
+enum AdvancedScheduleType { interval, multipleTimes, specificDays, cyclic }
 
 class AdvancedMedicationPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const AdvancedMedicationPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -31,6 +31,24 @@ class AdvancedMedicationPlanningScreen extends ConsumerStatefulWidget {
 class _AdvancedMedicationPlanningScreenState
     extends ConsumerState<AdvancedMedicationPlanningScreen> {
   AdvancedScheduleType? _selectedType;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-select schedule type if extracted from label
+    if (widget.extractedData?.dosageFrequency != null) {
+      final suggestedType = widget.extractedData!.dosageFrequency!.toAdvancedScheduleType();
+      if (suggestedType != null) {
+        _selectedType = suggestedType;
+      }
+    }
+  }
+
+  /// Check if this option was suggested by AI
+  bool _isSuggestedByAI(AdvancedScheduleType type) {
+    if (widget.extractedData?.dosageFrequency == null) return false;
+    return widget.extractedData!.dosageFrequency!.toAdvancedScheduleType() == type;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +82,36 @@ class _AdvancedMedicationPlanningScreenState
                   color: colors.onSurfaceVariant,
                 ),
               ),
+              // Show AI suggestion hint if available
+              if (widget.extractedData?.dosageFrequency?.rawText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Symbols.auto_awesome,
+                        size: 16,
+                        color: colors.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Z nalepke: "${widget.extractedData!.dosageFrequency!.rawText}"',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
               _buildScheduleOption(
                 type: AdvancedScheduleType.interval,
@@ -71,6 +119,7 @@ class _AdvancedMedicationPlanningScreenState
                 title: 'Interval',
                 description: 'Na X ur ali X dni',
                 colors: colors,
+                isSuggestedByAI: _isSuggestedByAI(AdvancedScheduleType.interval),
               ),
               const SizedBox(height: 16),
               _buildScheduleOption(
@@ -79,6 +128,7 @@ class _AdvancedMedicationPlanningScreenState
                 title: 'Večkrat dnevno',
                 description: 'Določite število vnosov na dan',
                 colors: colors,
+                isSuggestedByAI: _isSuggestedByAI(AdvancedScheduleType.multipleTimes),
               ),
               const SizedBox(height: 16),
               _buildScheduleOption(
@@ -87,6 +137,7 @@ class _AdvancedMedicationPlanningScreenState
                 title: 'Specifični dnevi v tednu',
                 description: 'Izberite dneve v tednu',
                 colors: colors,
+                isSuggestedByAI: _isSuggestedByAI(AdvancedScheduleType.specificDays),
               ),
               const SizedBox(height: 16),
               _buildScheduleOption(
@@ -95,6 +146,7 @@ class _AdvancedMedicationPlanningScreenState
                 title: 'Ciklično',
                 description: 'Npr. 10 dni jemanja, 20 dni pavze',
                 colors: colors,
+                isSuggestedByAI: _isSuggestedByAI(AdvancedScheduleType.cyclic),
               ),
               const Spacer(),
               FilledButton(
@@ -107,10 +159,7 @@ class _AdvancedMedicationPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -127,6 +176,7 @@ class _AdvancedMedicationPlanningScreenState
     required String title,
     required String description,
     required ColorScheme colors,
+    bool isSuggestedByAI = false,
   }) {
     final isSelected = _selectedType == type;
 
@@ -139,8 +189,10 @@ class _AdvancedMedicationPlanningScreenState
           color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? colors.primary : Colors.transparent,
-            width: 2,
+            color: isSelected
+                ? colors.primary
+                : colors.outlineVariant.withOpacity(0.5),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
@@ -148,7 +200,9 @@ class _AdvancedMedicationPlanningScreenState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? colors.primary : colors.surfaceContainerHigh,
+                color: isSelected
+                    ? colors.primary
+                    : colors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -162,33 +216,58 @@ class _AdvancedMedicationPlanningScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: isSelected
                               ? colors.onPrimaryContainer
                               : colors.onSurface,
                         ),
+                      ),
+                      if (isSuggestedByAI) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colors.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Symbols.auto_awesome, size: 12, color: colors.onPrimaryContainer),
+                              const SizedBox(width: 2),
+                              Text(
+                                'AI',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: colors.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     description,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isSelected
-                              ? colors.onPrimaryContainer
-                              : colors.onSurfaceVariant,
-                        ),
+                      color: isSelected
+                          ? colors.onPrimaryContainer
+                          : colors.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
             ),
             if (isSelected)
-              Icon(
-                Symbols.check_circle,
-                color: colors.primary,
-                size: 24,
-              ),
+              Icon(Symbols.check_circle, color: colors.primary, size: 24),
           ],
         ),
       ),
@@ -200,32 +279,52 @@ class _AdvancedMedicationPlanningScreenState
 
     switch (_selectedType!) {
       case AdvancedScheduleType.interval:
-        context.push('/add-medication/advanced-planning/interval', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/interval',
+          extra: {
+            'name': widget.medicationName,
+            'medTypeIndex': widget.medType.index,
+            'intakeAdvice': widget.intakeAdvice,
+            'userId': widget.userId,
+            'extractedData': widget.extractedData,
+          },
+        );
         break;
       case AdvancedScheduleType.multipleTimes:
-        context.push('/add-medication/advanced-planning/multiple-times', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/multiple-times',
+          extra: {
+            'name': widget.medicationName,
+            'medTypeIndex': widget.medType.index,
+            'intakeAdvice': widget.intakeAdvice,
+            'userId': widget.userId,
+            'extractedData': widget.extractedData,
+          },
+        );
         break;
       case AdvancedScheduleType.specificDays:
-        context.push('/add-medication/advanced-planning/specific-days', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/specific-days',
+          extra: {
+            'name': widget.medicationName,
+            'medTypeIndex': widget.medType.index,
+            'intakeAdvice': widget.intakeAdvice,
+            'userId': widget.userId,
+            'extractedData': widget.extractedData,
+          },
+        );
         break;
       case AdvancedScheduleType.cyclic:
-        context.push('/add-medication/advanced-planning/cyclic', extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'intakeAdvice': widget.intakeAdvice,
-        });
+        context.push(
+          '/add-medication/advanced-planning/cyclic',
+          extra: {
+            'name': widget.medicationName,
+            'medTypeIndex': widget.medType.index,
+            'intakeAdvice': widget.intakeAdvice,
+            'userId': widget.userId,
+            'extractedData': widget.extractedData,
+          },
+        );
         break;
     }
   }

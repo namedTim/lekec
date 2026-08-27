@@ -4,11 +4,7 @@ class TimeSlot extends StatelessWidget {
   final String time;
   final bool isPast;
 
-  const TimeSlot({
-    super.key,
-    required this.time,
-    this.isPast = false,
-  });
+  const TimeSlot({super.key, required this.time, this.isPast = false});
 
   @override
   Widget build(BuildContext context) {
@@ -16,13 +12,11 @@ class TimeSlot extends StatelessWidget {
     final colors = theme.colorScheme;
 
     // Past dosages: grey, Upcoming: green
-    final backgroundColor = isPast 
-        ? colors.surfaceContainerHighest 
+    final backgroundColor = isPast
+        ? colors.surfaceContainerHighest
         : Colors.green;
-    
-    final textColor = isPast 
-        ? colors.onSurfaceVariant 
-        : Colors.white;
+
+    final textColor = isPast ? colors.onSurfaceVariant : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 8),

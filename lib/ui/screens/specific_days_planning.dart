@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
 
 class SpecificDaysPlanningScreen extends ConsumerStatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const SpecificDaysPlanningScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -24,6 +29,16 @@ class SpecificDaysPlanningScreen extends ConsumerStatefulWidget {
 class _SpecificDaysPlanningScreenState
     extends ConsumerState<SpecificDaysPlanningScreen> {
   final Set<int> _selectedDays = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-select the AI-extracted weekdays (0=Monday .. 6=Sunday).
+    final days = widget.extractedData?.dosageFrequency?.specificDays;
+    if (days != null) {
+      _selectedDays.addAll(days.where((d) => d >= 0 && d <= 6));
+    }
+  }
 
   final List<String> _dayNames = [
     'Ponedeljek',
@@ -94,9 +109,10 @@ class _SpecificDaysPlanningScreenState
                             color: colors.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color:
-                                  isSelected ? colors.primary : Colors.transparent,
-                              width: 2,
+                              color: isSelected
+                                  ? colors.primary
+                                  : colors.outlineVariant.withOpacity(0.5),
+                              width: isSelected ? 2 : 1,
                             ),
                           ),
                           child: Row(
@@ -138,10 +154,7 @@ class _SpecificDaysPlanningScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 24),
@@ -154,12 +167,16 @@ class _SpecificDaysPlanningScreenState
 
   void _handleContinue() {
     // Navigate to time selection screen
-    context.push('/add-medication/advanced-planning/specific-days/times',
-        extra: {
-          'name': widget.medicationName,
-          'medType': widget.medType,
-          'selectedDays': _selectedDays.toList(),
-          'intakeAdvice': widget.intakeAdvice,
-        });
+    context.push(
+      '/add-medication/advanced-planning/specific-days/times',
+      extra: {
+        'name': widget.medicationName,
+        'medTypeIndex': widget.medType.index,
+        'selectedDays': _selectedDays.toList(),
+        'intakeAdvice': widget.intakeAdvice,
+        'userId': widget.userId,
+        'extractedData': widget.extractedData,
+      },
+    );
   }
 }

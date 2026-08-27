@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:lekec/database/tables/users.dart';
-import 'package:lekec/database/tables/medications.dart';
+import 'users.dart';
+import 'medications.dart';
 
 class MedicationPlans extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -10,7 +10,6 @@ class MedicationPlans extends Table {
   DateTimeColumn get startDate => dateTime()();
   DateTimeColumn get endDate => dateTime().nullable()();
 
-  RealColumn get dosageAmount => real()();  // mg, ml, unit, etc.
+  RealColumn get dosageAmount => real()(); // mg, ml, unit, etc.
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-
 }

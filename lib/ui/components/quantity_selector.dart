@@ -1,17 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+/// Formats a double for display: shows "0.5", "1", "2" (no trailing .0)
+String _formatQuantity(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+  // Show at most 2 decimal places, strip trailing zeros
+  final s = value.toStringAsFixed(2);
+  // Remove trailing zeros after decimal point
+  if (s.contains('.')) {
+    final trimmed = s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+    return trimmed;
+  }
+  return s;
+}
+
+/// Parses a number string, treating comma as decimal separator
+double? _parseNumber(String text) {
+  final normalized = text.trim().replaceAll(',', '.');
+  return double.tryParse(normalized);
+}
+
 class QuantitySelector extends StatefulWidget {
-  final int initialValue;
-  final int minValue;
-  final int maxValue;
+  final double initialValue;
+  final double minValue;
+  final double maxValue;
+  final double step;
   final String label;
 
   const QuantitySelector({
     super.key,
     this.initialValue = 1,
-    this.minValue = 1,
+    this.minValue = 0.5,
     this.maxValue = 99,
+    this.step = 1,
     this.label = 'Količina',
   });
 
@@ -20,7 +43,7 @@ class QuantitySelector extends StatefulWidget {
 }
 
 class _QuantitySelectorState extends State<QuantitySelector> {
-  late int _value;
+  late double _value;
 
   @override
   void initState() {
@@ -30,33 +53,38 @@ class _QuantitySelectorState extends State<QuantitySelector> {
 
   void _increment() {
     if (_value < widget.maxValue) {
-      setState(() => _value++);
+      final raw = _value + widget.step;
+      // Round to 2 decimal places to avoid floating point drift
+      final rounded = (raw * 100).round() / 100;
+      setState(() => _value = rounded.clamp(widget.minValue, widget.maxValue));
     }
   }
 
   void _decrement() {
     if (_value > widget.minValue) {
-      setState(() => _value--);
+      final raw = _value - widget.step;
+      final rounded = (raw * 100).round() / 100;
+      setState(() => _value = rounded.clamp(widget.minValue, widget.maxValue));
     }
   }
 
   Future<void> _showManualInput() async {
-    final controller = TextEditingController(text: _value.toString());
-    final result = await showDialog<int>(
+    final controller = TextEditingController(text: _formatQuantity(_value));
+    final result = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Vnesi količino'),
         content: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           autofocus: true,
           decoration: InputDecoration(
             labelText: widget.label,
-            hintText: '${widget.minValue} - ${widget.maxValue}',
+            hintText: '${_formatQuantity(widget.minValue)} - ${_formatQuantity(widget.maxValue)}',
             border: const OutlineInputBorder(),
           ),
           onSubmitted: (value) {
-            final parsed = int.tryParse(value);
+            final parsed = _parseNumber(value);
             if (parsed != null &&
                 parsed >= widget.minValue &&
                 parsed <= widget.maxValue) {
@@ -71,7 +99,7 @@ class _QuantitySelectorState extends State<QuantitySelector> {
           ),
           FilledButton(
             onPressed: () {
-              final parsed = int.tryParse(controller.text);
+              final parsed = _parseNumber(controller.text);
               if (parsed != null &&
                   parsed >= widget.minValue &&
                   parsed <= widget.maxValue) {
@@ -80,7 +108,8 @@ class _QuantitySelectorState extends State<QuantitySelector> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        'Vnesi število med ${widget.minValue} in ${widget.maxValue}'),
+                      'Vnesi število med ${_formatQuantity(widget.minValue)} in ${_formatQuantity(widget.maxValue)}',
+                    ),
                   ),
                 );
               }
@@ -137,11 +166,17 @@ class _QuantitySelectorState extends State<QuantitySelector> {
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  _value.toString(),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colors.primary,
+                // FittedBox keeps long values (e.g. "9999") inside the
+                // 60-wide box by scaling them down, so the +/- buttons
+                // never get pushed out of the dialog.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _formatQuantity(_value),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colors.primary,
+                    ),
                   ),
                 ),
               ),
@@ -173,19 +208,21 @@ class _QuantitySelectorState extends State<QuantitySelector> {
   }
 }
 
-Future<int?> showQuantitySelector(
+Future<double?> showQuantitySelector(
   BuildContext context, {
-  int initialValue = 1,
-  int minValue = 1,
-  int maxValue = 99,
+  double initialValue = 1,
+  double minValue = 0.5,
+  double maxValue = 99,
+  double step = 1,
   String label = 'Količina',
 }) {
-  return showDialog<int>(
+  return showDialog<double>(
     context: context,
     builder: (context) => QuantitySelector(
       initialValue: initialValue,
       minValue: minValue,
       maxValue: maxValue,
+      step: step,
       label: label,
     ),
   );

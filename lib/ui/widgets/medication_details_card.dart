@@ -2,7 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../components/quantity_selector.dart';
 import '../../database/tables/medications.dart';
+import '../../helpers/medication_icon_helper.dart';
 import '../../helpers/medication_unit_helper.dart';
+
+class _AddPillIcon extends StatelessWidget {
+  const _AddPillIcon({
+    required this.pillColor,
+    required this.badgeColor,
+    required this.badgeBorderColor,
+    required this.badgeIconColor,
+  });
+
+  final Color pillColor;
+  final Color badgeColor;
+  final Color badgeBorderColor;
+  final Color badgeIconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: Icon(Symbols.pill, size: 30, color: pillColor)),
+          Positioned(
+            right: -6,
+            top: 1,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: badgeBorderColor, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Symbols.add,
+                size: 12,
+                color: badgeIconColor,
+                weight: 700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class MedicationDetailsCard extends StatelessWidget {
   const MedicationDetailsCard({
@@ -13,20 +62,24 @@ class MedicationDetailsCard extends StatelessWidget {
     required this.frequency,
     required this.times,
     required this.medType,
-    this.criticalReminder = false,
+    this.userName,
     this.onAddMedication,
     this.onDelete,
+    this.isAsNeeded = false,
+    this.onLogIntake,
   });
 
   final String medName;
+  final String? userName;
   final String dosage;
   final int pillsRemaining;
-  final String frequency; // e.g., "2x dnevno", "1x dnevno"
-  final List<String> times; // e.g., ["8:00", "20:00"]
+  final String frequency;
+  final List<String> times;
   final MedicationType medType;
-  final bool criticalReminder;
-  final Function(int)? onAddMedication;
+  final Function(double)? onAddMedication;
   final VoidCallback? onDelete;
+  final bool isAsNeeded;
+  final VoidCallback? onLogIntake;
 
   Color _getPillCountColor(int count) {
     if (count >= 20) {
@@ -60,12 +113,27 @@ class MedicationDetailsCard extends StatelessWidget {
     return 'ob $allButLast in ${times.last}';
   }
 
+  Widget _buildTypeIcon() {
+    final style = getMedicationStyle(medType);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: style.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: Icon(style.icon, size: 26, color: style.color),
+    );
+  }
+
   Future<void> _handleAddMedication(BuildContext context) async {
     final quantity = await showQuantitySelector(
       context,
       initialValue: 1,
-      minValue: -pillsRemaining, // Allow negative to zero out
-      maxValue: 999,
+      minValue: -pillsRemaining.toDouble(),
+      maxValue: 99999,
+      step: 1,
       label: 'Število ${getMedicationUnitShort(medType, 5)}',
     );
     if (quantity != null) {
@@ -82,7 +150,7 @@ class MedicationDetailsCard extends StatelessWidget {
       key: Key('medication_$medName${DateTime.now().millisecondsSinceEpoch}'),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: colors.error,
           borderRadius: BorderRadius.circular(20),
@@ -98,15 +166,19 @@ class MedicationDetailsCard extends StatelessWidget {
         return false; // Don't actually dismiss, let parent handle it
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colors.surface,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: colors.outlineVariant.withOpacity(0.5),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 80,
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
@@ -114,24 +186,19 @@ class MedicationDetailsCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            _buildTypeIcon(),
+            const SizedBox(width: 14),
             // Main content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Medicine name with alarm icon
+                  // Medicine name + dosage
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      if (criticalReminder) ...[
-                        Icon(
-                          Symbols.alarm,
-                          size: 20,
-                          color: colors.error,
-                          fill: 1,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Expanded(
+                      Flexible(
                         child: Text(
                           medName,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -139,17 +206,14 @@ class MedicationDetailsCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        dosage,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
                     ],
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Dosage
-                  Text(
-                    dosage,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
                   ),
 
                   const SizedBox(height: 8),
@@ -175,41 +239,95 @@ class MedicationDetailsCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Remaining pills chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getPillCountColor(pillsRemaining),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$pillsRemaining preostalo',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                  // Remaining pills chip + user name
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getPillCountColor(pillsRemaining),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'še $pillsRemaining ${getMedicationUnit(medType, pillsRemaining)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      if (userName != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Symbols.person, size: 14, color: colors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              userName!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
                 ],
               ),
             ),
 
-            // Add button
-            Container(
-              margin: const EdgeInsets.only(left: 12),
-              decoration: BoxDecoration(
-                color: colors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                onPressed: () => _handleAddMedication(context),
-                icon: const Icon(Symbols.add),
-                color: colors.onPrimary,
-                tooltip: 'Dodaj zdravilo',
-              ),
+            // Action buttons
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isAsNeeded && onLogIntake != null)
+                  Container(
+                    margin: const EdgeInsets.only(left: 12, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: onLogIntake,
+                      icon: const Icon(Symbols.task_alt),
+                      color: colors.onPrimary,
+                      tooltip: 'Zabeleži vnos',
+                      iconSize: 22,
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                    ),
+                  ),
+                Container(
+                  margin: const EdgeInsets.only(left: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: () => _handleAddMedication(context),
+                    icon: _AddPillIcon(
+                      pillColor: colors.onSurfaceVariant,
+                      badgeColor: colors.primary,
+                      badgeBorderColor: colors.surfaceContainerHighest,
+                      badgeIconColor: colors.onPrimary,
+                    ),
+                    color: colors.onSurfaceVariant,
+                    tooltip: 'Upravljaj zalogo',
+                    iconSize: 32,
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

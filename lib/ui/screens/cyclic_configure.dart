@@ -3,12 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/features/meds/providers/medications_provider.dart';
-import 'package:lekec/features/core/providers/intake_schedule_provider.dart';
-import 'package:lekec/main.dart' show homePageKey;
-import 'package:lekec/ui/components/quantity_selector.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../../utils/time_parse.dart';
+import '../../features/meds/providers/medications_provider.dart';
+import '../../features/core/providers/intake_schedule_provider.dart';
+import '../../main.dart' show homePageKey;
+import '../components/hinted_scroll_view.dart';
+import '../components/quantity_selector.dart';
+import '../components/critical_reminder_recap.dart';
+import '../components/stop_date_selector.dart';
 
 class CyclicConfigureScreen extends ConsumerStatefulWidget {
   final String medicationName;
@@ -16,6 +21,8 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
   final int takingDays;
   final int pauseDays;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const CyclicConfigureScreen({
     super.key,
@@ -24,6 +31,8 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
     required this.takingDays,
     required this.pauseDays,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -34,8 +43,30 @@ class CyclicConfigureScreen extends ConsumerStatefulWidget {
 class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
   final List<TimeOfDay> _times = [];
   int _initialQuantity = 0;
-  int _dosageAmount = 1;
+  double _dosageAmount = 1;
   bool _isSaving = false;
+  bool _criticalReminder = true;
+  StopCondition _stopCondition = const StopCondition.never();
+
+  @override
+  void initState() {
+    super.initState();
+    final freq = widget.extractedData?.dosageFrequency;
+    if (freq == null) return;
+    // Recommended intake times (start hours) from the label / AI.
+    for (final s in freq.suggestedTimes ?? const <String>[]) {
+      final t = parseTimeOfDay(s);
+      if (t != null) _times.add(t);
+    }
+    // Dose per intake.
+    final amount = freq.amountPerDose;
+    if (amount != null && amount > 0) _dosageAmount = amount;
+    // Treatment duration → stop condition.
+    final duration = freq.durationDays;
+    if (duration != null && duration > 0) {
+      _stopCondition = StopCondition.afterDays(duration);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +82,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
         title: const Text('Časi opomnikov'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: HintedScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +138,8 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
               const SizedBox(height: 32),
 
               // Times list
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
                 child: _times.isEmpty
                     ? Center(
                         child: Text(
@@ -118,6 +150,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                         ),
                       )
                     : ListView.builder(
+                        shrinkWrap: true,
                         itemCount: _times.length,
                         itemBuilder: (context, index) {
                           return Padding(
@@ -182,7 +215,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                     context,
                     initialValue: _dosageAmount,
                     minValue: 1,
-                    maxValue: 99,
+                    maxValue: 9999,
                     label: 'Količina na vnos',
                   );
                   if (quantity != null) {
@@ -212,7 +245,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$_dosageAmount',
+                              '${_dosageAmount == _dosageAmount.roundToDouble() ? _dosageAmount.toInt().toString() : _dosageAmount.toString()}',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -236,13 +269,14 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
                 onTap: () async {
                   final quantity = await showQuantitySelector(
                     context,
-                    initialValue: _initialQuantity > 0 ? _initialQuantity : 1,
+                    initialValue: _initialQuantity > 0 ? _initialQuantity.toDouble() : 1,
                     minValue: 0,
-                    maxValue: 999,
+                    maxValue: 99999,
+                    step: 1,
                     label: 'Začetna zaloga',
                   );
                   if (quantity != null) {
-                    setState(() => _initialQuantity = quantity);
+                    setState(() => _initialQuantity = quantity.toInt());
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -296,6 +330,21 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Stop date (optional end of plan)
+              StopDateCard(
+                condition: _stopCondition,
+                startDate: DateTime.now(),
+                onChanged: (c) => setState(() => _stopCondition = c),
+              ),
+              const SizedBox(height: 16),
+
+              // Critical Reminder Recap
+              CriticalReminderRecap(
+                enabled: _criticalReminder,
+                onChanged: (value) => setState(() => _criticalReminder = value),
+              ),
+              const SizedBox(height: 24),
+
               FilledButton(
                 onPressed: _times.isNotEmpty && !_isSaving ? _handleSave : null,
                 style: FilledButton.styleFrom(
@@ -344,6 +393,7 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
           medType: drift.Value(widget.medType),
           intakeAdvice: drift.Value(widget.intakeAdvice),
           dosagesRemaining: drift.Value(initialQuantity),
+          criticalReminder: drift.Value(_criticalReminder),
         ),
       );
 
@@ -357,10 +407,11 @@ class _CyclicConfigureScreenState extends ConsumerState<CyclicConfigureScreen> {
 
       // Create cyclic plan
       await planService.createCyclicPlan(
-        userId: 1, // TODO: Get from auth
+        userId: widget.userId,
         medicationId: medicationId,
         startDate: DateTime.now(),
-        dosageAmount: _dosageAmount.toDouble(),
+        endDate: resolveEndDate(_stopCondition, DateTime.now()),
+        dosageAmount: _dosageAmount,
         initialQuantity: initialQuantity,
         cycleDaysOn: widget.takingDays,
         cycleDaysOff: widget.pauseDays,

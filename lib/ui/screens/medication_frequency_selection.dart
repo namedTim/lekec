@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:lekec/database/tables/medications.dart';
-import 'package:lekec/ui/components/step_progress_indicator.dart';
+import '../../database/tables/medications.dart';
+import '../../services/gemini_medication_service.dart';
+import '../components/step_progress_indicator.dart';
 
-enum FrequencyOption {
-  onceDaily,
-  twiceDaily,
-  asNeeded,
-  moreOptions,
-}
+enum FrequencyOption { onceDaily, twiceDaily, asNeeded, moreOptions }
 
 class MedicationFrequencySelectionScreen extends StatefulWidget {
   final String medicationName;
   final MedicationType medType;
   final String intakeAdvice;
+  final int userId;
+  final MedicationExtractionResult? extractedData;
 
   const MedicationFrequencySelectionScreen({
     super.key,
     required this.medicationName,
     required this.medType,
     required this.intakeAdvice,
+    required this.userId,
+    this.extractedData,
   });
 
   @override
@@ -31,6 +31,18 @@ class MedicationFrequencySelectionScreen extends StatefulWidget {
 class _MedicationFrequencySelectionScreenState
     extends State<MedicationFrequencySelectionScreen> {
   FrequencyOption? _selectedFrequency;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-select frequency if extracted from label
+    if (widget.extractedData?.dosageFrequency != null) {
+      final suggestedFrequency = widget.extractedData!.dosageFrequency!.toFrequencyOption();
+      if (suggestedFrequency != null) {
+        _selectedFrequency = suggestedFrequency;
+      }
+    }
+  }
 
   String _getFrequencyLabel(FrequencyOption option) {
     switch (option) {
@@ -45,22 +57,44 @@ class _MedicationFrequencySelectionScreenState
     }
   }
 
+  /// Check if this option was suggested by AI
+  bool _isSuggestedByAI(FrequencyOption option) {
+    if (widget.extractedData?.dosageFrequency == null) return false;
+    return widget.extractedData!.dosageFrequency!.toFrequencyOption() == option;
+  }
+
   void _handleNext() {
     if (_selectedFrequency == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Izberite možnost')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Izberite možnost')));
       return;
     }
 
     if (_selectedFrequency == FrequencyOption.moreOptions) {
-      // Navigate to advanced medication planning
       context.push(
         '/add-medication/advanced-planning',
         extra: {
           'name': widget.medicationName,
-          'medType': widget.medType,
+          'medTypeIndex': widget.medType.index,
           'intakeAdvice': widget.intakeAdvice,
+          'userId': widget.userId,
+          'extractedData': widget.extractedData,
+        },
+      );
+    } else if (_selectedFrequency == FrequencyOption.twiceDaily) {
+      // Twice daily reuses the "multiple times" picker locked to 2 slots, so
+      // the user enters both intake times explicitly (instead of the second
+      // being auto-derived as first + 12h).
+      context.push(
+        '/add-medication/advanced-planning/multiple-times/times',
+        extra: {
+          'name': widget.medicationName,
+          'medTypeIndex': widget.medType.index,
+          'timesPerDay': 2,
+          'intakeAdvice': widget.intakeAdvice,
+          'userId': widget.userId,
+          'extractedData': widget.extractedData,
         },
       );
     } else {
@@ -68,9 +102,11 @@ class _MedicationFrequencySelectionScreenState
         '/add-medication/simple-planning',
         extra: {
           'name': widget.medicationName,
-          'medType': widget.medType,
-          'frequency': _selectedFrequency,
+          'medTypeIndex': widget.medType.index,
+          'frequencyIndex': _selectedFrequency!.index,
           'intakeAdvice': widget.intakeAdvice,
+          'userId': widget.userId,
+          'extractedData': widget.extractedData,
         },
       );
     }
@@ -94,34 +130,62 @@ class _MedicationFrequencySelectionScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
               Text(
                 'Kako pogosto boste jemali ${widget.medicationName}?',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 48),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: FrequencyOption.values.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final option = FrequencyOption.values[index];
-                    return _FrequencyOptionButton(
-                      label: _getFrequencyLabel(option),
-                      isSelected: _selectedFrequency == option,
-                      onTap: () {
-                        setState(() {
-                          _selectedFrequency = option;
-                        });
-                      },
-                    );
+              // Show AI suggestion hint if available
+              if (widget.extractedData?.dosageFrequency?.rawText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Symbols.auto_awesome,
+                        size: 16,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Z nalepke: "${widget.extractedData!.dosageFrequency!.rawText}"',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
+              // Options laid out at their natural height (mirrors the advanced
+              // planning screen) so the spacing scales the same on every device
+              // — the flexible Spacer below absorbs leftover height instead of
+              // a scroll viewport stretching the list.
+              for (final option in FrequencyOption.values) ...[
+                _FrequencyOptionButton(
+                  label: _getFrequencyLabel(option),
+                  isSelected: _selectedFrequency == option,
+                  isSuggestedByAI: _isSuggestedByAI(option),
+                  onTap: () {
+                    setState(() {
+                      _selectedFrequency = option;
+                    });
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
+                if (option != FrequencyOption.values.last)
+                  const SizedBox(height: 16),
+              ],
+              const Spacer(),
               FilledButton(
                 onPressed: _handleNext,
                 style: FilledButton.styleFrom(
@@ -132,30 +196,31 @@ class _MedicationFrequencySelectionScreenState
                 ),
                 child: const Text(
                   'Naprej',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
         ),
-      ),      bottomNavigationBar: const StepProgressIndicator(
+      ),
+      bottomNavigationBar: const StepProgressIndicator(
         currentStep: 2,
         totalSteps: 3,
-      ),    );
+      ),
+    );
   }
 }
 
 class _FrequencyOptionButton extends StatelessWidget {
   final String label;
   final bool isSelected;
+  final bool isSuggestedByAI;
   final VoidCallback onTap;
 
   const _FrequencyOptionButton({
     required this.label,
     required this.isSelected,
+    this.isSuggestedByAI = false,
     required this.onTap,
   });
 
@@ -173,8 +238,10 @@ class _FrequencyOptionButton extends StatelessWidget {
           color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? colors.primary : Colors.transparent,
-            width: 2,
+            color: isSelected
+                ? colors.primary
+                : colors.outlineVariant.withOpacity(0.5),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
@@ -194,6 +261,28 @@ class _FrequencyOptionButton extends StatelessWidget {
                 ),
               ),
             ),
+            if (isSuggestedByAI)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Symbols.auto_awesome, size: 14, color: colors.onPrimaryContainer),
+                    const SizedBox(width: 4),
+                    Text(
+                      'AI',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

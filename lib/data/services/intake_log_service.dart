@@ -1,10 +1,47 @@
 import 'package:drift/drift.dart' as drift;
-import 'package:lekec/database/drift_database.dart';
+import '../../database/drift_database.dart';
+import '../../database/tables/medications.dart' show MedicationStatus;
+import '../../utils/medication_utils.dart';
+import 'notification_service.dart';
 
 class IntakeLogService {
   final AppDatabase db;
 
   IntakeLogService(this.db);
+
+  /// A medication is considered "running low" once its remaining stock drops to
+  /// this many doses or fewer (matches the low-stock card in the island sheet).
+  static const int _lowStockDoseMultiple = 3;
+
+  /// Fires a low-stock notification when a decrement pushes the remaining stock
+  /// across the warning threshold (or empties it). Only notifies on the
+  /// downward crossing, so it triggers once per refill cycle rather than on
+  /// every dose. Fire-and-forget: a notification failure never blocks the write.
+  void _maybeNotifyLowStock({
+    required Medication medication,
+    required double oldRemaining,
+    required double newRemaining,
+    required double dosageAmount,
+  }) {
+    final dose = dosageAmount > 0 ? dosageAmount : 1.0;
+    final threshold = dose * _lowStockDoseMultiple;
+    final ranOut = newRemaining <= 0 && oldRemaining > 0;
+    final crossedLow = newRemaining <= threshold && oldRemaining > threshold;
+    if (!ranOut && !crossedLow) return;
+
+    final count = newRemaining <= 0 ? 0 : newRemaining.ceil();
+    final unit = getMedicationUnit(medication.medType, count);
+    final numStr = newRemaining == newRemaining.roundToDouble()
+        ? newRemaining.toInt().toString()
+        : newRemaining.toString();
+
+    NotificationService().showLowStockNotification(
+      medicationId: medication.id,
+      medName: medication.name,
+      remainingLabel: '$numStr $unit',
+      isOut: newRemaining <= 0,
+    );
+  }
 
   /// Get the next medication that needs to be taken
   /// Returns medication info, time until next dose, and if it's overdue
@@ -77,7 +114,8 @@ class IntakeLogService {
       )..where((t) => t.id.equals(plan!.medicationId))).getSingleOrNull();
     }
 
-    if (medication == null) return null;
+    if (medication == null || medication.status == MedicationStatus.deleted)
+      return null;
 
     final scheduledTime = nextIntake.scheduledTime;
     final timeDiff = now.difference(scheduledTime);
@@ -125,18 +163,96 @@ class IntakeLogService {
 
       if (medication == null) continue;
 
+      // For deleted medications, only show past intakes (already scheduled)
+      // so the user can still see what they took today
+      if (medication.status == MedicationStatus.deleted &&
+          intake.scheduledTime.isAfter(now)) {
+        continue;
+      }
+
       // Check if it's a one-time entry
       final rule = await (db.select(
         db.medicationScheduleRules,
       )..where((t) => t.planId.equals(plan.id))).getSingleOrNull();
 
-      final isOneTime = rule?.ruleType == 'oneTime';
+      final isOneTime =
+          rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
 
       final timeKey =
           '${intake.scheduledTime.hour.toString().padLeft(2, '0')}:${intake.scheduledTime.minute.toString().padLeft(2, '0')}';
 
       grouped.putIfAbsent(timeKey, () => []);
       grouped[timeKey]!.add({
+        'intake': intake,
+        'plan': plan,
+        'medication': medication,
+        'isOneTimeEntry': isOneTime,
+      });
+    }
+
+    return grouped;
+  }
+
+  /// Load all intakes for a date range, grouped by date key (yyyy-MM-dd).
+  /// Excludes future intakes for deleted medications.
+  Future<Map<String, List<Map<String, dynamic>>>> loadIntakesForRange({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final now = DateTime.now();
+    final intakes =
+        await (db.select(db.medicationIntakeLogs)
+              ..where((t) => t.scheduledTime.isBiggerOrEqualValue(start))
+              ..where((t) => t.scheduledTime.isSmallerThanValue(end))
+              ..orderBy([(t) => drift.OrderingTerm.asc(t.scheduledTime)]))
+            .get();
+
+    final planIds = intakes.map((i) => i.planId).toSet().toList();
+    final medIds = intakes.map((i) => i.medicationId).toSet().toList();
+
+    final plans = planIds.isEmpty
+        ? <MedicationPlan>[]
+        : await (db.select(db.medicationPlans)
+              ..where((t) => t.id.isIn(planIds)))
+            .get();
+    final medications = medIds.isEmpty
+        ? <Medication>[]
+        : await (db.select(db.medications)
+              ..where((t) => t.id.isIn(medIds)))
+            .get();
+    final rules = planIds.isEmpty
+        ? <MedicationScheduleRule>[]
+        : await (db.select(db.medicationScheduleRules)
+              ..where((t) => t.planId.isIn(planIds)))
+            .get();
+
+    final planMap = {for (final p in plans) p.id: p};
+    final medMap = {for (final m in medications) m.id: m};
+    final ruleByPlan = {for (final r in rules) r.planId: r};
+
+    final grouped = <String, List<Map<String, dynamic>>>{};
+
+    for (final intake in intakes) {
+      final plan = planMap[intake.planId];
+      if (plan == null) continue;
+      final medication = medMap[plan.medicationId];
+      if (medication == null) continue;
+
+      if (medication.status == MedicationStatus.deleted &&
+          intake.scheduledTime.isAfter(now)) {
+        continue;
+      }
+
+      final rule = ruleByPlan[plan.id];
+      final isOneTime =
+          rule?.ruleType == 'oneTime' || rule?.ruleType == 'asNeeded';
+
+      final d = intake.scheduledTime;
+      final dateKey =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+      grouped.putIfAbsent(dateKey, () => []);
+      grouped[dateKey]!.add({
         'intake': intake,
         'plan': plan,
         'medication': medication,
@@ -179,7 +295,9 @@ class IntakeLogService {
     )..where((t) => t.id.equals(intakeId))).write(
       MedicationIntakeLogsCompanion(
         wasTaken: drift.Value(wasTaken),
-        takenTime: drift.Value(DateTime.now()), // Set for both taken and not taken
+        takenTime: drift.Value(
+          DateTime.now(),
+        ), // Set for both taken and not taken
       ),
     );
 
@@ -189,11 +307,20 @@ class IntakeLogService {
         !intake.wasTaken &&
         medication != null &&
         medication.dosagesRemaining != null) {
-      final newRemaining = medication.dosagesRemaining! - plan.dosageAmount;
+      // Prevent negative values - clamp at 0
+      final oldRemaining = medication.dosagesRemaining!;
+      final newRemaining = (oldRemaining - plan.dosageAmount)
+          .clamp(0.0, double.infinity);
       await (db.update(
         db.medications,
       )..where((t) => t.id.equals(medication.id))).write(
         MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+      );
+      _maybeNotifyLowStock(
+        medication: medication,
+        oldRemaining: oldRemaining,
+        newRemaining: newRemaining,
+        dosageAmount: plan.dosageAmount,
       );
     }
 
@@ -256,5 +383,105 @@ class IntakeLogService {
             takenTime: drift.Value(DateTime.now()),
           ),
         );
+  }
+
+  /// Create a one-time *future* reminder: an inactive plan plus a not-yet-taken
+  /// intake log scheduled at [scheduledTime]. Unlike [createOneTimeEntry] (which
+  /// records an intake already taken now), this leaves the log open so the
+  /// notification/alarm pipeline reminds the user at the chosen time. The caller
+  /// is responsible for (re)scheduling notifications afterwards. Returns the
+  /// intake log id, which is also the alarm id used by the scheduler.
+  Future<int> createOneTimeReminder({
+    required int medicationId,
+    required int userId,
+    required double dosageAmount,
+    required DateTime scheduledTime,
+  }) async {
+    // Inactive plan so it doesn't show in the meds list, mirroring
+    // createOneTimeEntry. startDate is the reminder time itself.
+    final planId = await db
+        .into(db.medicationPlans)
+        .insert(
+          MedicationPlansCompanion.insert(
+            userId: userId,
+            medicationId: medicationId,
+            startDate: scheduledTime,
+            dosageAmount: dosageAmount,
+            isActive: const drift.Value(false),
+          ),
+        );
+
+    // 'oneTime' rule is ignored by the schedule generator, so the single log
+    // below is the only entry this plan ever produces.
+    await db
+        .into(db.medicationScheduleRules)
+        .insert(
+          MedicationScheduleRulesCompanion.insert(
+            planId: planId,
+            ruleType: 'oneTime',
+            isActive: const drift.Value(false),
+          ),
+        );
+
+    return db
+        .into(db.medicationIntakeLogs)
+        .insert(
+          MedicationIntakeLogsCompanion(
+            userId: drift.Value(userId),
+            medicationId: drift.Value(medicationId),
+            planId: drift.Value(planId),
+            scheduledTime: drift.Value(scheduledTime),
+            wasTaken: const drift.Value(false),
+            dosageAmount: drift.Value(dosageAmount),
+          ),
+        );
+  }
+
+  /// Log an as-needed ("po potrebi") intake with custom time and quantity
+  Future<void> logAsNeededIntake({
+    required int planId,
+    required int medicationId,
+    required int userId,
+    required double dosageAmount,
+    required DateTime takenTime,
+  }) async {
+    // Create the intake log entry
+    await db
+        .into(db.medicationIntakeLogs)
+        .insert(
+          MedicationIntakeLogsCompanion(
+            planId: drift.Value(planId),
+            medicationId: drift.Value(medicationId),
+            userId: drift.Value(userId),
+            scheduledTime: drift.Value(takenTime),
+            wasTaken: const drift.Value(true),
+            takenTime: drift.Value(takenTime),
+            dosageAmount: drift.Value(dosageAmount),
+          ),
+        );
+
+    // Update medication remaining count
+    final medication = await (db.select(
+      db.medications,
+    )..where((t) => t.id.equals(medicationId))).getSingleOrNull();
+
+    if (medication != null && medication.dosagesRemaining != null) {
+      final oldRemaining = medication.dosagesRemaining!;
+      final newRemaining = (oldRemaining - dosageAmount).clamp(
+        0.0,
+        double.infinity,
+      );
+      await (db.update(
+        db.medications,
+      )..where((t) => t.id.equals(medicationId))).write(
+        MedicationsCompanion(dosagesRemaining: drift.Value(newRemaining)),
+      );
+      _maybeNotifyLowStock(
+        medication: medication,
+        oldRemaining: oldRemaining,
+        newRemaining: newRemaining,
+        dosageAmount: dosageAmount,
+      );
+    }
   }
 }
