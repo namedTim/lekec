@@ -23,6 +23,12 @@ class ServerMessageService {
   static const minSyncInterval = Duration(minutes: 15);
   static DateTime? _lastSyncAttempt;
 
+  /// Messages stop being shown this long after the device first received
+  /// them, even if the server still serves them. The row is kept (not
+  /// deleted) so sync reconciliation doesn't re-insert a still-served
+  /// message as new and unseen.
+  static const maxMessageAge = Duration(days: 30);
+
   /// Fixed id for the locally generated welcome message. Negative so it can
   /// never collide with a server id and survives sync reconciliation.
   static const welcomeMessageId = -1;
@@ -106,15 +112,24 @@ class ServerMessageService {
         );
   }
 
-  /// All cached messages, newest (highest server id) first.
+  /// All cached messages younger than [maxMessageAge], newest (highest
+  /// server id) first.
+  ///
+  /// The cutoff is fixed when the stream is created; a message crossing the
+  /// 30-day line while the app stays open disappears on the next re-query
+  /// (any table write), which is close enough.
   Stream<List<ServerMessage>> watchAll() {
+    final cutoff = DateTime.now().subtract(maxMessageAge);
     return (_db.select(_db.serverMessages)
+          ..where((t) => t.receivedAt.isBiggerThanValue(cutoff))
           ..orderBy([(t) => OrderingTerm.desc(t.id)]))
         .watch();
   }
 
   Future<List<ServerMessage>> getAll() {
+    final cutoff = DateTime.now().subtract(maxMessageAge);
     return (_db.select(_db.serverMessages)
+          ..where((t) => t.receivedAt.isBiggerThanValue(cutoff))
           ..orderBy([(t) => OrderingTerm.desc(t.id)]))
         .get();
   }
