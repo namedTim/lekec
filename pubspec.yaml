@@ -1,6 +1,6 @@
 name: lekec
 description: pill dispenser
-version: 1.5.5+17
+version: 1.5.6+18
 
 publish_to: "none"
 
@@ -37,8 +37,9 @@ dependencies:
   flutter_native_splash: ^2.4.7
   share_plus: ^10.1.4
   file_picker: ^8.3.7
-  in_app_purchase: ^3.2.0
-  in_app_purchase_android: ^0.4.0
+  in_app_purchase: ^3.3.0
+  # 0.5.x wraps Google Play Billing Library 8 (Play requires >= 8.0.0).
+  in_app_purchase_android: ^0.5.0
   package_info_plus: ^8.0.0
   # Backs the cross-isolate queue for medication notification action taps
   # ("Sem vzel" / "Bom preskočil") on non-critical reminders — see
