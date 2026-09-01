@@ -29,10 +29,19 @@ class AlarmReceiver : BroadcastReceiver() {
         if (action == ACTION_ALARM_STOP) {
             val id = intent.getIntExtra("id", 0)
             Log.d("AlarmReceiver", "Received stop alarm command from notification, id: $id")
-            AlarmService.instance?.let {
-                it.handleStopAlarmCommand(id)
-                return
+            val service = AlarmService.instance
+            if (service != null) {
+                service.handleStopAlarmCommand(id)
+            } else {
+                // Fork: no running service means nothing is ringing — there is
+                // nothing to stop. The old fall-through started the service
+                // via startForegroundService() only for it to return before
+                // startForeground(), which Android punishes by killing the app
+                // (ForegroundServiceDidNotStartInTimeException). Just clear
+                // the stale notification.
+                NotificationManagerCompat.from(context).cancel(id)
             }
+            return
         }
 
         /// Fork: a custom action button was tapped. Record the choice durably

@@ -27,6 +27,10 @@ class AlarmService : Service() {
     companion object {
         private const val TAG = "AlarmService"
 
+        // Fork: id for the placeholder foreground notification (must be != 0
+        // and never collide with an alarm id, which are always positive).
+        private const val PLACEHOLDER_NOTIFICATION_ID = -0x1A2A3A
+
         var instance: AlarmService? = null
 
         @JvmStatic
@@ -59,6 +63,31 @@ class AlarmService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Fork: the service is started with startForegroundService() (O+), so
+        // EVERY start — including sticky restarts with a null intent and
+        // stop/early-return paths below — must call startForeground() promptly
+        // or Android kills the app with
+        // ForegroundServiceDidNotStartInTimeException (seen in Play Console).
+        // Promote immediately: with the ringing alarm's notification when one
+        // exists, otherwise a silent placeholder. A real alarm start replaces
+        // it below; early-return paths end in stopSelf()/stopAlarm(), whose
+        // stopForeground(true) removes it again.
+        try {
+            val active = activeNotification
+            if (active != null) {
+                startAlarmService(activeNotificationId, active)
+            } else {
+                startAlarmService(
+                    PLACEHOLDER_NOTIFICATION_ID,
+                    NotificationHandler(this).buildPlaceholderNotification()
+                )
+            }
+        } catch (e: Exception) {
+            // ForegroundServiceStartNotAllowedException and friends — nothing
+            // more to do; still handle the command below.
+            Log.e(TAG, "Could not promote service to foreground early: ${e.message}", e)
+        }
+
         if (intent == null) {
             Log.w(TAG, "onStartCommand got a null intent — stopping service.")
             stopSelf()

@@ -39,6 +39,23 @@ class NotificationHandler(private val context: Context) {
         }
     }
 
+    /// Fork: minimal silent notification whose only purpose is satisfying the
+    /// startForegroundService() contract on service starts that stop again
+    /// before a real alarm notification exists (stop actions, sticky restarts
+    /// with a null intent, unparseable extras). Without it Android kills the
+    /// app with ForegroundServiceDidNotStartInTimeException.
+    fun buildPlaceholderNotification(): Notification {
+        val appInfo = context.packageManager.getApplicationInfo(context.packageName, 0)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(appInfo.icon)
+            .setContentTitle(context.packageManager.getApplicationLabel(appInfo).toString())
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setSilent(true)
+            .setOngoing(true)
+            .build()
+    }
+
     // We need to use [Resources.getIdentifier] because resources are registered by Flutter.
     @SuppressLint("DiscouragedApi")
     fun buildNotification(
