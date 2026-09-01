@@ -76,3 +76,4 @@ lib/config/api_keys.dart
 **/android/key.properties
 *.jks
 *.keystore
+dist/

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:logging/logging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../database/drift_database.dart';
 import '../../services/server_messages_api.dart';
@@ -33,12 +34,24 @@ class ServerMessageService {
   /// never collide with a server id and survives sync reconciliation.
   static const welcomeMessageId = -1;
 
+  /// One-shot flag: has the very first server sync of this install already
+  /// happened? Stored in `SharedPreferences` (the mechanism the app already
+  /// uses for small cross-launch flags) rather than the database, because it
+  /// is app state, not user data, and so needs no schema migration.
+  static const _initialSyncDoneKey = 'initialMessageSyncDone';
+
   /// Fetch the current list and reconcile the local cache:
   ///   * new ids are inserted (unseen),
   ///   * known ids get their text refreshed but keep `seenAt`,
   ///   * ids the server no longer returns are deleted (retracted remotely).
   /// Rows with negative ids are app-generated (e.g. the welcome message) and
   /// are never touched by reconciliation.
+  ///
+  /// On the very first sync of a fresh install, new rows are inserted already
+  /// seen, so the user's first load after onboarding shows only the welcome
+  /// message as new instead of a backlog of server messages. Every later sync
+  /// inserts new rows unseen, as usual.
+  ///
   /// Returns true if a fetch actually happened and succeeded.
   Future<bool> syncFromServer({bool force = false}) async {
     final now = DateTime.now();
@@ -48,6 +61,8 @@ class ServerMessageService {
       return false;
     }
     _lastSyncAttempt = now;
+
+    final preSeenNewRows = !await _isInitialSyncDone();
 
     try {
       final remote = await _api.fetchMessages();
@@ -74,6 +89,7 @@ class ServerMessageService {
                   kind: Value(m.kind),
                   url: Value(m.url),
                   urlLabel: Value(m.urlLabel),
+                  seenAt: preSeenNewRows ? Value(now) : const Value.absent(),
                 ),
                 // Refresh the content of a message we already have, but never
                 // touch receivedAt/seenAt — that is what makes "show once" stick.
@@ -89,10 +105,46 @@ class ServerMessageService {
               );
         }
       });
+      if (preSeenNewRows) await _markInitialSyncDone();
       return true;
     } catch (e, st) {
       _log.warning('syncFromServer failed', e, st);
       return false;
+    }
+  }
+
+  /// True once the first successful server sync of this install has happened.
+  ///
+  /// Installs that predate the flag already hold server rows, and their user
+  /// has seen (or dismissed) them — pre-seeing anything there would be wrong,
+  /// so the flag is simply recorded as done on first check.
+  Future<bool> _isInitialSyncDone() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_initialSyncDoneKey) ?? false) return true;
+
+      final existing = await (_db.select(_db.serverMessages)
+            ..where((t) => t.id.isBiggerThanValue(0))
+            ..limit(1))
+          .getSingleOrNull();
+      if (existing != null) {
+        await prefs.setBool(_initialSyncDoneKey, true);
+        return true;
+      }
+      return false;
+    } catch (e, st) {
+      // Never let a prefs failure block a sync; fall back to today's behaviour.
+      _log.warning('initial sync flag check failed', e, st);
+      return true;
+    }
+  }
+
+  Future<void> _markInitialSyncDone() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_initialSyncDoneKey, true);
+    } catch (e, st) {
+      _log.warning('could not persist initial sync flag', e, st);
     }
   }
 
